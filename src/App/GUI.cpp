@@ -2,166 +2,211 @@
 #pragma once
 
 
-static inline void GUI_Set_Default_Menu_Actions(GUI_Handler* handler)
+static inline v2f GUI_Get_Point_In_Placement_Space(
+	GUI_Placement p, 
+	v2f point, 
+	GUI_Theme* theme)
 {
-	Assert(handler);
+	v2f internal_dim = p.dim - (v2f{} + f32(theme->outline_thickness)) * 2;
 	
-	Action* actions = &handler->actions[0];
+	f32 rel_cursor_x = Min(internal_dim.x, Max(0.f, point.x - p.rect.min.x));
+	f32 rel_cursor_y = Min(internal_dim.y, Max(0.f, point.y - p.rect.min.y));
 	
-	*(actions + (u32)GUI_Menu_Actions::mouse) 	= Make_Action(Key_Code::MOUSE_LEFT, Button::NONE);
-	*(actions + (u32)GUI_Menu_Actions::up) 		= Make_Action(Key_Code::UP, Button::NONE);
-	*(actions + (u32)GUI_Menu_Actions::down) 	= Make_Action(Key_Code::DOWN, Button::NONE);
-	*(actions + (u32)GUI_Menu_Actions::left) 	= Make_Action(Key_Code::LEFT, Button::NONE);
-	*(actions + (u32)GUI_Menu_Actions::right) 	= Make_Action(Key_Code::RIGHT, Button::NONE);
-	*(actions + (u32)GUI_Menu_Actions::enter) 	= Make_Action(Key_Code::ENTER, Button::NONE);
-	*(actions + (u32)GUI_Menu_Actions::back) 	= Make_Action(Key_Code::ESC, Button::NONE);
+	v2f result = Hadamar_Division(v2f{rel_cursor_x, rel_cursor_y}, internal_dim); 
+	
+	return result;
 }
 
 
-static inline u32 GUI_Get_Widget_Size(void* header)
+static inline void GUI_Push_Layout(GUI_Context* context)
 {
-	Assert(header);
+	bool can_push = context->layout_stack_count < Array_Lenght(context->layout_stack);
+	Assert(can_push);
 	
-	u32 result;
-	
-	u16 type_number = *((u16*)(header));
-	
-	if(type_number < (u16)GUI_Widget_Type::COUNT)
+	if(can_push)
 	{
-		result = sizeof(GUI_Widget_Header);
-		switch(*((GUI_Widget_Type*)header))
-		{
-			case GUI_Widget_Type::button:
-			{
-				result += sizeof(GUI_Button);
-			}break;
-			
-			case GUI_Widget_Type::slider:
-			{
-				result += sizeof(GUI_Slider);
-			}break;
-			
-			case GUI_Widget_Type::checkbox:
-			{
-				result += sizeof(GUI_Checkbox);
-			}break;
-			
-			case GUI_Widget_Type::key_listener:
-			{
-				result += sizeof(GUI_Key_Listener);
-			}break;
-			
-			case GUI_Widget_Type::list_button:
-			{
-				result += sizeof(GUI_List_Button);
-				GUI_List_Button* lb = (GUI_List_Button*)(((GUI_Widget_Header*)header) + 1);
-				Assert(lb->list_element_count > 1);
-				
-				result += sizeof(GUI_List_Button_Element) * lb->list_element_count;
-			}break;
-			
-			case GUI_Widget_Type::input_field:
-			{
-				result += sizeof(GUI_Input_Field);
-			}break;
-			
-			default:
-			{
-				Terminate;
-			}
-		}
-		
-		return result;
-	}
-	else
-	{
-		result = sizeof(GUI_Static_Widget_Header);
-		switch(*((GUI_Static_Widget_Type*)header))
-		{
-			case GUI_Static_Widget_Type::text:
-			{
-				result += sizeof(GUI_Text);
-			}break;
-			
-			default:
-			{
-				Terminate;
-			}
-		}
-		
-		return result;
+		context->layout_stack[context->layout_stack_count] = context->layout;
+		context->layout_stack_count += 1;
 	}
 }
 
 
-static GUI_Builder GUI_Builder_Create(
-	Linear_Allocator* allocator, 
-	GUI_Handler* handler, 
-	GUI_Link_Direction ld, 
-	GUI_Build_Direction bd)
+static inline void GUI_Pop_Layout(GUI_Context* context)
 {
-	GUI_Builder builder = {};
-	builder.allocator = allocator;
-	builder.allocator_state_copy = *allocator;
-
-	builder.theme = &handler->default_theme;
+	bool can_pop = context->layout_stack_count > 0;
+	Assert(can_pop);
 	
-	builder.link_direction = ld;
-	builder.build_direction = bd;
-	
-	return builder;
+	if(can_pop)
+	{
+		context->layout_stack_count -= 1;
+		context->layout = context->layout_stack[context->layout_stack_count];
+	}
 }
 
 
-static void GUI_Builder_Calc_Dim_And_Pos(
-	GUI_Builder* builder,
-	v2f* out_position,
-	v2f* out_dimensions,
-	v2f* in_position, 
-	v2f* in_dimensions)
+static inline void GUI_Set_Default_Menu_Actions(GUI_Context* context)
 {
-	Assert(builder);
-	Assert(out_position);
-	Assert(out_dimensions);
+	Assert(context);
+	
+	Action* actions = &context->actions[0];
+	
+	*(actions + GUI_Menu_Actions::mouse) 	= Make_Action(Key_Code::MOUSE_LEFT, Button::NONE);
+	*(actions + GUI_Menu_Actions::up) 		= Make_Action(Key_Code::UP, Button::DPAD_UP);
+	*(actions + GUI_Menu_Actions::down) 	= Make_Action(Key_Code::DOWN, Button::DPAD_DOWN);
+	*(actions + GUI_Menu_Actions::left) 	= Make_Action(Key_Code::LEFT, Button::DPAD_LEFT);
+	*(actions + GUI_Menu_Actions::right) 	= Make_Action(Key_Code::RIGHT, Button::DPAD_RIGHT);
+	*(actions + GUI_Menu_Actions::enter) 	= Make_Action(Key_Code::ENTER, Button::BUT_A);
+	*(actions + GUI_Menu_Actions::back) 	= Make_Action(Key_Code::ESC, Button::BUT_X);
+}
+
+
+static inline Rect GUI_Get_Dropdown_Button_Open_Rect(v2f pos, v2f dim, u32 element_count)
+{
+	f32 half_dim_y = dim.y / 2;
+	
+	v2f center = v2f{pos.x, pos.y - (half_dim_y * f32(element_count) - half_dim_y)};
+	
+	v2f new_dim = v2f{dim.x, dim.y * f32(element_count)};
+	
+	Rect result = Create_Rect_Center(center, new_dim);
+	return result;
+}
+
+
+static inline void GUI_One_Time_Skip_Padding(GUI_Context* context)
+{
+	context->layout.one_time_skip_padding = true;
+}
+
+
+static inline  bool GUI_Accelerated_Tick(
+	GUI_Input_Acceleration_Behavior* p,
+	f64 time,
+	f64* input_start_time,
+	f64* next_input_time)
+{
+	Assert(p->input_delay_time > 0);
+	Assert(p->input_speed_up_time >= 0);
+	
+	if(time < *next_input_time)
+		return false;
+	
+	if(*input_start_time == 0)
+	{
+		*input_start_time = time;
+		*next_input_time = time + p->input_delay_time;
+		
+		return true;
+	}
+	else 
+	{
+		f64 s = p->input_speed_up_time > 0? p->input_speed_up_time : 1.0;
+		
+		f64 hold_duration = *next_input_time - *input_start_time;
+		f64 t = Min(1.0 + (hold_duration / s), Max(1.0, p->max_speed_up_factor));
+		f64 t2 = *next_input_time + (p->input_delay_time / t);
+		
+		*next_input_time = t2;
+	
+		return true;
+	}
+}
+
+
+static inline GUI_Highlight GUI_Highlight_Nothing()
+{
+	return {};
+}
+
+
+static inline GUI_Highlight GUI_Highlight_Next(GUI_Context* context, i32 num_elements)
+{
+	return { context->widget_count, num_elements };
+}
+
+
+static inline GUI_Highlight GUI_Highlight_Next(GUI_Context* context)
+{
+	return { context->widget_count, 1 };
+}
+
+
+static inline GUI_Highlight GUI_Highlight_Prev(GUI_Context* context)
+{
+	return { context->widget_count - 1, 1 };
+}
+
+
+static inline v2f GUI_Tight_Fit_Text(char* text, v2f text_scale, Font* font)
+{
+	v2f result = v2f
+	{
+		text_scale.x * f32(font->char_width) * f32(Null_Terminated_Buffer_Lenght(text)), 
+		text_scale.y * f32(font->char_height)
+	};
+	
+	return result;
+}
+
+
+static inline GUI_Placement GUI_Get_Placement(GUI_Context* context, v2f* dim, v2f* pos)
+{
+	GUI_Layout* layout = &context->layout;
+	
+	GUI_Placement result;
+	
+	v2f last_element_dim = layout->last_element_dim;
 	
 	// Auto positioning.
 	// NOTE: Dimension effects positioning, so it's handeled first.
-	*out_dimensions = (in_dimensions)? *in_dimensions : builder->last_element_dim;
+	result.dim = (dim)? *dim : last_element_dim;
 	
-	if(!in_position)
+	f32 padding;
+	if(layout->one_time_skip_padding)
 	{
-		f32 padding = builder->theme->padding;
+		padding = 0;
+		layout->one_time_skip_padding = false;
+	}
+	else
+	{
+		padding = layout->theme->padding;
+	}
+	
+	
+	if(!pos)
+	{
+		
 		v2f offset; 
-		switch(builder->build_direction)
+		switch(layout->build_direction)
 		{
 			case GUI_Build_Direction::up_center:
 			{
-				offset = v2f{0, builder->last_element_dim.y / 2 + out_dimensions->y / 2 + padding};
+				offset = v2f{0, last_element_dim.y / 2 + result.dim.y / 2 + padding};
 			}break;
 			
 			
 			case GUI_Build_Direction::down_center:
 			{
-				offset = v2f{0, -builder->last_element_dim.y / 2 - out_dimensions->y / 2 - padding};
+				offset = v2f{0, -last_element_dim.y / 2 - result.dim.y / 2 - padding};
 			}break;
 			
 			
 			case GUI_Build_Direction::left_center:
 			{
-				offset = v2f{-builder->last_element_dim.x / 2 - out_dimensions->x / 2 - padding, 0};
+				offset = v2f{-last_element_dim.x / 2 - result.dim.x / 2 - padding, 0};
 			}break;
 			
 			
 			case GUI_Build_Direction::right_center:
 			{
-				offset = v2f{builder->last_element_dim.x / 2 + out_dimensions->x / 2 + padding, 0};
+				offset = v2f{last_element_dim.x / 2 + result.dim.x / 2 + padding, 0};
 			}break;
 			
 			
 			case GUI_Build_Direction::down_left:
 			{
-				v2f half_last_dim = builder->last_element_dim / 2;
-				v2f half_out_dim = *out_dimensions / 2;
+				v2f half_last_dim = last_element_dim / 2;
+				v2f half_out_dim = result.dim / 2;
 				offset = v2f{0, -half_last_dim.y - half_out_dim.y - padding};
 			
 				f32 left_shift = half_out_dim.x - half_last_dim.x;
@@ -171,8 +216,8 @@ static void GUI_Builder_Calc_Dim_And_Pos(
 			
 			case GUI_Build_Direction::down_right:
 			{
-				v2f half_last_dim = builder->last_element_dim / 2;
-				v2f half_out_dim = *out_dimensions / 2;
+				v2f half_last_dim = last_element_dim / 2;
+				v2f half_out_dim = result.dim / 2;
 				offset = v2f{0, -half_last_dim.y - half_out_dim.y - padding};
 			
 				f32 right_shift = half_last_dim.x - half_out_dim.x;
@@ -182,8 +227,8 @@ static void GUI_Builder_Calc_Dim_And_Pos(
 			
 			case GUI_Build_Direction::up_left:
 			{
-				v2f half_last_dim = builder->last_element_dim / 2;
-				v2f half_out_dim = *out_dimensions / 2;
+				v2f half_last_dim = last_element_dim / 2;
+				v2f half_out_dim = result.dim / 2;
 				offset = v2f{0, half_last_dim.y + half_out_dim.y + padding};
 			
 				f32 left_shift = half_out_dim.x - half_last_dim.x;
@@ -193,8 +238,8 @@ static void GUI_Builder_Calc_Dim_And_Pos(
 			
 			case GUI_Build_Direction::up_right:
 			{
-				v2f half_last_dim = builder->last_element_dim / 2;
-				v2f half_out_dim = *out_dimensions / 2;
+				v2f half_last_dim = last_element_dim / 2;
+				v2f half_out_dim = result.dim / 2;
 				offset = v2f{0, half_last_dim.y + half_out_dim.y + padding};
 			
 				f32 right_shift = half_last_dim.x - half_out_dim.x;
@@ -204,8 +249,8 @@ static void GUI_Builder_Calc_Dim_And_Pos(
 			
 			case GUI_Build_Direction::left_top:
 			{
-				v2f half_last_dim = builder->last_element_dim / 2;
-				v2f half_out_dim = *out_dimensions / 2;
+				v2f half_last_dim = last_element_dim / 2;
+				v2f half_out_dim = result.dim / 2;
 				offset = v2f{-half_last_dim.x - half_out_dim.x - padding, 0};
 			
 				f32 up_shift = half_last_dim.y - half_out_dim.y;
@@ -215,8 +260,8 @@ static void GUI_Builder_Calc_Dim_And_Pos(
 			
 			case GUI_Build_Direction::left_bottom:
 			{
-				v2f half_last_dim = builder->last_element_dim / 2;
-				v2f half_out_dim = *out_dimensions / 2;
+				v2f half_last_dim = last_element_dim / 2;
+				v2f half_out_dim = result.dim / 2;
 				offset = v2f{-half_last_dim.x - half_out_dim.x - padding, 0};
 			
 				f32 up_shift = half_out_dim.y - half_last_dim.y;
@@ -226,8 +271,8 @@ static void GUI_Builder_Calc_Dim_And_Pos(
 			
 			case GUI_Build_Direction::right_top:
 			{
-				v2f half_last_dim = builder->last_element_dim / 2;
-				v2f half_out_dim = *out_dimensions / 2;
+				v2f half_last_dim = last_element_dim / 2;
+				v2f half_out_dim = result.dim / 2;
 				offset = v2f{half_last_dim.x + half_out_dim.x + padding, 0};
 			
 				f32 up_shift = half_last_dim.y - half_out_dim.y;
@@ -237,8 +282,8 @@ static void GUI_Builder_Calc_Dim_And_Pos(
 			
 			case GUI_Build_Direction::right_bottom:
 			{
-				v2f half_last_dim = builder->last_element_dim / 2;
-				v2f half_out_dim = *out_dimensions / 2;
+				v2f half_last_dim = last_element_dim / 2;
+				v2f half_out_dim = result.dim / 2;
 				offset = v2f{half_last_dim.x + half_out_dim.x + padding, 0};
 			
 				f32 up_shift = half_out_dim.y - half_last_dim.y;
@@ -246,334 +291,133 @@ static void GUI_Builder_Calc_Dim_And_Pos(
 			}break;
 		}
 		
-		*out_position = builder->last_element_pos + offset;
+		result.pos = layout->last_element_pos + offset;
 	}
 	else
 	{
-		v2f half_dim = *out_dimensions / 2;
-		*out_position = *in_position;
+		GUI_Anchor anchor = layout->anchor;
 		
-		switch(builder->anchor)
+		v2f p;
+		if(pos == &GUI_AUTO_TOP_CENTER)
+		{
+			pos = &p;
+			
+			anchor = GUI_Anchor::top;
+			p = {f32(context->canvas->dim.x / 2), f32(context->canvas->dim.y - padding)};
+		}
+		else if(pos == &GUI_AUTO_TOP_RIGHT)
+		{
+			pos = &p;
+			
+			anchor = GUI_Anchor::top_right;
+			p = {f32(context->canvas->dim.x - padding), f32(context->canvas->dim.y - padding)};
+		}
+		else if(pos == &GUI_AUTO_TOP_LEFT)
+		{
+			pos = &p;
+			
+			anchor = GUI_Anchor::top_left;
+			p = {f32(padding), f32(context->canvas->dim.y - padding)};
+		}
+		else if(pos == &GUI_AUTO_MIDDLE_RIGHT)
+		{
+			pos = &p;
+			
+			anchor = GUI_Anchor::right;
+			p = {f32(context->canvas->dim.x - padding), f32(context->canvas->dim.y / 2)};
+		}
+		else if(pos == &GUI_AUTO_MIDDLE_LEFT)
+		{
+			pos = &p;
+			
+			anchor = GUI_Anchor::left;
+			p = {f32(padding), f32(context->canvas->dim.y / 2)};
+		}
+		else if(pos == &GUI_AUTO_BOTTOM_CENTER)
+		{
+			pos = &p;
+			
+			anchor = GUI_Anchor::bottom;
+			p = {f32(context->canvas->dim.x / 2), padding};
+		}
+		else if(pos == &GUI_AUTO_BOTTOM_RIGHT)
+		{
+			pos = &p;
+			
+			anchor = GUI_Anchor::bottom_right;
+			p = {f32(context->canvas->dim.x - padding), padding};
+		}
+		else if(pos == &GUI_AUTO_BOTTOM_LEFT)
+		{
+			pos = &p;
+			
+			anchor = GUI_Anchor::bottom_left;
+			p = {padding, padding};
+		}
+		else if(pos == &GUI_AUTO_MIDDLE)
+		{
+			pos = &p;
+			
+			anchor = GUI_Anchor::center;
+			p = {f32(context->canvas->dim.x / 2), f32(context->canvas->dim.y / 2)};
+		}
+		
+		v2f half_dim = result.dim / 2;
+		result.pos = *pos;
+		
+		switch(anchor)
 		{
 			case GUI_Anchor::top:
 			{
-				out_position->y -= half_dim.y;
+				result.pos.y -= half_dim.y;
 			}break;
 			
 			case GUI_Anchor::bottom:
 			{
-				out_position->y += half_dim.y;
+				result.pos.y += half_dim.y;
 			}break;
 			
 			case GUI_Anchor::left:
 			{
-				out_position->x += half_dim.x;
+				result.pos.x += half_dim.x;
 			}break;
 			
 			case GUI_Anchor::right:
 			{
-				out_position->x -= half_dim.x;
+				result.pos.x -= half_dim.x;
 			}break;
 			
 			case GUI_Anchor::top_left:
 			{
-				out_position->y -= half_dim.y;
-				out_position->x += half_dim.x;
+				result.pos.y -= half_dim.y;
+				result.pos.x += half_dim.x;
 			}break;
 			
 			case GUI_Anchor::top_right:
 			{
-				out_position->y -= half_dim.y;
-				out_position->x -= half_dim.x;
+				result.pos.y -= half_dim.y;
+				result.pos.x -= half_dim.x;
 			}break;
 			
 			case GUI_Anchor::bottom_left:
 			{
-				out_position->y += half_dim.y;
-				out_position->x += half_dim.x;
+				result.pos.y += half_dim.y;
+				result.pos.x += half_dim.x;
 			}break;
 			
 			case GUI_Anchor::bottom_right:
 			{
-				out_position->y += half_dim.y;
-				out_position->x -= half_dim.x;
+				result.pos.y += half_dim.y;
+				result.pos.x -= half_dim.x;
 			}break;
 		}
 	}
 	
-	builder->last_element_pos = *out_position;
-	builder->last_element_dim = *out_dimensions;
-}
-
-
-static inline GUI_Static_Widget_Header* GUI_Builder_Create_Static_Header(
-	GUI_Builder* builder,
-	GUI_Static_Widget_Header* header, 
-	GUI_Static_Widget_Type type,
-	u32 widget_size,
-	v2f* position,
-	v2f* dimensions)
-{
-	*header = GUI_Static_Widget_Header();
-	header->type = type;
-	header->theme = builder->theme;
+	layout->last_element_pos = result.pos;
+	layout->last_element_dim = result.dim;
 	
-	v2f dummy = {};
+	result.rect = Create_Rect_Center(result.pos, result.dim);
 	
-	GUI_Builder_Calc_Dim_And_Pos(
-		builder, 
-		&header->position, 
-		&dummy, 
-		position, 
-		dimensions);
-	
-	
-	builder->static_widget_memory_count += widget_size;
-	builder->static_widget_count += 1;
-	
-	return header;
-}
-
-
-static inline GUI_Add_Result GUI_Builder_Create_Header(
-	GUI_Builder* builder,
-	void* widget,
-	u32 widget_size,
-	GUI_Widget_Type type,
-	v2f* position,
-	v2f* dimensions,
-	u32 extra_memory = 0)
-{
-	u32 total_size = widget_size + sizeof(GUI_Widget_Header) + extra_memory;
-	GUI_Widget_Header* header = (GUI_Widget_Header*)(builder->allocator->push(total_size));
-	Mem_Copy(header + 1, widget, widget_size);
-	
-	header->type = type;
-	header->theme = builder->theme;
-	
-	GUI_Builder_Calc_Dim_And_Pos(
-		builder, 
-		&header->position, 
-		&header->dimensions, 
-		position, 
-		dimensions);
-	
-	
-	// Builder tracking thigs:
-	GUI_Add_Result result = {header, builder->widget_count};
-	if(builder->widget_count == 0)
-		builder->first_element = result;
-	
-	builder->widget_memory_count += GUI_Get_Widget_Size(header);
-	builder->last_element = result;
-	builder->widget_count += 1;
-	
-	return result;
-}
-
-
-static GUI_Add_Result GUI_Builder_Create_Button(
-	GUI_Builder* builder, 
-	GUI_Button* widget, 
-	v2f* position,
-	v2f* dimensions)
-{
-	Assert(builder);
-	Assert(widget);
-	
-	GUI_Widget_Type t = GUI_Widget_Type::button;
-	return GUI_Builder_Create_Header(builder, widget, sizeof(*widget), t, position, dimensions);
-}
-
-
-static GUI_Add_Result GUI_Builder_Create_List_Button(
-	GUI_Builder* builder, 
-	GUI_List_Button* widget, 
-	v2f* position,
-	v2f* dimensions,
-	GUI_List_Button_Element** out_element_array)
-{
-	Assert(builder);
-	Assert(widget);
-	Assert(widget->list_element_count > 1);
-	
-	u32 extra_memory = sizeof(GUI_List_Button_Element) * widget->list_element_count;
-	u32 widget_size = sizeof(*widget);
-	
-	GUI_Widget_Type t = GUI_Widget_Type::list_button;
-	GUI_Add_Result result = GUI_Builder_Create_Header(
-		builder, 
-		widget, 
-		widget_size, 
-		t, 
-		position, 
-		dimensions, 
-		extra_memory);
-	
-	*out_element_array = (GUI_List_Button_Element*)((u8*)result.widget + widget_size + sizeof(GUI_Widget_Header));
-	
-	return result;
-}
-
-
-static GUI_Add_Result GUI_Builder_Create_Slider(
-	GUI_Builder* builder, 
-	GUI_Slider* widget,
-	v2f* position, 
-	v2f* dimensions)
-{
-	Assert(builder);
-	Assert(widget);
-	
-	GUI_Widget_Type t = GUI_Widget_Type::slider;
-	return GUI_Builder_Create_Header(builder, widget, sizeof(*widget), t, position, dimensions);
-}
-
-
-static GUI_Add_Result GUI_Builder_Create_Checkbox(
-	GUI_Builder* builder, 
-	GUI_Checkbox* widget,
-	v2f* position, 
-	v2f* dimensions)
-{
-	Assert(builder);
-	Assert(widget);
-	
-	GUI_Widget_Type t = GUI_Widget_Type::checkbox;
-	return GUI_Builder_Create_Header(builder, widget, sizeof(*widget), t, position, dimensions);
-}
-
-
-static GUI_Add_Result GUI_Builder_Create_Key_Listener(GUI_Builder* builder, GUI_Key_Listener* widget)
-{
-	Assert(builder);
-	Assert(widget);
-	
-	GUI_Widget_Type t = GUI_Widget_Type::key_listener;
-	return GUI_Builder_Create_Header(builder, widget, sizeof(*widget), t, 0, 0);
-}
-
-
-static GUI_Add_Result GUI_Builder_Create_Input_Field(
-	GUI_Builder* builder, 
-	GUI_Input_Field* widget,
-	v2f* position,
-	v2f* dimensions)
-{
-	Assert(builder);
-	Assert(widget);
-	
-	GUI_Widget_Type t = GUI_Widget_Type::input_field;
-	
-	return GUI_Builder_Create_Header(builder, widget, sizeof(*widget), t, position, dimensions);
-}
-
-
-static GUI_Static_Widget_Header* GUI_Builder_Create_Text(
-	GUI_Builder* builder, 
-	GUI_Text* static_widget, 
-	v2f* position)
-{
-	Assert(builder);
-	Assert(static_widget);
-	Assert(static_widget->text);
-
-	// Text doens't have dimensions in the regular sense, but it's bounding box is calculated here.
-	// It's used for auto position of elements and mouse selection of text elements.
-	
-	Font* font = &builder->theme->font;
-	
-	u32 text_lenght = Null_Terminated_Buffer_Lenght(static_widget->text);
-	v2f dim = 
-		{
-			(f32)(text_lenght * static_widget->text_scale.x * font->char_width), 
-			(f32)(static_widget->text_scale.y * font->char_height)
-		};
-	
-	u32 static_widget_size = sizeof(*static_widget) + sizeof(GUI_Static_Widget_Header);
-	GUI_Static_Widget_Header* header = (GUI_Static_Widget_Header*)(builder->allocator->push(static_widget_size));
-	*((GUI_Text*)(header + 1)) = *static_widget;
-	
-	GUI_Static_Widget_Type t = GUI_Static_Widget_Type::text;
-	return GUI_Builder_Create_Static_Header(builder, header, t, static_widget_size, position, &dim);
-}
-
-
-static inline void GUI_Builder_Push_Placement(GUI_Builder* builder)
-{
-	Assert(builder);
-	Assert(builder->placement_stack_count < Array_Lenght(builder->placement_stack));
-	
-	builder->placement_stack[builder->placement_stack_count].pos = builder->last_element_pos;
-	builder->placement_stack[builder->placement_stack_count].dim = builder->last_element_dim;
-	builder->placement_stack[builder->placement_stack_count].bl = builder->build_direction;
-	
-	builder->placement_stack_count += 1;
-}
-
-
-static inline void GUI_Builder_Pop_Placement(GUI_Builder* builder)
-{
-	Assert(builder);
-	Assert(builder->placement_stack_count > 0);
-	
-	builder->placement_stack_count -= 1;
-	
-	builder->last_element_pos = builder->placement_stack[builder->placement_stack_count].pos;
-	builder->last_element_dim = builder->placement_stack[builder->placement_stack_count].dim;
-	builder->build_direction = builder->placement_stack[builder->placement_stack_count].bl;
-}
-
-
-static inline v2f GUI_Builder_Fit_Button_Dimensions_To_Text(GUI_Builder* builder, GUI_Button* button)
-{
-	GUI_Theme* theme = builder->theme;
-	
-	u32 text_width = Null_Terminated_Buffer_Lenght(button->text);
-	
-	u32 w = theme->font.char_width;
-	u32 h = theme->font.char_height;
-	
-	v2f result = v2f{
-			button->text_scale.x * w * (f32)text_width + theme->outline_thickness * 3,
-			button->text_scale.y * h + theme->outline_thickness * 3};
-			
-	return result;
-}
-
-
-static inline v2f GUI_Builder_Fit_List_Button_Dimensions_To_Text(GUI_Builder* builder, GUI_List_Button* button)
-{
-	GUI_Theme* theme = builder->theme;
-	
-	u32 text_width = Null_Terminated_Buffer_Lenght(button->text);
-	
-	u32 w = theme->font.char_width;
-	u32 h = theme->font.char_height;
-	
-	v2f result = v2f{
-			button->text_scale.x * w * (f32)text_width + theme->outline_thickness * 3,
-			button->text_scale.y * h + theme->outline_thickness * 3};
-			
-	return result;
-}
-
-
-static inline Rect GUI_Get_List_Button_Open_Rect(GUI_Widget_Header* header)
-{
-	f32 half_dim_y = header->dimensions.y / 2;
-	
-	f32 l0 = header->position.y + half_dim_y;
-	
-	GUI_List_Button* lb = (GUI_List_Button*)(header + 1);
-	
-	f32 l1 = header->position.y + (half_dim_y * lb->list_element_count);
-	
-	v2f center = v2f{header->position.x, header->position.y - (l1 - l0)};
-	
-	v2f new_dim = v2f{header->dimensions.x, header->dimensions.y * lb->list_element_count};
-	
-	Rect result = Create_Rect_Center(center, new_dim);
 	return result;
 }
 
@@ -591,958 +435,1203 @@ static inline v2f GUI_Calc_Centered_Text_Position(char* text, v2f scale, v2f pos
 }
 
 
-static inline Action* GUI_Get_Action(Action* actions, GUI_Menu_Actions action)
+static inline void GUI_Reset_Selection_State(GUI_Context* context)
 {
-	return (actions + (u32)action);
+	context->cursor_mask_enabled = false;
+	context->cursor_mask_validation = false;
+	context->defered_render = GUI_Defered_Render_Type::none;
+	context->selection_state = {};
+	context->selected_id = 0;
 }
 
 
-static inline GUI_Widget_Header* GUI_Get_Selected_Header(GUI_Frame* frame)
+static inline void GUI_Begin_Context(
+	GUI_Context* context,  
+	GUI_Anchor anchor,
+	GUI_Build_Direction build_direction,
+	GUI_Theme* theme,
+	GUI_Link_Direction::Type ld = GUI_Link_Direction::up)
 {
-	if(frame->selected_idx < frame->widget_count)
+	Assert(context->widget_count == 0);
+	
+	context->layout = GUI_Layout();
+	context->layout_stack_count = 0;
+	context->layout.anchor = anchor;
+	context->layout.build_direction = build_direction;
+	context->layout.theme = theme;
+	
+	context->cursor_mask_validation = false;
+	
+	// Handle input.
+	Action* actions = context->actions;
+	Update_Actions(context->platform, actions, GUI_Menu_Actions::COUNT);
+	
+	if(Is_Flag_Set(context->platform->Get_Flags(), (u32)App_Flags::is_focused))
 	{
-		return frame->random_access_table[frame->selected_idx];
-	}
-	
-	return 0;
-}
-
-
-static inline bool GUI_Is_Menu_Up(GUI_Handler* handler)
-{
-	return handler->active_frame.memory;
-}
-
-
-static void GUI_Push_Frame(
-	GUI_Handler* handler,
-	GUI_Builder* builder,
-	Platform_Calltable* platform, 
-	General_Allocator* mem_arena,
-	void(*on_back_action)(),
-	void(*on_frame_close)())
-{
-	Assert(handler);
-	Assert(builder);
-	Assert(platform);
-	Assert(mem_arena);
-	
-	GUI_Frame* frame = &handler->active_frame;
-	
-	GUI_Frame* prev_frame = 0;
-	
-	// There is a menu, it needs to be pushed forwards in the chain.
-	if(frame->widget_count + frame->static_widget_count > 0)
-	{
-		prev_frame = mem_arena->push<GUI_Frame>();
-		*prev_frame = *frame;
-	}
-	
-	// there is no previous menu, show cursor.
-	else
-	{
-		platform->Set_Flag(App_Flags::cursor_is_visible, true);
-	}
-	
-	*frame = GUI_Frame();
-	frame->prev_frame = prev_frame;
-
-
-	u32 frame_size = sizeof(*frame->random_access_table) * builder->widget_count;
-	frame_size += builder->widget_memory_count + builder->static_widget_memory_count;
-	
-	// Setup the memory section pointers	
-	frame->memory = mem_arena->push(frame_size);
-	
-	frame->random_access_table = (GUI_Widget_Header**)frame->memory;
-	frame->widgets = (GUI_Widget_Header*)(frame->random_access_table + builder->widget_count);
-	frame->static_widgets = 
-		(GUI_Static_Widget_Header*)((u8*)frame->widgets) + builder->widget_memory_count;
-	
-	
-	frame->ld = builder->link_direction;
-	
-	// Copy over the data.
-	u8* read_cursor = (u8*)builder->allocator_state_copy.next_free;
-	u8* widget_write_cursor = (u8*)frame->widgets;
-	u8* static_widget_write_cursor = (u8*)frame->static_widgets;
-	u32 widget_size;
-	for(u16 i = 0; i < builder->widget_count + builder->static_widget_count; ++i, read_cursor += widget_size)
-	{
-		widget_size	= GUI_Get_Widget_Size(read_cursor);
-		void* source = read_cursor;
-		void* dest = 0; 
-		
-		// Widget
-		if(*((u16*)read_cursor) < (u16)GUI_Widget_Type::COUNT)
+		if(context->disable_kc_navigation)
 		{
-			dest = widget_write_cursor;
-			widget_write_cursor += widget_size;
-			
-			GUI_Widget_Header* target = (GUI_Widget_Header*)dest;
-			*(frame->random_access_table + frame->widget_count) = target;
-			frame->widget_count += 1;
+			context->disable_kc_navigation = false;
 		}
-		
-		// Static Widget
 		else
 		{
-			dest = static_widget_write_cursor;
-			static_widget_write_cursor += widget_size;
-			frame->static_widget_count += 1;
+			if(actions[GUI_Menu_Actions::up].Is_Pressed())
+			{
+				context->selected_index += -1 * ld;
+				GUI_Reset_Selection_State(context);
+			}
+			
+			if(actions[GUI_Menu_Actions::down].Is_Pressed())
+			{
+				context->selected_index += 1 * ld;
+				GUI_Reset_Selection_State(context);
+			}			
 		}
 		
-		Mem_Copy(dest, source, widget_size);
-	}
-	
-	Assert(frame->widget_count == builder->widget_count);
-	Assert(frame->static_widget_count == builder->static_widget_count);
-	
-	*builder->allocator = builder->allocator_state_copy;
-	*builder = {};
-	
-	frame->selected_idx = builder->selected_idx;
-}
-
-   
-static void GUI_Pop_Frame(GUI_Handler* handler, Platform_Calltable* platform, General_Allocator* mem_arena)
-{
-	Assert(handler);
-	GUI_Frame* active_frame = &handler->active_frame;
-	
-	Assert(active_frame->memory);
-	
-	if(active_frame->on_frame_close)
-		active_frame->on_frame_close();
-	
-	mem_arena->free(active_frame->memory);
-	
-	GUI_Frame* prev_frame = active_frame->prev_frame;
-	if(prev_frame)
-	{    
-		*active_frame = *prev_frame;
-		mem_arena->free(prev_frame);
-	}
-	
-	// This is the only frame.
-	else
-	{
-		*active_frame = GUI_Frame();
-		platform->Set_Flag(App_Flags::cursor_is_visible, false);
+		context->cursor_position = context->platform->Get_Cursor_Position();
 	}
 }
 
 
-static inline bool GUI_Default_Mouse_On_Element_Test(GUI_Handler* handler, 
-	Rect element_rect, 
-	v2i cursor_position, 
-	u32 idx)
+static inline void GUI_End_Context(GUI_Context* context)
 {
-	if(Is_Point_Inside_Rect(v2i::Cast<f32>(cursor_position), element_rect))
+	// Sometimes you have to rendering some things at the end in order to insure that,
+	// draw order is correct.
+	// TODO: That said, this is a temprory placeholder, that carrise manny issues.
+	// For one the char*[] that is passed into the Do function, has still be valid,
+	// when ending the context here.
+	switch(context->defered_render)
 	{
-		handler->selection_state.cursor_on_selection = true;
-		if(idx != handler->active_frame.selected_idx)
+		case GUI_Defered_Render_Type::dropdown_button:
 		{
-			handler->selection_state.element = {};
-			handler->active_frame.selected_idx = idx;
+			GUI_Dropdown_Button_State* state = &context->selection_state.dropdown_button;
+			GUI_Theme* theme = state->theme;
+			
+			Font* font = &theme->font;
+
+			Draw_Filled_Rect_With_Outline(
+				context->canvas, 
+				state->open_rect, 
+				theme->background_color,
+				theme->outline_thickness, 
+				theme->selected_color);
+			
+			v2f pos = state->pos;
+			
+			for(u32 i = 0; i < state->element_count; ++i)
+			{
+				char* text = state->element_names[i];
+				u32 text_color;
+				if(state->selected_element_idx == i)
+				{
+					u32 bg_color = theme->outline_color;
+					text_color = theme->background_color;
+					
+					if(state->is_pressed_down)
+					{
+						text_color = theme->down_color;
+						bg_color = theme->background_color;
+					}								
+					
+					Rect bg_rect = Create_Rect_Center(pos, state->dim);						
+					
+					Draw_Filled_Rect_With_Outline(
+						context->canvas, 
+						bg_rect, bg_color, 
+						theme->outline_thickness, 
+						theme->selected_color);
+				}
+				else
+					text_color = theme->outline_color;
+				
+				v2f text_p = GUI_Calc_Centered_Text_Position(text, state->text_scale, pos, font);
+				Draw_Text(context->canvas, (u8*)text, text_p, text_color, font, state->text_scale);
+				
+				pos.y -= state->dim.y;
+			}
+		}break;
+	}
+	
+	context->defered_render = GUI_Defered_Render_Type::none;
+	
+	if(!context->cursor_mask_validation)
+	{
+		context->cursor_mask_enabled = false;
+		context->cursor_mask_area = {};
+	}
+	
+	if(context->widget_count > 0 &&
+		context->selected_index > context->widget_count - 1 &&
+		context->widget_count < context->last_widget_count)
+	{
+		context->selected_index = context->widget_count - 1;
+	}
+	
+	context->last_cursor_position = context->cursor_position;
+	context->last_widget_count = context->widget_count;
+	
+	
+	// Selection wrapping.
+	{
+		if(context->selected_index < 0)
+		{
+			context->selected_index = context->widget_count - 1;
+			GUI_Reset_Selection_State(context);
 		}
 		
+		if(context->selected_index >= context->widget_count)
+		{
+			context->selected_index = 0;		
+			GUI_Reset_Selection_State(context);
+		}
+	}
+	
+	// Reset state.
+	{
+		context->widget_count = 0;	
+		context->layout = {}; // Unnessery?
+	}
+}
+
+
+// Generates a non zero id based on the position, dimensions and some mangle factor provided
+// by the calling code. Usually that would be the line number from the __LINE__ macro.
+// There is really no gurantee that there wont be ID collissions. This really is just hoping
+// the program is correct, where randomly it might not be.
+// TODO: upgrade to use a 64 bite nouse function to at least reduce the change of collissions.
+static u32 GUI_Generate_ID(Rect rect, u32 mangle_factor)
+{
+	v2i np = v2f::Cast<i32>(Round(rect.min + rect.max));
+	u32 id;
+	do
+	{
+		id = 1 + mangle_factor + Noise_Squirrel3_2D(np, mangle_factor++);
+	}while(!id);
+	
+	return id;
+}
+
+
+static inline bool GUI_Is_Element_Selected(GUI_Context* context, bool cursor_on_selection, u32 id)
+{
+	bool result = false;
+	
+	// This is the selected element.
+	if(context->selected_index == context->widget_count)
+	{
+		// Buuut, it seems to be a different widget?
+		if(id != context->selected_id)
+		{
+			GUI_Reset_Selection_State(context);
+			context->selected_id = id;		
+		}
+		
+		result = true;
+	}
+	else if(context->cursor_mask_enabled &&
+		Is_Point_Inside_Rect(v2i::Cast<f32>(context->cursor_position), context->cursor_mask_area))
+	{
+		// Just a capture clause for cursor on a masked reagion.
+	}
+	// If the cursor has moved and it is on the element. Make it selected.
+	else if((context->cursor_position != context->last_cursor_position && cursor_on_selection))
+	{
+		GUI_Reset_Selection_State(context);
+		context->selected_index = context->widget_count;
+		context->selected_id = id;
+		
+		result = true;
+	}
+	
+	context->widget_count += 1; // Suprising side effect! But better to do it here than forget to do it ouside.
+	return result;
+}
+
+
+static inline bool GUI_Selected_Element_Is_Pressed(GUI_Context* context, bool cursor_on_selection)
+{
+	bool result = context->actions[GUI_Menu_Actions::enter].Is_Pressed() ||
+		(cursor_on_selection && context->actions[GUI_Menu_Actions::mouse].Is_Pressed());
+
+	return result;
+}
+
+
+static inline bool GUI_Selected_Element_Is_Released(GUI_Context* context, bool cursor_on_selection)
+{
+	bool result = context->actions[GUI_Menu_Actions::enter].Is_Released() ||
+		(cursor_on_selection && context->actions[GUI_Menu_Actions::mouse].Is_Released());
+
+	return result;
+}
+
+
+static inline bool GUI_On_Release_Action(
+	GUI_Context* context, bool cursor_on_selection, bool* is_pressed_down)
+{
+	if(GUI_Selected_Element_Is_Pressed(context, cursor_on_selection))
+	{
+		*is_pressed_down = true;
+	}
+	else if(*is_pressed_down && GUI_Selected_Element_Is_Released(context, cursor_on_selection))
+	{
+		*is_pressed_down = false;
 		return true;
+	}
+	else if(context->actions[GUI_Menu_Actions::mouse].Is_Up() && 
+		context->actions[GUI_Menu_Actions::enter].Is_Up())
+	{
+		*is_pressed_down = false;
 	}
 	
 	return false;
 }
 
 
-static inline bool GUI_Default_Mouse_On_Element_Test(GUI_Handler* handler, 
-	GUI_Widget_Header* header, 
-	v2i cursor_position, 
-	u32 idx)
+static void GUI_Do_Spacing(
+	GUI_Context* context, 
+	v2f* dim)
 {
-	Rect element_rect = Create_Rect_Center(header->position, header->dimensions);
-	return GUI_Default_Mouse_On_Element_Test(handler, element_rect, cursor_position, idx);
+	GUI_One_Time_Skip_Padding(context);
+	if(dim)
+	{
+		v2f d = *dim;
+		if(d.x == 0)
+			d.x = context->layout.last_element_dim.x;
+		
+		if(d.y == 0)
+			d.y = context->layout.last_element_dim.y;
+		
+		GUI_Get_Placement(context, &d, 0);
+	}
+	else // AUTO case
+	{		
+		GUI_Get_Placement(context, dim, 0);
+	}
 }
 
 
-static void GUI_Handle_Mouse_Input(GUI_Handler* handler, Platform_Calltable* platform)
+static void GUI_Do_Text(
+	GUI_Context* context, 
+	v2f* pos, 
+	char* text,
+	GUI_Highlight highlight = GUI_Highlight_Nothing(),
+	v2f text_scale = v2f{1.f, 1.f}, 
+	bool is_title = false)
 {
-	v2i cursor_position = platform->Get_Cursor_Position();
+	// --------------------------------------------------------------------------
 	
-	GUI_Frame* active_frame = &handler->active_frame;
+	GUI_Theme* theme = context->layout.theme;
 	
-	bool mouse_is_pressed = GUI_Get_Action(handler->actions, GUI_Menu_Actions::mouse)->Is_Pressed();
-	bool mouse_down = GUI_Get_Action(handler->actions, GUI_Menu_Actions::mouse)->Is_Down();
+	v2f dim = GUI_Tight_Fit_Text(text, text_scale, &theme->font);
 	
-	if(handler->last_cursor_position != cursor_position || mouse_is_pressed)
+	GUI_Placement p = GUI_Get_Placement(context, &dim, pos);
+
+	v2f text_p = GUI_Calc_Centered_Text_Position(text, text_scale, p.pos, &theme->font);
+	
+	// --------------------------------------------------------------------------
+	
+	bool is_highlighted = highlight.highlight_count && 
+		context->selected_index >= highlight.idx && 
+		context->selected_index < highlight.idx + highlight.highlight_count;
+	
+	u32 color;
+	if(is_title)
+		color = theme->title_color;
+	else
+		color = is_highlighted? theme->selected_color : theme->outline_color;
+	
+	Draw_Text(context->canvas, (u8*)text, text_p, color, &theme->font, text_scale);
+}
+
+
+
+
+
+static bool GUI_Do_Button(
+	GUI_Context* context, 
+	v2f* pos, 
+	v2f* dim, 
+	char* text, 
+	v2f text_scale = v2f{1, 1})
+{
+	// --------------------------------------------------------------------------
+	
+	GUI_Theme* theme = context->layout.theme;
+	
+	if(dim == &GUI_AUTO_FIT)
 	{
-		handler->last_cursor_position = cursor_position;
+		*dim = GUI_Tight_Fit_Text(text, text_scale, &theme->font) + theme->padding;
+	}
+	
+	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
+	
+	
+	u32 id = GUI_Generate_ID(p.rect, __LINE__);
+	
+	bool cursor_on_selection = Is_Point_Inside_Rect(v2i::Cast<f32>(context->cursor_position), p.rect);
+	bool is_selected = GUI_Is_Element_Selected(context, cursor_on_selection, id);
+	
+	// --------------------------------------------------------------------------
+	
+	bool result = false;
+	
+	u32 outline_color;
+	
+	if(is_selected)
+	{
+		GUI_Button_State* state = &context->selection_state.button;
 		
-		handler->selection_state.cursor_on_selection = false;
-		
-		// Loop starts from the selected idx and iterates though to the end, 
-		// then from idx 0 up to the selected idx.
-		
-		u32 i, j;
-		for(i = 0, j = active_frame->selected_idx; i < active_frame->widget_count; ++i, ++j)
+		// Handle input.
+		if(GUI_On_Release_Action(context, cursor_on_selection, &state->is_pressed_down))
 		{
-			if(j >= active_frame->widget_count)
-				j = 0;
+			result = true;
+		}
+		
+		if(state->is_pressed_down)
+			outline_color = theme->down_color;
+		else
+			outline_color = theme->selected_color;
+	}
+	else
+	{
+		outline_color = theme->outline_color;
+	}
+	
+	// Draw
+	{
+		Draw_Filled_Rect_With_Outline(
+			context->canvas, 
+			p.rect, 
+			theme->background_color,
+			theme->outline_thickness, 
+			outline_color);
+		
+		if(text)
+		{
+			v2f text_p = GUI_Calc_Centered_Text_Position(text, text_scale, p.pos, &theme->font);
+			Draw_Text(context->canvas, (u8*)text, text_p, outline_color, &theme->font, text_scale);
+		}
+	}
+	
+	return result;
+}
+
+
+static bool GUI_Do_Fill_Slider(
+	GUI_Context* context, 
+	v2f* pos, 
+	v2f* dim, 
+	f32* value,
+	f32 max = 1.f, 
+	f32 min = 0.f, 
+	f32 step = 0.01f,
+	GUI_Input_Acceleration_Behavior inp_accel = GUI_Input_Acceleration_Behavior())
+{
+	Assert(step > 0);
+	Assert(max > min);
+	Assert(value);
+	
+	// --------------------------------------------------------------------------
+	
+	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
+	
+	u32 id = GUI_Generate_ID(p.rect, __LINE__);
+	
+	v2f cursor_position = v2i::Cast<f32>(context->cursor_position);
+	
+	bool cursor_on_selection = Is_Point_Inside_Rect(cursor_position, p.rect);
+	bool is_selected = GUI_Is_Element_Selected(context, cursor_on_selection, id);
+	
+	GUI_Theme* theme = context->layout.theme;
+	
+	// --------------------------------------------------------------------------
+	
+	f32 pre_val = *value;
+	
+	*value = Min(*value, max);
+	*value = Max(*value, min);
+	
+	u32 bar_color; 
+	
+	if(is_selected)
+	{
+		GUI_Slider_State* state = &context->selection_state.slider;
+		bar_color = theme->selected_color;		
+		
+		f64 time = context->platform->Get_Time_Stamp();
+		
+		// Handle mouse input -----------------
+		if(context->actions[GUI_Menu_Actions::mouse].Is_Pressed() && cursor_on_selection)
+			state->is_held_down = true;
+		
+		if(context->actions[GUI_Menu_Actions::mouse].Is_Up())
+			state->is_held_down = false;
+		
+		if(state->is_held_down)
+		{
+			f32 internal_width = p.dim.x - (f32(theme->outline_thickness) * 2);
+			f32 rel_cursor_x = Min(internal_width, Max(0.f, cursor_position.x - p.rect.min.x));
 			
-			GUI_Widget_Header* header = active_frame->random_access_table[j];
+			f32 fill_percent = rel_cursor_x / internal_width;
+			f32 fill = (max - min) * fill_percent;
+			i32 steps = Round_To_Signed_Int32(fill / step);
 			
-			switch(header->type)
+			*value = min + steps * step;
+		}
+		
+		
+		// Handle input Keyboard/Controller.
+		Action* left = context->actions + GUI_Menu_Actions::left;
+		Action* right = context->actions + GUI_Menu_Actions::right; 
+		
+		if(left->Is_Pressed() || right->Is_Pressed())
+		{
+			state->input_start_time = 0;
+			state->next_input_time = 0;
+		}	
+	
+		while(left->Is_Down() &&
+			GUI_Accelerated_Tick(&inp_accel, time, &state->input_start_time, &state->next_input_time))
+		{
+			*value = Max(*value - step, min);
+		}
+		
+		while(right->Is_Down() &&
+			GUI_Accelerated_Tick(&inp_accel, time, &state->input_start_time, &state->next_input_time))
+		{		
+			*value = Min(*value + step, max);
+		}
+	}
+	else
+	{
+		bar_color = theme->outline_color;
+	}
+	
+	// Draw
+	{
+		f32 d = max - min;
+		Assert(d > 0);
+		
+		f32 fill = 0;
+		if(d != 0)
+			fill = (*value - min) / d;
+		
+		Draw_Percentile_Bar(
+			context->canvas,
+			p.rect,
+			theme->background_color,
+			theme->outline_thickness,
+			bar_color,
+			bar_color,
+			fill);		
+	}
+	
+	return pre_val != *value;
+}
+
+
+static bool GUI_Do_Checkbox(GUI_Context* context, v2f* pos, v2f* dim, bool* value)
+{
+	// --------------------------------------------------------------------------
+	
+	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
+	
+	u32 id = GUI_Generate_ID(p.rect, __LINE__);
+	
+	v2f cursor_position = v2i::Cast<f32>(context->cursor_position);
+	
+	bool cursor_on_selection = Is_Point_Inside_Rect(cursor_position, p.rect);
+	bool is_selected = GUI_Is_Element_Selected(context, cursor_on_selection, id);
+	
+	GUI_Theme* theme = context->layout.theme;
+	
+	// --------------------------------------------------------------------------
+	
+	bool pre_val = *value;
+	
+	
+	u32 outline_color;
+	if(is_selected)
+	{
+		GUI_Button_State* state = &context->selection_state.button;
+		
+		if(GUI_On_Release_Action(context, cursor_on_selection, &state->is_pressed_down))
+		{
+			*value = !(*value);
+		}
+		
+		if(state->is_pressed_down)
+			outline_color = theme->down_color;
+		else
+			outline_color = theme->selected_color;
+	}
+	else
+	{
+		outline_color = theme->outline_color;
+	}
+	
+	// Draw
+	{		
+		Draw_Filled_Rect_With_Outline(
+			context->canvas, 
+			p.rect, 
+			theme->background_color,
+			theme->outline_thickness, 
+			outline_color);
+
+		if(*value)
+		{
+			// half here on purpose
+			Rect rect = Create_Rect_Center(p.pos, p.dim * 0.5f);
+			Draw_Filled_Rect(context->canvas, rect, outline_color);
+		}		
+	}
+	
+	return pre_val != *value;
+}
+
+
+static u32 GUI_Do_Dropdown_Button(
+	GUI_Context* context, 
+	v2f* pos,
+	v2f* dim,
+	char* text,
+	u32 element_count,
+	char** element_names,
+	v2f text_scale = v2f{1.f, 1.f})
+{
+	Assert(element_count > 0);
+	
+	// --------------------------------------------------------------------------
+	
+	GUI_Theme* theme = context->layout.theme;
+	
+	if(dim == &GUI_AUTO_FIT)
+	{
+		u32 button_text_lenght = Null_Terminated_Buffer_Lenght(text);
+		u32 longest_sub_lenght = Null_Terminated_Buffer_Lenght(element_names[0]);
+		u32 longest_sub_idx = 0;
+		
+		for(u32 i = 1; i < element_count; ++i)
+		{
+			u32 text_lenght = Null_Terminated_Buffer_Lenght(element_names[i]);
+			if(text_lenght > longest_sub_lenght)
 			{
-				case GUI_Widget_Type::list_button:
+				longest_sub_lenght = text_lenght;
+				longest_sub_idx = i;
+			}
+		}
+		
+		char* longest_text = (button_text_lenght >= longest_sub_lenght)? 
+			text : element_names[longest_sub_idx];
+		
+		*dim = GUI_Tight_Fit_Text(longest_text, text_scale, &theme->font) + theme->padding;
+	}
+	
+	
+	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
+	u32 id = GUI_Generate_ID(p.rect, __LINE__);
+	
+	v2f cursor_position = v2i::Cast<f32>(context->cursor_position);
+	
+	bool cursor_on_selection = Is_Point_Inside_Rect(cursor_position, p.rect);
+	bool is_selected = GUI_Is_Element_Selected(context, cursor_on_selection, id);
+	
+	// --------------------------------------------------------------------------
+	
+	u32 outline_color;
+	
+	u32 result = 0;
+	
+	Rect open_rect = GUI_Get_Dropdown_Button_Open_Rect(p.pos, p.dim, element_count);
+	
+	if(is_selected)
+	{
+		GUI_Dropdown_Button_State* state = &context->selection_state.dropdown_button;
+		
+		bool cursor_is_in_open_rect = Is_Point_Inside_Rect(v2i::Cast<f32>(context->cursor_position), open_rect);
+		
+		if(state->is_open)
+		{
+			if(context->actions[GUI_Menu_Actions::back].Is_Pressed() || 
+				(context->actions[GUI_Menu_Actions::mouse].Is_Pressed() && !cursor_is_in_open_rect))
+			{
+				state->is_open = false;
+				state->is_pressed_down = false;
+			}
+			else
+			{
+				context->disable_kc_navigation = true;
+				
+				// KC controls
+				if(context->actions[GUI_Menu_Actions::up].Is_Pressed())
 				{
-					if(handler->selection_state.element.list_button.is_open)
-					{
-						Rect element_rect = GUI_Get_List_Button_Open_Rect(header);
+					if(state->selected_element_idx == 0)
+						state->selected_element_idx = element_count - 1;
+					else
+						state->selected_element_idx -= 1;
 					
-						GUI_List_Button* list_button = (GUI_List_Button*)(header + 1);
-						
-						if(GUI_Default_Mouse_On_Element_Test(handler, element_rect, cursor_position, j))
+					state->is_pressed_down = false;
+				}
+				
+				
+				if(context->actions[GUI_Menu_Actions::down].Is_Pressed())
+				{
+					if(state->selected_element_idx == element_count - 1)
+						state->selected_element_idx = 0;
+					else
+						state->selected_element_idx += 1;
+					
+					state->is_pressed_down = false;
+				}
+				
+				bool cursor_on_sub_selection = false;
+				
+				// Mouse controls
+				if(cursor_is_in_open_rect)
+				{
+					u32 pre_selection = state->selected_element_idx;
+					f32 level = p.pos.y - p.dim.y / 2;
+					for(u32 i = 0; i < element_count; ++i)
+					{
+						if(f32(context->cursor_position.y) > level)
 						{
-							u32 selection = handler->selection_state.element.list_button.selected_idx;
-							f32 level = header->position.y - header->dimensions.y / 2;
-							for(u32 y = 0; y < list_button->list_element_count; ++y)
+							if(context->cursor_position != context->last_cursor_position || 
+								context->actions[GUI_Menu_Actions::mouse].Is_Pressed())
 							{
-								if(cursor_position.y > level)
-								{
-									handler->selection_state.element.list_button.selected_idx = y;
-									break;
-								}
-								level -= header->dimensions.y;
+								state->selected_element_idx = i;
 							}
 							
-							if(selection != handler->selection_state.element.list_button.selected_idx)
-								handler->selection_state.element.list_button.is_pressed = false;
-						
-							return;
+							cursor_on_sub_selection = true;
+							break;
 						}
+						level -= p.dim.y;
 					}
-					else
-					{
-						if(GUI_Default_Mouse_On_Element_Test(handler, header, cursor_position, j))
-							return;
-					}
-				}break;
-				
-				case GUI_Widget_Type::slider:
-				{
-					if(GUI_Default_Mouse_On_Element_Test(handler, header, cursor_position, j))
-					{
-						bool slider_is_held = handler->selection_state.element.slider.is_clicked && mouse_down;
 					
-						if(mouse_is_pressed || slider_is_held)
-						{
-							handler->selection_state.element.slider.is_clicked = true;
-							
-							GUI_Slider* slider = (GUI_Slider*)(header + 1);
-							
-							GUI_Theme* theme = header->theme;
-							
-							v2f outline = 
-								v2f{f32(theme->outline_thickness) * 2, f32(theme->outline_thickness) * 2};
-							
-							v2f internal_dim = header->dimensions - outline;
-							v2f half_dim = internal_dim * 0.5f;
-							f32 rel_cursor_x = 
-								(v2i::Cast<f32>(cursor_position) - (header->position - half_dim)).x;
-							
-							f32 fill_percent = rel_cursor_x / internal_dim.x;
-							f32 fill = (slider->max - slider->min) * fill_percent + slider->min;
-							i32 steps = Round_To_Signed_Int32(fill / slider->step);
-							
-							slider->value = steps * slider->step;
-							
-							if(slider->on_value_change)
-								slider->on_value_change(slider);
-						}
-						
-						return;
-					}
-				}break;
+					if(pre_selection != state->selected_element_idx)
+						state->is_pressed_down = false;
+				}
 				
-				default:
+				
+				if(GUI_On_Release_Action(context, cursor_on_sub_selection, &state->is_pressed_down))
 				{
-					if(GUI_Default_Mouse_On_Element_Test(handler, header, cursor_position, j))
-						return;
+					state->is_open = false;
+					result = state->selected_element_idx + 1;
 				}
 			}
 		}
-	}	
-	
-	bool mouse_released = GUI_Get_Action(handler->actions, GUI_Menu_Actions::mouse)->Is_Released();
-	
-	if(!handler->selection_state.cursor_on_selection && mouse_released)
-	{
-		handler->selection_state = {};
+		
+		else
+		{
+			if(state->is_pressed_down)
+				outline_color = theme->down_color;
+			else
+				outline_color = theme->selected_color;
+			
+			if(GUI_On_Release_Action(context, cursor_on_selection, &state->is_pressed_down))
+			{
+				state->is_open = true;
+			}			
+		}		
+		
+		// Re-check if the box is open or not. May have changed in the above code block.
+		if(state->is_open)
+		{
+			context->defered_render = GUI_Defered_Render_Type::dropdown_button;
+			
+			context->cursor_mask_area = open_rect;
+			context->cursor_mask_enabled = true;
+			context->cursor_mask_validation = true;
+			
+			state->selected_element_idx = Min(state->selected_element_idx, element_count - 1);
+			state->element_count = element_count;
+			state->element_names = element_names;
+			state->open_rect = open_rect;
+			state->pos = p.pos;
+			state->dim = p.dim;
+			state->theme = theme;
+			state->text_scale = text_scale;
+			
+			return 0; // Skip the rest of the function. Drawring is handled in the End_Context function.
+		}
 	}
+	else
+	{
+		outline_color = theme->outline_color;
+	}
+	
+	// Draw closed mode.
+	{
+		Draw_Filled_Rect_With_Outline(
+			context->canvas, 
+			p.rect, 
+			theme->background_color,
+			theme->outline_thickness, 
+			outline_color);
+		
+		if(text)
+		{
+			v2f text_p = GUI_Calc_Centered_Text_Position(text, text_scale, p.pos, &theme->font);
+			Draw_Text(context->canvas, (u8*)text, text_p, outline_color, &theme->font, text_scale);
+		}
+	}
+	
+	return result;
 }
 
 
-static void GUI_Handle_Input(GUI_Handler* handler, Platform_Calltable* platform)
+//TODO: Should only take a width, as height is determined by the font and text scale.
+static bool GUI_Do_SL_Input_Field(
+	GUI_Context* context, 
+	v2f* pos, 
+	v2f* dim,
+	String* str,
+	u32 character_limit = 0,
+	v2f text_scale = v2f{1.f, 1.f},
+	bool (*character_check)(char*) = 0)
 {
-	Assert(handler);
-	Assert(platform);
+	static constexpr f32 min_handle_width = 3.f;
 	
-	Action* actions = &handler->actions[0];
-	GUI_Frame* active_frame = &handler->active_frame;
+	// --------------------------------------------------------------------------
 	
-	if((!GUI_Is_Menu_Up(handler)) || (!Is_Flag_Set(platform->Get_Flags(), (u32)App_Flags::is_focused)))
-		return;
+	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
 	
+	u32 id = GUI_Generate_ID(p.rect, __LINE__);
 	
-	Update_Actions(platform, actions, (u32)GUI_Menu_Actions::COUNT);
+	v2f cursor_position = v2i::Cast<f32>(context->cursor_position);
 	
-	GUI_Handle_Mouse_Input(handler, platform);
+	bool cursor_on_selection = Is_Point_Inside_Rect(cursor_position, p.rect);
+	bool is_selected = GUI_Is_Element_Selected(context, cursor_on_selection, id);
 	
-	bool mouse_is_pressed = GUI_Get_Action(actions, GUI_Menu_Actions::mouse)->Is_Pressed();
-	bool mouse_is_released = GUI_Get_Action(actions, GUI_Menu_Actions::mouse)->Is_Released();
+	GUI_Theme* theme = context->layout.theme;
+	Font* font = &theme->font;
 	
-	bool select_action_pressed = 
-		GUI_Get_Action(actions, GUI_Menu_Actions::enter)->Is_Pressed() ||
-			(handler->selection_state.cursor_on_selection && mouse_is_pressed);
+	// --------------------------------------------------------------------------
 	
+	u32 outline_color = theme->outline_color;
+	u32 view_offset = 0;
+	u32 view_limit; // Amount of charactes that can fit inside the text area.
 	
-	bool select_action_released = 
-		GUI_Get_Action(actions, GUI_Menu_Actions::enter)->Is_Released() ||
-			(handler->selection_state.cursor_on_selection && mouse_is_released);
+	v2f text_p = p.pos + v2f{1, -1} * f32(theme->outline_thickness) + v2f{2,-2} +
+		Hadamar_Product(v2f{-1, 1}, (p.dim / 2));
+	text_p.y -= text_scale.y * f32(font->char_height);
 	
-	// Set to false in the widget control in order to disable/highjack the up down controlls.
-	bool allow_kc_selection_change = true;
-	bool allow_back_action = true;
-	
-	GUI_Widget_Header* selected_header = GUI_Get_Selected_Header(active_frame);
-	if(selected_header)
+	f32 char_width = f32(font->char_width) * text_scale.x;
+	f32 char_height = f32(font->char_height) * text_scale.y;
+	// Calculate view limit.
 	{
-		void* selected_widget = (selected_header + 1);
+		f32 w = (text_p.x - (p.pos - p.dim / 2).x) * 2;
+		view_limit = (u32)Round_To_Signed_Int32((p.dim.x - w) / char_width);	
+	}
+	
+	v2f bar_dim;
+	v2f bar_center;
+	Rect bar_rect;
+	
+	{
+		f32 outline_thickness = f32(theme->outline_thickness);
+		f32 bar_height = Ceil(font->char_height * text_scale.y) * 0.33f;
+		f32 bar_offset_y = p.dim.y / 2 - bar_height / 2 - outline_thickness;
+		bar_dim = { p.dim.x - outline_thickness * 2, bar_height };
+		bar_center = p.pos - v2f{0, bar_offset_y};
+		bar_rect = Create_Rect_Center(bar_center, bar_dim);
+	}
+	
+	f32 f_lenght = f32(str->lenght) + 1.f;
+	f32 handle_width = Max(bar_dim.x * view_limit / f_lenght, min_handle_width);
+	
+	bool draw_cursor = false; // I don't think state needs to keep track of this.
+	u32 write_cursor_position = 0;
+	
+	bool text_select_mode = false;
+	u32 text_select_start_point = 0;
+	
+	if(is_selected)
+	{
+		GUI_SL_Input_Field_State* state = &context->selection_state.sl_input_field;
 		
-		// Keyboard/Controller selection interaction.
-		switch(selected_header->type)
+		draw_cursor = state->draw_cursor && state->is_active;
+		
+		bool shift_down = context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT) || 
+			context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT);
+		
+		// Handle input
+		bool mouse_pressed_down = context->actions[GUI_Menu_Actions::mouse].Is_Pressed();
+		
+		if(state->is_active)
 		{
-			case GUI_Widget_Type::button:
+			if(context->actions[GUI_Menu_Actions::back].Is_Pressed() || 
+				(!cursor_on_selection && mouse_pressed_down))
 			{
-				GUI_Button* button = (GUI_Button*)(selected_widget);
+				draw_cursor = false;
+				state->is_active = false;
+				state->view_offset = 0;
+				context->cursor_mask_validation = false;
+				context->cursor_mask_enabled = false;
+				context->cursor_position = v2i{-1, -1};
+			}
+			else
+			{
+				context->cursor_mask_validation = true;
+				context->cursor_mask_enabled = true;
+				context->cursor_mask_area = Create_Rect_Min_Dim(v2f{0,0}, v2u::Cast<f32>(context->canvas->dim));
 				
-				if(select_action_released)
+				u32 wcp = state->write_cursor_position;
+				
+				Char_Array typing_info = context->platform->Get_Typing_Information();
+	
+				for(u32 i = 0; i < typing_info.count; ++i)
 				{
-					if(handler->selection_state.element.button.is_pressed)
+					char c = typing_info.buffer[i];
+					
+					if(c == '\b'/*BACKSPACE*/)
 					{
-						handler->selection_state.element.button.is_pressed = false;
-						if(button->on_click)
+						if(state->text_select_mode) 
 						{
-							button->on_click(button->event_id);
-							return;
+							u32 p0 = state->write_cursor_position;
+							u32 p1 = state->text_select_start_point;
+							
+							if(p0 != p1)
+							{
+								if(p0 > p1)
+									Swap(&p0, &p1);
+								
+								str->erase(p0, p1);
+								
+								state->write_cursor_position = p0;
+							}
+							
+							state->text_select_mode = false;
+							continue;
+						}
+						
+						if(str->lenght > 0)
+						{
+							state->write_cursor_position -= 1;
+							if(state->write_cursor_position > wcp)
+								state->write_cursor_position = 0;
+							
+							str->remove_at(state->write_cursor_position);
 						}
 					}
-				}
-				else if(select_action_pressed)
-					handler->selection_state.element.button.is_pressed = true;
-				
-				
-			}break;
-			
-			
-			case GUI_Widget_Type::list_button:
-			{
-				GUI_List_Button* list_button = (GUI_List_Button*)(selected_widget);
-				
-				if(handler->selection_state.element.list_button.is_open)
-				{
-					allow_back_action = false;
-					allow_kc_selection_change = false;
-					
-					if(GUI_Get_Action(actions, GUI_Menu_Actions::back)->Is_Pressed())
-						handler->selection_state.element.list_button = {};
-					
-					u32* idx = &handler->selection_state.element.list_button.selected_idx;
-					if(GUI_Get_Action(actions, GUI_Menu_Actions::up)->Is_Pressed())
+					else if(c >= 32 && c <= 127 && 
+						(character_limit == 0 || str->lenght < character_limit) &&
+						(!character_check || (character_check && character_check(&c))))
 					{
-						*idx -= 1;
-						if(*idx >= list_button->list_element_count)
-							*idx = list_button->list_element_count - 1;
-						
-						handler->selection_state.element.list_button.is_pressed = false;
-					}
-					
-					if(GUI_Get_Action(actions, GUI_Menu_Actions::down)->Is_Pressed())
-					{
-						*idx += 1;
-						if(*idx >= list_button->list_element_count)
-							*idx = 0;
-						
-						handler->selection_state.element.list_button.is_pressed = false;
-					}
-					
-					if(select_action_released)
-					{
-						if(handler->selection_state.element.button.is_pressed)
+						if(state->text_select_mode) 
 						{
-							u32 selection = handler->selection_state.element.list_button.selected_idx;
-							handler->selection_state.element = {};
-							if(list_button->on_select)
+							if(state->text_select_mode) 
 							{
-								list_button->on_select(list_button->event_id, selection);
-								return;
+								u32 p0 = state->write_cursor_position;
+								u32 p1 = state->text_select_start_point;
+								
+								if(p0 != p1)
+								{
+									if(p0 > p1)
+										Swap(&p0, &p1);
+									
+									str->erase(p0, p1);
+									
+									state->write_cursor_position = p0;
+								}
+								
+								state->text_select_mode = false;
 							}
 						}
-					}
-					else if(select_action_pressed)
-						handler->selection_state.element.list_button.is_pressed = true;
-				}
-				else
-				{
-					if(select_action_released)
-					{
-						if(handler->selection_state.element.button.is_pressed)
-						{
-							handler->selection_state.element.list_button.is_pressed = false;
-							handler->selection_state.element.list_button.is_open = true;
-						}
-					}
-					else if(select_action_pressed)
-						handler->selection_state.element.list_button.is_pressed = true;
-					
-				}
-				
-			}break;
-			
-			
-			case GUI_Widget_Type::slider:
-			{
-				GUI_Slider* slider = (GUI_Slider*)(selected_widget);
-				
-				Action* left = GUI_Get_Action(actions, GUI_Menu_Actions::left);
-				Action* right = GUI_Get_Action(actions, GUI_Menu_Actions::right); 
-				
-				if(left->Is_Pressed() || right->Is_Pressed() || (!left->Is_Down() && !right->Is_Down()))
-				{
-					handler->selection_state.element.slider.accum_action_time = 0;
-					handler->selection_state.element.slider.full_action_time = 0;
-					handler->selection_state.element.slider.last_time_stamp = 0;
-				}
-				
-				f64 time = platform->Get_Time_Stamp();
-				f32 time_dif = f32(time - handler->selection_state.element.slider.last_time_stamp);
-				
-				if(handler->selection_state.element.slider.last_time_stamp > 0 && time_dif > 0)
-				{
-					handler->selection_state.element.slider.accum_action_time += time_dif;
-					handler->selection_state.element.slider.full_action_time += time_dif;
-					
-					f32 t = slider->action_tick_rate;
-					
-					if(slider->action_speed_up_time > 0)
-					{
-						f32 full_action_time = handler->selection_state.element.slider.full_action_time;
-						f32 t1 = full_action_time / slider->action_speed_up_time;
-						f32 t2 = 1.f + t1;
-						t /= t2;
-					}
-					
-					while(handler->selection_state.element.slider.accum_action_time >= t)
-					{
-						handler->selection_state.element.slider.accum_action_time -= t;
 						
-						if(GUI_Get_Action(actions, GUI_Menu_Actions::left)->Is_Down())
-						{
-							slider->value -= slider->step;
-							if(slider->value < slider->min)
-								slider->value = slider->min;
-							
-							if(slider->on_value_change)
-								slider->on_value_change(slider);
-						}
-						
-						if(GUI_Get_Action(actions, GUI_Menu_Actions::right)->Is_Down())
-						{	
-							slider->value += slider->step;
-							if(slider->value > slider->max)
-								slider->value = slider->max;
-							
-							if(slider->on_value_change)
-								slider->on_value_change(slider);
-						}				
-					}				
-				}
-				
-				handler->selection_state.element.slider.last_time_stamp = time;
-			}break;
-			
-			
-			case GUI_Widget_Type::checkbox:
-			{
-				GUI_Checkbox* checkbox = (GUI_Checkbox*)(selected_widget);
-				
-				if(select_action_released)
-				{
-					if(handler->selection_state.element.checkbox.is_pressed)
-					{
-						handler->selection_state.element.checkbox.is_pressed = false;
-						checkbox->is_checked = !checkbox->is_checked;
-						if(checkbox->on_value_change)
-							checkbox->on_value_change(checkbox);					
+						str->insert_at(state->write_cursor_position, c);
+						state->write_cursor_position += 1;
 					}
 				}
-				else if(select_action_pressed)
-					handler->selection_state.element.checkbox.is_pressed = true;
 				
-			}break;
-			
-			
-			case GUI_Widget_Type::key_listener:
-			{
-				GUI_Key_Listener* listener = (GUI_Key_Listener*)(selected_widget);
+				f_lenght = f32(str->lenght) + 1.f;
+				handle_width = Max(bar_dim.x * view_limit / f_lenght, min_handle_width);
 				
-				if(listener->on_trigger)
+				f64 time = context->platform->Get_Time_Stamp();
+				state->draw_cursor = !(time > state->flicker_start_time) || (u64)time % 2;
+				
+				//TODO: Provede a way for the user to set these.
+				GUI_Input_Acceleration_Behavior accel;
+				accel.input_speed_up_time = state->input_speed_up_time;
+				accel.input_delay_time = state->input_delay;
+				accel.max_speed_up_factor = state->max_speed_up_factor;
+				
+				Action* left = context->actions + GUI_Menu_Actions::left;
+				Action* right = context->actions + GUI_Menu_Actions::right;
+				
+				if(left->Is_Pressed() || right->Is_Pressed())
 				{
-					Key_Code key = Key_Code::NONE;
-					Button button = Button::NONE;
-					
-					for(u32 i = 0; i < (u32)Key_Code::COUNT; ++i)
-					{
-						Key_Code k = (Key_Code)i;
-						
-						if(platform->Get_Keyboard_Key_Down(k))
-						{
-							key = k;
-							break;
-						}
-					}
-					
-					Controller_State controller = platform->Get_Controller_State(0);
-					
-					for(u32 i = 0; i < (u32)Button::BUTTON_COUNT; ++i)
-					{
-						Button b = (Button)i;
-						
-						if(controller.Get_Button_Down(b))
-						{
-							button = b;
-							break;
-						}
-					}
-					
-					if(key != Key_Code::NONE || button != Button::NONE)
-						listener->on_trigger(key, button, listener->action_array,listener->action_idx);
-				}
-				
-			}break;
-			
-			
-			case GUI_Widget_Type::input_field:
-			{
-				GUI_Input_Field* input_field = (GUI_Input_Field*)(selected_widget);
-				
-				GUI_Selection_State::Element::Input_Field* state = &handler->selection_state.element.input_field;
-				
-				if(state->is_active)
-				{
-					// CONSIDER: What about, rebound keys?
-					// 	Should being in text input mode disable all regular keybinds?
-					//	Probably...
-					
-					f64 time = platform->Get_Time_Stamp();
-					state->draw_cursor = !(time > state->flicker_start_time) || (u64)time % 2;
-					
-					Char_Array typing_info = platform->Get_Typing_Information();
-					if(typing_info.count > 0)
-						state->flicker_start_time = time + GUI_Selection_State::Element::Input_Field::flicker_delay;
-					
-					for(u32 i = 0; i < typing_info.count; ++i)
-					{
-						char c = typing_info.buffer[i];
-						
-						if(c == '\b' || c == 127)
-						{
-							if(input_field->str->lenght > 0)
-								input_field->str->pop_last();
-						}
-						else if(c >= 32 && c <= 127 && 
-							(input_field->character_limit == U16_MAX 
-							|| input_field->str->lenght < input_field->character_limit) &&
-							(!input_field->character_check || 
-							(input_field->character_check && input_field->character_check(input_field, c))))
-						{
-							*input_field->str += c;
-						}
-					}
-				}
-				else
-				{
-					if(select_action_released)
-					{
-						state->is_active = true;
-						state->is_pressed = false;
-					}
-					else if(select_action_pressed)
-						state->is_pressed = true;
-				}
-				
-			}break;
-		}
-		
-	}
-	
-	
-	if(allow_back_action && 
-		active_frame->on_back_action && 
-		GUI_Get_Action(actions, GUI_Menu_Actions::back)->Is_Pressed())
-	{
-		active_frame->on_back_action();
-		return;	
-	}
-	
-	
-	// Keyboard/Controller element selection.
-	if(allow_kc_selection_change)
-	{
-		switch(active_frame->ld)
-		{
-			case GUI_Link_Direction::up:
-			{
-				if(GUI_Get_Action(actions, GUI_Menu_Actions::up)->Is_Pressed())
-				{
-					handler->selection_state = {};
-					active_frame->selected_idx -= 1;
-					
-					// selected_idx is an unsigned value and will underflow,
-					// so checking for < 0 does not work.
-					if(active_frame->selected_idx >= active_frame->widget_count)
-						active_frame->selected_idx = active_frame->widget_count - 1;					
+					state->input_start_time = 0;
+					state->next_input_time = 0;
 				}	
 				
-				if(GUI_Get_Action(actions, GUI_Menu_Actions::down)->Is_Pressed())
+				// Arrowkey/controller input 
+				while(left->Is_Down() &&
+					GUI_Accelerated_Tick(&accel, time, &state->input_start_time, &state->next_input_time))
 				{
-					handler->selection_state = {};
-					active_frame->selected_idx += 1;
-					
-					if(active_frame->selected_idx >= active_frame->widget_count)
-						active_frame->selected_idx = 0;
-				}
-				
-			}break;
-			
-			
-			case GUI_Link_Direction::down:
-			{
-				if(GUI_Get_Action(actions, GUI_Menu_Actions::up)->Is_Pressed())
-				{
-					
-					handler->selection_state = {};
-					active_frame->selected_idx += 1;
-					
-					if(active_frame->selected_idx >= active_frame->widget_count)
-						active_frame->selected_idx = 0;
-				}					
-				
-				if(GUI_Get_Action(actions, GUI_Menu_Actions::down)->Is_Pressed())
-				{
-					handler->selection_state = {};
-					active_frame->selected_idx -= 1;
-					
-					// selected_idx is an unsigned value and will underflow,
-					// so checking for < 0 does not work.
-					if(active_frame->selected_idx >= active_frame->widget_count)
-						active_frame->selected_idx = active_frame->widget_count - 1;
-					
-				}
-				
-			}break;
-		}
-		
-	}
-}
-
-
-static void GUI_Draw_Widgets(GUI_Handler* handler, Canvas* canvas, Linear_Allocator* interim_mem)
-{
-	GUI_Frame* active_frame = &handler->active_frame;
-	
-	Linear_Allocator allocator_state_copy = *interim_mem;
-	u32 defered_render_count = 0;
-	GUI_Widget_Header** defered_render_list = (GUI_Widget_Header**)allocator_state_copy.next_free;
-	
-	{		
-		u32 static_widget_size = 0;
-		u8* header_cursor = (u8*)active_frame->static_widgets;
-		for(u32 i = 0; i < active_frame->static_widget_count; ++i, header_cursor += static_widget_size)
-		{
-			static_widget_size = GUI_Get_Widget_Size(header_cursor);
-			GUI_Static_Widget_Header* header = (GUI_Static_Widget_Header*)header_cursor;
-			bool is_highlighted = 
-				active_frame->selected_idx != U16_MAX && header->highlight_idx == active_frame->selected_idx;
-			
-			GUI_Theme* theme = header->theme;
-			Font* font = &theme->font;
-			
-			switch(header->type)
-			{
-				case GUI_Static_Widget_Type::text:
-				{
-					GUI_Text* text = (GUI_Text*)(header + 1);
-					
-					v2f text_p = GUI_Calc_Centered_Text_Position(text->text, 
-							text->text_scale, 
-							header->position, 
-							font);
-					
-					u32 color;
-					if(text->is_title)
-						color = theme->title_color;
+					if(shift_down)
+					{
+						if(!state->text_select_mode)
+						{
+							state->text_select_start_point = state->write_cursor_position;
+							state->text_select_mode = true;
+						}
+					}
 					else
-						color = is_highlighted? theme->selected_color : theme->outline_color;
+						state->text_select_mode = false;
 					
-					Draw_Text(canvas, (u8*)text->text, text_p, color, font, text->text_scale);
-				}break;
+					
+					state->write_cursor_position -= 1;
+					
+					if(state->write_cursor_position > wcp)
+					{
+						if(context->actions[GUI_Menu_Actions::left].Is_Pressed())
+							state->write_cursor_position = str->lenght;	
+						
+						else
+							state->write_cursor_position = wcp;
+					}
+				}
+				
+				
+				while(right->Is_Down() &&
+					GUI_Accelerated_Tick(&accel, time, &state->input_start_time, &state->next_input_time))
+				{		
+					if(shift_down)
+					{
+						if(!state->text_select_mode)
+						{
+							state->text_select_start_point = state->write_cursor_position;
+							state->text_select_mode = true;
+						}
+					}
+					else
+						state->text_select_mode = false;
+					
+					
+					state->write_cursor_position += 1;
+					
+					if(state->write_cursor_position > str->lenght)
+					{
+						if(context->actions[GUI_Menu_Actions::right].Is_Pressed())
+							state->write_cursor_position = 0;
+						else
+							state->write_cursor_position = wcp;
+					}
+				}
+				
+				// mouse behavior with cursor and handle bar.
+				if(str->lenght)
+				{
+					bool mouse_y_on_text_area = 
+						(cursor_position.y >= text_p.y && cursor_position.y < text_p.y + char_height);
+					
+					if(mouse_pressed_down && mouse_y_on_text_area)
+					{
+						if(shift_down)
+						{
+							if(!state->text_select_mode)
+							{
+								state->text_select_start_point = state->write_cursor_position;
+								state->text_select_mode = true;
+							}
+						}
+						else
+							state->text_select_mode = false;
+						
+						f32 rel_cursor_x = cursor_position.x - text_p.x;
+						u32 click_p = Max(u32(0), Min((u32)Round(rel_cursor_x / char_width), view_limit));
+						
+						state->write_cursor_position = Min(state->view_offset + click_p, str->lenght);
+					}
+					
+					if(str->lenght >= view_limit)
+					{
+						v2f shrink_bar_dim = bar_dim - v2f{handle_width / 2, 0};
+						Rect shrink_bar = Create_Rect_Center(bar_center, shrink_bar_dim);	
+						
+						if(mouse_pressed_down && Is_Point_Inside_Rect(cursor_position, bar_rect))
+						{
+							state->handel_drag_mode = true;
+							state->text_select_mode = false;
+						}
+						
+						if(state->handel_drag_mode)
+						{
+							if(context->actions[GUI_Menu_Actions::mouse].Is_Down())
+							{
+								state->flicker_start_time = time + state->flicker_delay;
+								
+								f32 rel_shrink_bar_x = cursor_position.x - shrink_bar.min.x;
+								f32 percent = Clamp_Zero_To_One(rel_shrink_bar_x / shrink_bar_dim.x);
+							
+								state->view_offset = (u32)Round(f32(str->lenght - view_limit + 1) * percent);
+	
+								if(state->write_cursor_position < state->view_offset + 1)
+									state->write_cursor_position = state->view_offset + 1;
+								
+								else if(state->write_cursor_position > state->view_offset + view_limit - 1)
+									state->write_cursor_position = state->view_offset + view_limit - 1;
+							}
+							else
+								state->handel_drag_mode = false;
+						}
+					}
+				}		
+				
+				text_select_mode = state->text_select_mode;
+				text_select_start_point = state->text_select_start_point;
+				
+				if(wcp != state->write_cursor_position)
+					state->flicker_start_time = time + state->flicker_delay;
+				
+				
+				// View offset handling.
+				{
+					// Yes, trying to wrap ones head around all of these conditionals is madness.
+					// Therefore some helpfull comments! Hopefylly they aren't outdated!
+					// Also the check order of these matters, for the logic it self and to prevent
+					// tests that would underflow and crash if done in the wrong circumstance.
+					
+					bool underflow_protection = state->write_cursor_position > state->view_offset;
+		
+					// When the string can fit into a view, reset the view bar.
+					if(str->lenght < view_limit)
+					{
+						state->view_offset = 0;
+					}
+					
+					// Scroll the view leftwards when the right hand side of the view port is, farthen than
+					// there is text to show. Or in other words prevent whitespace when looking past the string. 
+					else if(state->write_cursor_position >= state->view_offset + 1 &&
+						state->view_offset + view_limit + 1 > str->lenght)
+					{
+						state->view_offset = str->lenght - view_limit + 1;
+					}
+					
+					// When the write cursor is beyond the right side of view, 
+					// scroll the view to the right keep it inside.
+					else if(underflow_protection &&
+						state->write_cursor_position - state->view_offset > view_limit - 1)
+					{
+						state->view_offset = state->write_cursor_position - (view_limit - 1);
+					}
+					
+					// Used as an underflow protection on top of the obvious.
+					else if(state->write_cursor_position == 0)
+					{
+						state->view_offset = 0;
+					}
+					
+					// When the write cursor is beyond the left side of view, 
+					// scroll the view to the right left it inside.
+					else if(state->write_cursor_position <= state->view_offset + 1)
+					{
+						state->view_offset = state->write_cursor_position - 1;
+					}
+				}
 			}
 		}
-	}
-	
-	for(u32 i = 0; i < active_frame->widget_count; ++i)
-	{
-		GUI_Widget_Header* header = active_frame->random_access_table[i];
-		void* widget = header + 1;
-		
-		bool is_selected = i == active_frame->selected_idx;
-		
-		GUI_Theme* theme = header->theme;
-		Font* font = &theme->font;
-		
-		switch(header->type)
+		else
 		{
-			case GUI_Widget_Type::button:
+			if(GUI_On_Release_Action(context, cursor_on_selection, &state->is_pressed_down))
 			{
-				GUI_Button* button = (GUI_Button*)widget;
-			
-				u32 outline_color = is_selected? theme->selected_color : theme->outline_color;
-				
-				if(is_selected && handler->selection_state.element.button.is_pressed) 
-					outline_color = theme->down_color;
-				
-				Rect button_rect = Create_Rect_Center(header->position, header->dimensions);
-				
-				Draw_Filled_Rect_With_Outline(
-					canvas, 
-					button_rect, 
-					theme->background_color,
-					theme->outline_thickness, 
-					outline_color);
-				
-				if(button->text)
-				{
-					v2f text_p = GUI_Calc_Centered_Text_Position(button->text, 
-						button->text_scale, 
-						header->position, 
-						font);
-			
-					Draw_Text(canvas, (u8*)button->text, text_p, outline_color, font, button->text_scale);
-				}
-			}break;
-			
-			
-			case GUI_Widget_Type::list_button:
-			{
-				GUI_List_Button* list_button = (GUI_List_Button*)widget;
-				if(!handler->selection_state.element.list_button.is_open || !is_selected)
-				{
-					u32 outline_color = is_selected? theme->selected_color : theme->outline_color;
-					if(is_selected && handler->selection_state.element.list_button.is_pressed) 
-						outline_color = theme->down_color;
-					
-					Rect button_rect = Create_Rect_Center(header->position, header->dimensions);
-					
-					Draw_Filled_Rect_With_Outline(
-						canvas, 
-						button_rect, 
-						theme->background_color,
-						theme->outline_thickness, 
-						outline_color);
-						
-					if(list_button->text)
-					{
-						v2f text_p = GUI_Calc_Centered_Text_Position(list_button->text, 
-							list_button->text_scale, 
-							header->position, 
-							font);
-						
-						Draw_Text(canvas, (u8*)list_button->text, text_p, outline_color, font, list_button->text_scale);
-					}
-				}
-				else
-				{
-					*interim_mem->push<GUI_Widget_Header*>() = header;
-					defered_render_count += 1;
-				}
-			
-			}break;
-			
-			
-			case GUI_Widget_Type::slider:
-			{
-				GUI_Slider* slider = (GUI_Slider*)widget;
-				
-				Rect slider_rect = Create_Rect_Center(header->position, header->dimensions);
-				
-				f32 fill = (slider->value - slider->min) / (slider->max - slider->min);
-				u32 bar_color = is_selected? theme->selected_color : theme->outline_color;
-				
-				Draw_Percentile_Bar(
-					canvas,
-					slider_rect,
-					theme->background_color,
-					theme->outline_thickness,
-					bar_color,
-					bar_color,
-					fill);
-				
-			}break;
-			
-			case GUI_Widget_Type::checkbox:
-			{
-				GUI_Checkbox* checkbox = (GUI_Checkbox*)widget;
-				u32 outline_color = is_selected? theme->selected_color : theme->outline_color;
-				
-				if(is_selected && handler->selection_state.element.checkbox.is_pressed) 
-					outline_color = theme->down_color;
-				
-				Rect rect = Create_Rect_Center(header->position, header->dimensions);
-				
-				Draw_Filled_Rect_With_Outline(
-					canvas, 
-					rect, 
-					theme->background_color,
-					theme->outline_thickness, 
-					outline_color);
-			
-				if(checkbox->is_checked)
-				{
-					// half here on purpose
-					rect = Create_Rect_Center(header->position, header->dimensions * 0.5f);
-					Draw_Filled_Rect(canvas, rect, outline_color);
-				}
-				
-			}break;
-			
-			case GUI_Widget_Type::input_field:
-			{
-				GUI_Input_Field* input_field = (GUI_Input_Field*)widget;
-				
-				GUI_Selection_State::Element::Input_Field* state = &handler->selection_state.element.input_field;
-				
-				u32 outline_color = is_selected? theme->selected_color : theme->outline_color;
-				
-				if(is_selected && state->is_pressed) 
-					outline_color = theme->down_color;
-				
-				Rect rect = Create_Rect_Center(header->position, header->dimensions);
-				
-				Draw_Filled_Rect_With_Outline(
-					canvas, 
-					rect, 
-					theme->background_color,
-					theme->outline_thickness, 
-					outline_color);
-					
-				
-				if(input_field->str->buffer)
-				{
-					v2f text_p = header->position - header->dimensions / 2 + v2f{2,2};
-					
-					bool draw_cursor = is_selected && state->draw_cursor && state->is_active;
-					
-					if(draw_cursor)
-					{
-						v2f cursor_p = text_p;
-						cursor_p.x += (input_field->str->lenght * (f32)font->char_width + 2);
-						
-						Draw_Vertical_Line(
-							canvas, 
-							cursor_p, 
-							font->char_height * input_field->text_scale.y, 
-							theme->outline_color);						
-					}
-					
-					Draw_Text(
-						canvas, 
-						(u8*)input_field->str->buffer, 
-						text_p, 
-						outline_color, 
-						font, 
-						input_field->text_scale);
-				}
-				
-			}break;
+				state->is_active = true;
+				state->write_cursor_position = str->lenght;
+				state->flicker_start_time = context->platform->Get_Time_Stamp() + state->flicker_delay;
+			}
 		}
+		
+		view_offset = state->view_offset;
+		
+		write_cursor_position = state->write_cursor_position;
+		
+		if(state->is_pressed_down)
+			outline_color = theme->down_color;
+		else
+			outline_color = theme->selected_color;
 	}
+
 	
-	for(u32 i = 0; i < defered_render_count; ++i)
-	{
-		GUI_Widget_Header* header = defered_render_list[i];
-		void* widget = header + 1;
+	// Draw
+	{		
+		Draw_Filled_Rect_With_Outline(
+			context->canvas, 
+			p.rect, 
+			theme->background_color,
+			theme->outline_thickness, 
+			outline_color);
 		
-		bool is_selected = i == active_frame->selected_idx;
-		GUI_Theme* theme = header->theme;
-		Font* font = &theme->font;
+		// If the text can fit in the box, move it down so it's centered.
+		if(str->lenght < view_limit)
+			text_p.y = p.pos.y - (font->char_height * text_scale.y) / 2;
 		
-		switch(header->type)
+		if(text_select_mode)
 		{
-			case GUI_Widget_Type::list_button:
-			{
-				GUI_List_Button* list_button = (GUI_List_Button*)widget;
-				
-				Rect lb_rect = GUI_Get_List_Button_Open_Rect(header);
-					
-				Draw_Filled_Rect_With_Outline(
-					canvas, 
-					lb_rect, 
-					theme->background_color,
-					theme->outline_thickness, 
-					theme->selected_color);
-				
-				v2f draw_p = header->position;
-				GUI_List_Button_Element* list_elements = (GUI_List_Button_Element*)(list_button + 1);
-				f32 shrink_v = 0;
-				v2f dim = v2f{header->dimensions.x - shrink_v, header->dimensions.y - shrink_v};
-				
-				for(u32 j = 0; j < list_button->list_element_count; ++j)
-				{
-					v2f text_p = GUI_Calc_Centered_Text_Position(list_elements->text, 
-						list_button->text_scale, 
-						draw_p, 
-						font);
-					
-					u32 text_color;
-					if(handler->selection_state.element.list_button.selected_idx == j)
-					{
-						u32 bg_color = theme->outline_color;
-						text_color = theme->background_color;
-						
-						if(is_selected && handler->selection_state.element.list_button.is_pressed)
-						{
-							text_color = theme->down_color;
-							bg_color = theme->background_color;
-						}								
-						
-						Rect bg_rect = Create_Rect_Center(draw_p, dim);						
-						Draw_Filled_Rect_With_Outline(canvas, bg_rect, bg_color, theme->outline_thickness, theme->selected_color);
-					}
-					else
-						text_color = theme->outline_color;
-					
-					Draw_Text(canvas, (u8*)list_elements->text, text_p, text_color, font, list_button->text_scale);
-					
-					draw_p.y -= header->dimensions.y;
-					++list_elements;
-					
-				}
-			}break;
+			i32 p0 = (i32)write_cursor_position;
+			i32 p1 = (i32)text_select_start_point;
 			
-			default:
-				Terminate;
+			if(p1 != p0)
+			{
+				// p0 is forced to be less than p1.
+				if(p0 > p1)
+					Swap(&p0, &p1);
+				
+				p0 = Max(i32(0), i32(p0 - view_offset));
+				p1 = Min(i32(view_limit), i32(p1 - view_offset));
+				p1 -= p0;
+			
+				v2f selection_pos = {text_p.x + p0 * char_width, text_p.y};
+				v2f selection_dim = {p1 * char_width, char_height};
+				
+				Rect select_rect = Create_Rect_Min_Dim(selection_pos, selection_dim);
+				
+				Draw_Filled_Rect(context->canvas, select_rect, theme->title_color);
+			}
 		}
+		
+		if(str->lenght > 0)
+		{	
+			u32 view_lenght = Min(str->lenght - view_offset, view_limit);
+	
+			Draw_Text(
+				context->canvas, 
+				Create_String_View(str, view_offset, view_lenght),
+				text_p, 
+				outline_color, 
+				&theme->font, 
+				text_scale);
+		}
+		
+		// CONSIDER: Draw the cursor with different collor when at the maximum character limit.
+		if(draw_cursor)
+		{
+			v2f cursor_p = text_p;
+			
+			cursor_p.x += f32(write_cursor_position - view_offset) * f32(font->char_width);
+			
+			Draw_Vertical_Line(
+				context->canvas, 
+				cursor_p, 
+				f32(font->char_height) * text_scale.y, 
+				theme->outline_color);					
+		}
+		
+		// bar area.
+		if(str->lenght >= view_limit)
+		{
+			Draw_Filled_Rect(context->canvas, bar_rect, theme->down_color);
+			
+			v2f handle_center = bar_center + v2f{-bar_dim.x / 2 + handle_width / 2, 0};
+			
+			f32 xoff = (f32)view_offset / f_lenght * bar_dim.x;
+			handle_center.x += xoff;
+			Rect handle_rect = Create_Rect_Center(handle_center, v2f{handle_width, bar_dim.y});
+			
+			Draw_Filled_Rect(context->canvas, handle_rect, theme->outline_color);
+		}	
+		
 	}
 	
-	*interim_mem = allocator_state_copy;
+	return false;
 }

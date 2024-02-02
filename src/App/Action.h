@@ -57,7 +57,8 @@ static void Update_Actions(Platform_Calltable* platform, Action* actions, u32 co
 	{
 		Action* action = actions + i;
 		
-		if(action->last_poll_frame != frame - 1 || action->disabled)
+		if(action->last_poll_frame != frame - 1 || action->disabled || 
+			!Is_Flag_Set(platform->Get_Flags(), (u32)App_Flags::is_focused))
 		{
 			action->invalid = true;
 			action->state = Button_State{false, false};

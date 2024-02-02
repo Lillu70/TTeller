@@ -1,7 +1,6 @@
 
 #pragma once
 
-
 #include "..\Utility\Assert.h"
 #include "..\Utility\Primitives.h"
 #include "..\Utility\Vector_Ex.h"
@@ -22,7 +21,6 @@
 
 #include "Terminus_Font.h"
 
-
 #define INTERIM_MEM_SIZE KiB * 32
 
 static Platform_Calltable s_platform;
@@ -31,5 +29,3 @@ static General_Allocator s_mem;
 static Linear_Allocator s_interim_mem;
 
 static Canvas s_canvas;
-
-static GUI_Handler s_gui = GUI_Handler();

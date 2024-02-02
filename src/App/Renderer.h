@@ -96,6 +96,15 @@ static void Draw_Text(
 	Font* font,
 	v2f scale);
 	
+	
+static void Draw_Text(
+	Canvas* canvas,
+	String_View text,
+	v2f pos,
+	u32 color,
+	Font* font,
+	v2f scale);	
+
 
 static void Draw_Glypgh(
 	Canvas* canvas,

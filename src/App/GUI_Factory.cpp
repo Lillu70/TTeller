@@ -3,6 +3,512 @@
 
 #define AUTO 0
 
+static GUI_Theme s_theme = {};
+static GUI_Context s_gui;
+static String input_field_text;
+
+
+struct Participation_Requirement
+{
+	static inline const char* type_names[] = 
+		{"Ominaisuus", "Esine Merkki", "Hahmo Merkki"};
+	
+	enum class Type
+	{
+		character_stat = 0,
+		mark_item,
+		mark_personal,
+		COUNT
+	};
+	
+	Type type;
+};
+
+
+struct Participent
+{
+	u32 requirement_count = 0;
+	Participation_Requirement requirements[5];
+};
+
+
+struct New_Event_State
+{
+	static inline const char* p[] = {"/k1", "/k2", "/k3", "/k4"};
+	u32 participent_count = 0;
+	Participent participents[4];
+	
+	String event_name;
+};
+static New_Event_State s_new_event_state;
+
+
+static inline void Init_GUI()
+{	
+	s_gui.platform = &s_platform;
+	s_gui.canvas = &s_canvas;
+	
+	Init_String(&input_field_text, &s_mem, "Type text here.");
+	
+	v3<u8> c;
+	f32 g;
+	
+	{		
+		c = {165, 80, 80};
+		s_theme.selected_color = Put_Color(c.r, c.g, c.b);
+		
+		g = 0.5f;
+		s_theme.down_color = Put_Color(u8(c.r * g), u8(c.g * g), u8(c.b * g));
+		
+		g = 1.3f;
+		s_theme.title_color = Put_Color(u8(c.r * g), u8(c.g * g), u8(c.b * g));
+	}
+	
+	{		
+		c = {80, 55, 50};
+		s_theme.background_color = Put_Color(c.r, c.g, c.b);
+		g = 2.f;
+		s_theme.outline_color = BLACK;//Put_Color(u8(c.r * g), u8(c.g * g), u8(c.b * g));
+	}
+	
+	s_theme.font.data_buffer = (u8*)&s_terminus_font[0];
+	s_theme.font.char_width = s_terminus_font_char_width;
+	s_theme.font.char_height = s_terminus_font_char_height;
+
+	GUI_Set_Default_Menu_Actions(&s_gui);
+	Init_String(&s_new_event_state.event_name, &s_mem, "Uusi tapahtumagargaerg aerg aergaergargaergrg argargaergaergaerg");	
+}
+
+
+static void AUTO_TEST()
+{
+	GUI_Begin_Context(&s_gui, GUI_Anchor::top_right, GUI_Build_Direction::down_left, &s_theme);
+	
+	GUI_Do_Button(&s_gui, &GUI_AUTO_TOP_CENTER, 	&GUI_AUTO_FIT, "Button");
+	GUI_Do_Button(&s_gui, &GUI_AUTO_TOP_LEFT, 		&GUI_AUTO_FIT, "Button");
+	GUI_Do_Button(&s_gui, &GUI_AUTO_TOP_RIGHT, 		&GUI_AUTO_FIT, "Button");
+	GUI_Do_Button(&s_gui, &GUI_AUTO_MIDDLE_RIGHT, 	&GUI_AUTO_FIT, "Button");
+	GUI_Do_Button(&s_gui, &GUI_AUTO_MIDDLE_LEFT, 	&GUI_AUTO_FIT, "Button");
+	GUI_Do_Button(&s_gui, &GUI_AUTO_BOTTOM_CENTER, 	&GUI_AUTO_FIT, "Button");
+	GUI_Do_Button(&s_gui, &GUI_AUTO_BOTTOM_RIGHT, 	&GUI_AUTO_FIT, "Button");
+	GUI_Do_Button(&s_gui, &GUI_AUTO_BOTTOM_LEFT, 	&GUI_AUTO_FIT, "Button");
+	GUI_Do_Button(&s_gui, &GUI_AUTO_MIDDLE, 		&GUI_AUTO_FIT, "Button");
+	
+	GUI_End_Context(&s_gui);
+}
+
+
+static void Do_Color_Editor_Widget(u32* color, v2f slider_dim, char* text)
+{
+	GUI_Do_Text(&s_gui, AUTO, text, GUI_Highlight_Next(&s_gui, 3));
+	
+	GUI_Input_Acceleration_Behavior accel = {0.1, 0.05, 10000};
+	
+	v3f upc = Unpack_Color(*color);
+	
+	GUI_Do_Text(&s_gui, AUTO, "Red:", GUI_Highlight_Next(&s_gui));
+	GUI_One_Time_Skip_Padding(&s_gui);
+	if(GUI_Do_Fill_Slider(&s_gui, AUTO, &slider_dim, &upc.r, 255, 1, 1.f, accel))
+	{
+		*color = Put_Color((u8)upc.r, (u8)upc.g, (u8)upc.b);
+	}
+	
+	
+	GUI_Do_Text(&s_gui, AUTO, "Green:", GUI_Highlight_Next(&s_gui));
+	GUI_One_Time_Skip_Padding(&s_gui);
+	if(GUI_Do_Fill_Slider(&s_gui, AUTO, &slider_dim, &upc.g, 255, 1, 1.f, accel))
+	{
+		*color = Put_Color((u8)upc.r, (u8)upc.g, (u8)upc.b);
+	}
+	
+	
+	GUI_Do_Text(&s_gui, AUTO, "Blue:", GUI_Highlight_Next(&s_gui));
+	GUI_One_Time_Skip_Padding(&s_gui);
+	if(GUI_Do_Fill_Slider(&s_gui, AUTO, &slider_dim, &upc.b, 255, 1, 1.f, accel))
+	{
+		*color = Put_Color((u8)upc.r, (u8)upc.g, (u8)upc.b);
+	}
+}
+
+
+static void Do_Theme_Menu()
+{
+	GUI_Begin_Context(&s_gui, GUI_Anchor::top_left, GUI_Build_Direction::down_left, &s_theme);
+	
+	v2f slider_dim = v2f{100, 15};
+	
+	// Color Editing.
+	{
+		v2f spacing = {0, 15};
+		GUI_Layout layout_capture;
+		
+		GUI_Do_Text(&s_gui, &GUI_AUTO_TOP_LEFT, "Theme Editor:", {}, v2f{1.5f, 1.5f}, true);
+		
+		GUI_Do_Text(&s_gui, AUTO, "Colors:", GUI_Highlight_Next(&s_gui, 18), v2f{1.0f, 1.0f});
+		
+		GUI_Push_Layout(&s_gui);
+		
+		Do_Color_Editor_Widget(&s_theme.outline_color, slider_dim, "Outline:");
+
+		GUI_Do_Spacing(&s_gui, &spacing);
+		Do_Color_Editor_Widget(&s_theme.selected_color, slider_dim, "Selected:");
+		
+		layout_capture = s_gui.layout;
+		
+		GUI_Pop_Layout(&s_gui);
+		s_gui.layout.last_element_pos.x += slider_dim.x + spacing.y + s_theme.padding * 2;
+		GUI_Push_Layout(&s_gui);
+		
+		Do_Color_Editor_Widget(&s_theme.background_color, slider_dim, "Background:");
+
+		GUI_Do_Spacing(&s_gui, &spacing);
+		Do_Color_Editor_Widget(&s_theme.down_color, slider_dim, "Down:");
+		
+		GUI_Pop_Layout(&s_gui);
+		s_gui.layout.last_element_pos.x += slider_dim.x + spacing.y + s_theme.padding * 2;
+		
+		Do_Color_Editor_Widget(&s_theme.title_color, slider_dim, "Title:");
+		
+		GUI_Do_Spacing(&s_gui, &spacing);
+		Do_Color_Editor_Widget(&s_theme.text_color, slider_dim, "Text:");		
+	
+		s_gui.layout = layout_capture;
+		
+		GUI_Do_Text(&s_gui, AUTO, "Other Theme Elements:");
+		
+		GUI_Do_Text(&s_gui, AUTO, "Outline thickness:");
+		GUI_One_Time_Skip_Padding(&s_gui);
+		f32 v = f32(s_theme.outline_thickness);
+		if(GUI_Do_Fill_Slider(&s_gui, AUTO, &slider_dim, &v, 5, 0, 1))
+		{
+			s_theme.outline_thickness = u32(v);
+		}
+		
+		
+		v2f p = {f32(s_canvas.dim.x) - 10, 10};
+		s_gui.layout.anchor = GUI_Anchor::bottom_right;
+		s_gui.layout.build_direction = GUI_Build_Direction::up_right;
+		
+		v = s_theme.padding;
+		GUI_One_Time_Skip_Padding(&s_gui);
+		if(GUI_Do_Fill_Slider(&s_gui, &p, &slider_dim, &v, 15, 0, 1.f))
+		{
+			s_theme.padding = v;
+		}
+		GUI_Do_Text(&s_gui, AUTO, "Padding:");
+	}
+	
+	// Test widgets!
+	{
+
+		GUI_Do_Text(&s_gui, &GUI_AUTO_TOP_RIGHT, "Test Widgets:", {}, v2f{2.f, 2.f}, true);
+		s_gui.layout.build_direction = GUI_Build_Direction::down_right;
+		
+		if(GUI_Do_Button(&s_gui, AUTO, &GUI_AUTO_FIT, "This Is a Button"))
+		{
+			
+		}
+		
+		static char* opt[] = {"Option 1", "Option 2", "Something else", "Option 3", "Option 4"};
+		static char* t = "This Is Dropdown Button";
+		switch(u32 s = GUI_Do_Dropdown_Button(&s_gui, AUTO, &GUI_AUTO_FIT, t, Array_Lenght(opt), (char**)&opt))
+		{
+			case 1:
+			{
+				
+			}break;
+			
+			case 2:
+			{
+				
+			}break;
+		}
+		
+		v2f d = {20, 20};
+		static bool b = false;
+		GUI_Do_Checkbox(&s_gui, AUTO, &d, &b);
+		
+		GUI_Push_Layout(&s_gui);
+		s_gui.layout.build_direction = GUI_Build_Direction::left_center;
+		GUI_One_Time_Skip_Padding(&s_gui);
+		GUI_Do_Text(&s_gui, AUTO, "This is a checkbox:");
+		GUI_Pop_Layout(&s_gui);
+		
+		d = { slider_dim.x * 2, 26 };
+		GUI_Do_SL_Input_Field(&s_gui, AUTO, &d, &input_field_text);
+	}
+	
+	GUI_End_Context(&s_gui);
+}
+
+
+static void Random_Test_UI()
+{
+	GUI_Begin_Context(&s_gui, GUI_Anchor::top_left, GUI_Build_Direction::right_center, &s_theme);
+	
+	static u32 button_count = 0;
+
+	{
+		v2f pos = v2f{s_theme.padding, (f32)s_canvas.dim.y - s_theme.padding};
+		v2f dim = v2f{170, 30};
+		
+		if(GUI_Do_Button(&s_gui, &pos, &dim, "New Button!"))
+		{
+			button_count += 1;
+		}
+	}
+	
+	{
+		v2f pp = s_gui.layout.last_element_pos;
+		v2f dd = s_gui.layout.last_element_dim;
+		
+		v2f cc = v2f{20, 20};
+		GUI_Do_Text(&s_gui, AUTO, "Setting 1:", GUI_Highlight_Next(&s_gui));
+		
+		GUI_One_Time_Skip_Padding(&s_gui);
+		
+		bool is_fullscreen = Is_Flag_Set(s_platform.Get_Flags(), (u32)App_Flags::is_fullscreen);
+		if(GUI_Do_Checkbox(&s_gui, AUTO, &cc, &is_fullscreen))
+		{
+			s_platform.Set_Flag(App_Flags::is_fullscreen, is_fullscreen);
+		}
+		
+		
+		s_gui.layout.build_direction = GUI_Build_Direction::down_left;
+		
+		v2f dp_dim = v2f{170, 30};
+		
+		static char* options[] = {"Opt 1", "Opt 2", "Opt 3", "Opt 4", "Lonqg option :)", "Opt 6"};
+		
+		switch(GUI_Do_Dropdown_Button(&s_gui, 0, &GUI_AUTO_FIT, "short", Array_Lenght(options), (char**)&options))
+		{
+			case 1:
+			{
+				
+			}break;
+			
+			case 2:
+			{
+				
+			}break;
+		}
+		
+		f32 y = s_gui.layout.last_element_dim.y;
+		
+		GUI_Do_Text(&s_gui, AUTO, "Character Name:");
+		GUI_One_Time_Skip_Padding(&s_gui);
+		v2f ilp{s_gui.layout.last_element_dim.x, y};
+		GUI_Do_SL_Input_Field(&s_gui, AUTO, &ilp, &input_field_text);
+		
+		GUI_Do_Text(&s_gui, AUTO, "Setting 2:", GUI_Highlight_Next(&s_gui));
+		GUI_One_Time_Skip_Padding(&s_gui);
+		
+		static bool ccv1 = false;
+		if(GUI_Do_Checkbox(&s_gui, AUTO, &cc, &ccv1))
+		{
+			
+		}
+		
+		GUI_Do_Text(&s_gui, AUTO, "Setting 3:", GUI_Highlight_Next(&s_gui));
+		GUI_One_Time_Skip_Padding(&s_gui);
+		
+		static bool ccv2 = false;
+		if(GUI_Do_Checkbox(&s_gui, AUTO, &cc, &ccv2))
+		{
+			
+		}
+		
+		s_gui.layout.last_element_pos = pp;
+		s_gui.layout.last_element_dim = dd;
+	}
+	
+	
+	s_gui.layout.build_direction = GUI_Build_Direction::down_right;
+	
+	for(u32 i = 0; i < button_count; ++i)
+	{
+		if(GUI_Do_Button(&s_gui, AUTO, &GUI_AUTO_FIT, "IMGUI BUTTON"))
+		{
+			button_count -= 1;
+		}
+	}
+	
+	
+	s_gui.layout.build_direction = GUI_Build_Direction::down_left;
+	v2f ld = s_gui.layout.last_element_dim;
+	
+	
+	GUI_Do_Text(&s_gui, AUTO, "Red:", GUI_Highlight_Next(&s_gui));
+	
+	GUI_One_Time_Skip_Padding(&s_gui);
+
+	static f32 r = (u8)Unpack_Color(s_theme.outline_color).r;
+	if(GUI_Do_Fill_Slider(&s_gui, AUTO, &ld, &r, 255, 0, 1.f, {0.1, 0.05, 10000}))
+	{
+		v3f c = Unpack_Color(s_theme.outline_color);
+		s_theme.outline_color = Put_Color((u8)r, (u8)c.g, (u8)c.b);
+	}
+	
+	GUI_Do_Text(&s_gui, AUTO, "Green:", GUI_Highlight_Next(&s_gui));
+	
+	GUI_One_Time_Skip_Padding(&s_gui);
+	
+	static f32 g = (u8)Unpack_Color(s_theme.outline_color).g;
+	if(GUI_Do_Fill_Slider(&s_gui, AUTO, &ld, &g, 255, 1, 1.f, {0.1, 0.05, 10000}))
+	{
+		v3f c = Unpack_Color(s_theme.outline_color);
+		s_theme.outline_color = Put_Color((u8)c.r, (u8)g, (u8)c.b);
+	}
+	
+	GUI_Do_Text(&s_gui, AUTO, "Blue:", GUI_Highlight_Next(&s_gui));
+	
+	GUI_One_Time_Skip_Padding(&s_gui);
+	
+	static f32 b = (u8)Unpack_Color(s_theme.outline_color).b;
+	if(GUI_Do_Fill_Slider(&s_gui, AUTO, &ld, &b, 255, 1, 1.f, {0.1, 0.05, 10000}))
+	{
+		v3f c = Unpack_Color(s_theme.outline_color);
+		s_theme.outline_color = Put_Color((u8)c.r, (u8)c.g, (u8)b);
+	}
+
+
+	GUI_Do_Spacing(&s_gui, AUTO);	
+	
+	GUI_Do_Text(&s_gui, AUTO, "Random test sliders: 3 highlights!", GUI_Highlight_Next(&s_gui, 3));
+	static f32 sval0 = 0.f;
+	GUI_Do_Fill_Slider(&s_gui, AUTO, &ld, &sval0);
+	
+	static f32 sval1 = 0.2f;
+	GUI_Do_Fill_Slider(&s_gui, AUTO, AUTO, &sval1, 1, 0, 0.0005f, {0.01, 0.01, 10000});
+	
+	static f32 sval3 = 1.f;
+	GUI_Do_Fill_Slider(&s_gui, AUTO, AUTO, &sval3, 10, 0, 1.f, {1, 0.2f, 1});
+	
+	v2f spacing = {s_gui.layout.last_element_dim.x, 5};
+	GUI_Do_Spacing(&s_gui, &spacing);
+	
+	GUI_Do_Button(&s_gui, AUTO, &GUI_AUTO_FIT, "Random button at the end.");
+	
+	GUI_End_Context(&s_gui);
+}
+
+
+static void Do_New_Event_Frame()
+{
+	New_Event_State* state = &s_new_event_state;
+	
+	GUI_Begin_Context(&s_gui, GUI_Anchor::top_left, GUI_Build_Direction::down_left, &s_theme);
+	
+	GUI_Do_Text(&s_gui, &GUI_AUTO_TOP_LEFT, "Luo uusi tapahtuma.", {}, v2f{2,2}, true);
+	GUI_Do_Text(&s_gui, AUTO, "Tapahtuman nimi:");
+	
+	{		
+		v2f d = v2f{182, 26};
+		GUI_Do_SL_Input_Field(&s_gui, AUTO, &d, &state->event_name);
+	}
+	
+	if(GUI_Do_Button(&s_gui, AUTO, &GUI_AUTO_FIT, "Lisaa uusi osallistuja"))
+	{
+		if(state->participent_count < Array_Lenght(state->participents))
+			state->participent_count += 1;
+		
+	}
+	
+	if(state->participent_count > 0)
+	{
+		GUI_Push_Layout(&s_gui);
+		
+		s_gui.layout.build_direction = GUI_Build_Direction::right_center;
+		
+		if(GUI_Do_Button(&s_gui, AUTO, &GUI_AUTO_FIT, "Poista kaikki osallistujat"))
+		{
+			for(u32 i = 0; i < state->participent_count; ++i)
+			{
+				*state->participents[i].requirements = {};
+				state->participents[i].requirement_count = 0;
+			}
+			state->participent_count = 0;
+		}
+		
+		GUI_Pop_Layout(&s_gui);
+	}
+	
+	for(u32 i = 0; i < state->participent_count; ++i)
+	{
+		Participent* p = state->participents + i;
+		
+		GUI_Push_Layout(&s_gui);
+		
+		v2f dim = v2f{18, 18};
+		if(GUI_Do_Button(&s_gui, AUTO, &dim, "X"))
+		{
+			u32 size = sizeof(Participent);
+			Remove_Element_From_Packed_Array(state->participents, &state->participent_count, size, i--);
+			GUI_Pop_Layout(&s_gui);
+			continue;
+		}
+		
+		GUI_Push_Layout(&s_gui);
+		
+		s_gui.layout.build_direction = GUI_Build_Direction::right_center;
+		GUI_Do_Text(&s_gui, AUTO, (char*)state->p[i]);
+		
+		GUI_Pop_Layout(&s_gui);
+		
+		if(u32 s = GUI_Do_Dropdown_Button(
+			&s_gui, 
+			AUTO, 
+			&GUI_AUTO_FIT, 
+			"Lisaa vaatimus", 
+			(u32)Participation_Requirement::Type::COUNT, 
+			(char**)Participation_Requirement::type_names))
+		{
+			if(p->requirement_count < Array_Lenght(p->requirements))
+			{
+				p->requirements[p->requirement_count] = {(Participation_Requirement::Type)(s - 1)};
+				p->requirement_count += 1;				
+			}
+		}
+		
+		for(u32 j = 0; j < p->requirement_count; ++j)
+		{
+			Participation_Requirement* r = p->requirements + j;
+			
+			if(GUI_Do_Button(&s_gui, AUTO, &dim, "X"))
+			{
+				u32 size = sizeof(Participation_Requirement);
+				Remove_Element_From_Packed_Array(p->requirements, &p->requirement_count, size, j--);
+			}
+			
+			GUI_Push_Layout(&s_gui);
+			
+			s_gui.layout.build_direction = GUI_Build_Direction::right_center;
+			GUI_Do_Text(&s_gui, AUTO, (char*)Participation_Requirement::type_names[(u32)r->type]);
+			
+			GUI_Pop_Layout(&s_gui);
+		}
+		
+		GUI_Pop_Layout(&s_gui);
+		s_gui.layout.last_element_pos.x += 150;	
+		
+	}
+	
+	GUI_End_Context(&s_gui);
+}
+
+static void SL_Input()
+{
+	GUI_Begin_Context(&s_gui, GUI_Anchor::top_left, GUI_Build_Direction::down_left, &s_theme);
+	
+	GUI_Do_Text(&s_gui, &GUI_AUTO_TOP_LEFT, "Teksti laatikko testi:", {}, v2f{2,2}, true);
+	v2f d = v2f{250, 26};
+	GUI_Do_SL_Input_Field(&s_gui, AUTO, &d, &s_new_event_state.event_name);
+	
+	GUI_End_Context(&s_gui);
+}
+
+
+#if 0
 
 static void GUI_Create_New_Event_Frame();
 
@@ -35,369 +541,4 @@ struct Character_Stat
 	Stats type;
 	i8 value;
 };
-
-
-struct Participation_Requirement
-{
-	static inline const char* Type_Names[] = 
-		{"Ominaisuus", "Esine Merkki", "Hahmo Merkki"};
-	
-	enum class Type
-	{
-		character_stat = 0,
-		mark_item,
-		mark_personal,
-		COUNT
-	};
-	
-	Type type;
-	
-	union
-	{
-		struct
-		{
-			String tag_name;
-			Exists_Statement es;		
-		};
-		
-		struct 
-		{
-			Character_Stat stat;
-			Numerical_Relation nr;
-			i8 relation_value;
-		};
-	};
-};
-
-
-struct Participant_Requirements
-{
-	static constexpr u32 max_participation_requirements = 5;
-	
-	u32 requirement_count = 0;
-	Participation_Requirement requirements[max_participation_requirements];
-};
-
-
-struct New_Event_State
-{
-	u32 participent_count = 0;
-	static constexpr u32 max_participent_count = 4;
-	
-	static inline const char* p[] = {"/k1", "/k2", "/k3", "/k4"};
-	
-	String event_name; // ???
-	
-	Participant_Requirements participation_requirements[max_participent_count];
-
-};
-static New_Event_State s_new_event_state;
-
-
-static inline void Init_GUI()
-{	
-	v3<u8> c;
-	f32 g;
-	
-	{		
-		c = {165, 80, 80};
-		s_gui.default_theme.selected_color = Put_Color(c.r, c.g, c.b);
-		
-		g = 0.5f;
-		s_gui.default_theme.down_color = Put_Color(u8(c.r * g), u8(c.g * g), u8(c.b * g));
-		
-		g = 1.3f;
-		s_gui.default_theme.title_color = Put_Color(u8(c.r * g), u8(c.g * g), u8(c.b * g));
-	}
-	
-	{		
-		c = {80, 55, 50};
-		s_gui.default_theme.background_color = Put_Color(c.r, c.g, c.b);
-		g = 2.f;
-		s_gui.default_theme.outline_color = Put_Color(u8(c.r * g), u8(c.g * g), u8(c.b * g));
-	}
-	
-	s_gui.default_theme.font.data_buffer = (u8*)&s_terminus_font[0];
-	s_gui.default_theme.font.char_width = s_terminus_font_char_width;
-	s_gui.default_theme.font.char_height = s_terminus_font_char_height;
-
-	GUI_Set_Default_Menu_Actions(&s_gui);
-	
-	Init_String(&s_new_event_state.event_name, &s_mem, 6);
-}
-
-
-static void GUI_Rebuild_New_Event_Frame()
-{
-	u32 selection = s_gui.active_frame.selected_idx;
-	GUI_Pop_Frame(&s_gui, &s_platform, &s_mem);
-	GUI_Create_New_Event_Frame();
-
-	if(selection < s_gui.active_frame.widget_count)
-		s_gui.active_frame.selected_idx = selection;
-	else
-		s_gui.active_frame.selected_idx = s_gui.active_frame.widget_count - 1;
-}
-
-
-static void GUI_Add_New_Participent(u32)
-{
-	if(s_new_event_state.participent_count < s_new_event_state.max_participent_count)
-	{
-		s_new_event_state.participent_count += 1;
-		GUI_Rebuild_New_Event_Frame();	
-	}
-}
-
-
-static void GUI_Add_Participation_Requirement(u32 event_id, u32 button_idx)
-{
-	Assert(event_id < s_new_event_state.participent_count);
-	Participant_Requirements* prs = &s_new_event_state.participation_requirements[event_id];
-	
-	if(prs->requirement_count < Array_Lenght(prs->requirements))
-	{
-		Participation_Requirement* pr = prs->requirements + prs->requirement_count;
-		*pr = {};
-		pr->type = static_cast<Participation_Requirement::Type>(button_idx);
-		prs->requirement_count += 1;
-		
-		GUI_Rebuild_New_Event_Frame();
-	}
-}
-
-
-static void GUI_Delete_Participation_Requirement(Participation_Requirement* pr)
-{
-	// TODO: clean up any memory allocations. This get's hairy with strings!
-	*pr = {};
-}
-
-
-static void GUI_Delete_Participation_Requirement(Participant_Requirements* prs, u32 idx)
-{
-	// NOTE shifts up elements, when deleting intivitual requirements.
-	GUI_Delete_Participation_Requirement(prs->requirements + idx);
-	
-	Remove_Element_From_Packed_Array<Participation_Requirement>
-		(prs->requirements, &prs->requirement_count, idx);
-		
-	prs->requirements[prs->requirement_count] = {};
-};
-
-
-static void GUI_Delete_Participation_Requirements(Participant_Requirements* prs)
-{
-	for(u32 i = 0; i < prs->requirement_count; ++i)
-		GUI_Delete_Participation_Requirement(prs->requirements + i);
-	
-	prs->requirement_count = 0;
-}
-
-
-static void GUI_Remove_Participent(u32 event_id)
-{
-	GUI_Delete_Participation_Requirements(s_new_event_state.participation_requirements + event_id);
-	
-	Remove_Element_From_Packed_Array<Participant_Requirements>
-		(s_new_event_state.participation_requirements, &s_new_event_state.participent_count, event_id);
-	
-	s_new_event_state.participation_requirements[s_new_event_state.participent_count] = {};
-	
-	GUI_Rebuild_New_Event_Frame();
-}
-
-
-static void GUI_Remove_All_Participents(u32)
-{
-	for(u32 i = 0; i < s_new_event_state.participent_count; ++i)
-		GUI_Delete_Participation_Requirements(s_new_event_state.participation_requirements + i);
-	
-	s_new_event_state.participent_count = 0;
-	GUI_Rebuild_New_Event_Frame();
-}
-
-
-static void GUI_Remove_Participation_Requirement(u32 event_id)
-{
-	u32 idx = event_id;
-	for(u32 i = 0; i < s_new_event_state.participent_count; ++i)
-	{
-		u32 req_count = s_new_event_state.participation_requirements[i].requirement_count;
-		if(idx < req_count)
-		{
-			GUI_Delete_Participation_Requirement(s_new_event_state.participation_requirements + i, idx);
-			GUI_Rebuild_New_Event_Frame();
-			return;
-		}
-		
-		idx -= req_count;
-	}
-	
-	Terminate;
-}
-
-
-static void Pop_GUI_Frame()
-{
-	GUI_Pop_Frame(&s_gui, &s_platform, &s_mem);	
-}
-
-
-static void GUI_Create_New_Event_Frame()
-{	
-	GUI_Builder builder = GUI_Builder_Create(
-		&s_interim_mem, 
-		&s_gui,
-		GUI_Link_Direction::up, 
-		GUI_Build_Direction::down_left);
-	
-	builder.anchor = GUI_Anchor::top_left;
-	
-	
-	{
-		GUI_Text frame_title;
-		frame_title.text = "Luo uusi tapahtuma.";
-		frame_title.text_scale = v2f{} + 2.0f;
-		frame_title.is_title = true;
-		
-		v2f position = v2f{builder.theme->padding, f32(s_canvas.dim.y) - builder.theme->padding};
-		GUI_Builder_Create_Text(&builder, &frame_title, &position);
-	}
-	
-	{
-		GUI_Text text;
-		text.text = "Tapahtuman nimi:";
-		text.text_scale = v2f{1,1};
-		text.is_title = false;
-		GUI_Builder_Create_Text(&builder, &text, 0)->highlight_idx = builder.widget_count;
-		
-		GUI_Input_Field event_name_field = GUI_Input_Field();
-		event_name_field.str = &s_new_event_state.event_name;
-		event_name_field.text_scale = v2f{1, 1};
-		event_name_field.character_limit = U16_MAX;
-		event_name_field.character_check = 0;
-		
-		v2f dimensions = v2f{182, 20};
-		
-		GUI_Builder_Create_Input_Field(&builder, &event_name_field, 0, &dimensions);
-	}
-	
-	{
-		GUI_Button button;
-		button.text = "Lisaa uusi osallistuja";
-		button.text_scale = v2f{} + 1;
-		button.on_click = GUI_Add_New_Participent;
-		
-		v2f dim = GUI_Builder_Fit_Button_Dimensions_To_Text(&builder, &button);
-		
-		GUI_Builder_Create_Button(&builder, &button, 0, &dim);
-	}
-	
-	if(s_new_event_state.participent_count > 0)
-	{
-		GUI_Builder_Push_Placement(&builder);
-		
-		builder.build_direction = GUI_Build_Direction::right_center;
-		
-		{
-			GUI_Button button;
-			button.text = "Poista kaikki osallistujat";
-			button.text_scale = v2f{} + 1;
-			button.on_click = GUI_Remove_All_Participents;
-			
-			v2f dim = GUI_Builder_Fit_Button_Dimensions_To_Text(&builder, &button);
-			
-			GUI_Builder_Create_Button(&builder, &button, 0, &dim);
-		}
-		
-		GUI_Builder_Pop_Placement(&builder);
-
-	}
-	
-	
-	u32 delete_requirement_id = 0;
-	for(u32 i = 0; i < s_new_event_state.participent_count; ++i)
-	{
-		{			
-			GUI_Button delete_participent;
-			delete_participent.text = "X";
-			delete_participent.text_scale = v2f{} + 1;
-			delete_participent.on_click = GUI_Remove_Participent;
-			delete_participent.event_id = i;
-			
-			v2f dim = v2f{18,18};
-			
-			u32 button_idx = GUI_Builder_Create_Button(&builder, &delete_participent, 0, &dim).idx;
-			
-			builder.build_direction = GUI_Build_Direction::down_left;
-			
-			{
-				GUI_Builder_Push_Placement(&builder);
-				
-				builder.build_direction = GUI_Build_Direction::right_center;
-				GUI_Text participent;
-				participent.text = (char*)s_new_event_state.p[i];
-				participent.text_scale = v2f{} + 1;
-				
-				GUI_Builder_Create_Text(&builder, &participent, 0)->highlight_idx = button_idx;
-				
-				GUI_Builder_Pop_Placement(&builder);
-			}
-		
-			GUI_Builder_Push_Placement(&builder);
-		}
-
-		{
-			GUI_List_Button add_reg;
-			add_reg.text = "Lisaa vaatimus";
-			add_reg.text_scale = v2f{} + 1;
-			add_reg.on_select = GUI_Add_Participation_Requirement;
-			add_reg.event_id = i;
-			add_reg.list_element_count = (u32)Participation_Requirement::Type::COUNT;
-			
-			v2f dim = GUI_Builder_Fit_List_Button_Dimensions_To_Text(&builder, &add_reg);
-			
-			GUI_List_Button_Element* element_array = 0;
-			
-			GUI_Builder_Create_List_Button(&builder, &add_reg, 0, &dim, &element_array);
-			
-			for(u32 j = 0; j < add_reg.list_element_count; ++j)
-				element_array[j].text = (char*)Participation_Requirement::Type_Names[j];
-		}
-		
-		Participant_Requirements* prs = s_new_event_state.participation_requirements + i;
-		for(u32 j = 0; j < prs->requirement_count; ++j)
-		{
-			GUI_Button delete_requirement;
-			delete_requirement.text = "X";
-			delete_requirement.text_scale = v2f{} + 1;
-			delete_requirement.on_click = GUI_Remove_Participation_Requirement;
-			delete_requirement.event_id = delete_requirement_id++;
-			
-			v2f dim = v2f{18,18};
-			
-			u32 button_idx = GUI_Builder_Create_Button(&builder, &delete_requirement, 0, &dim).idx;
-			
-			GUI_Builder_Push_Placement(&builder);
-			builder.build_direction = GUI_Build_Direction::right_bottom;
-			
-			Participation_Requirement* pr = prs->requirements + j;
-			
-			GUI_Text text;
-			text.text = (char*)Participation_Requirement::Type_Names[(u32)pr->type];
-			text.text_scale = v2f{} + 1.f;
-			
-			GUI_Builder_Create_Text(&builder, &text, 0)->highlight_idx = button_idx;
-			
-			GUI_Builder_Pop_Placement(&builder);
-		}
-		
-		GUI_Builder_Pop_Placement(&builder);
-		builder.build_direction = GUI_Build_Direction::right_top;
-		
-		builder.last_element_pos.x += 131;
-	}
-	
-	GUI_Push_Frame(&s_gui, &builder, &s_platform, &s_mem, 0, 0);
-}
+#endif

@@ -24,7 +24,6 @@ void Init_App(Platform_Calltable platform_calltable, void* app_memory, u32 app_m
 	Init_Canvas(&s_canvas, pixel_buffer, v2i::Cast<u32>(pixel_buffer_dim));
 	Init_GUI();
 
-	GUI_Create_New_Event_Frame();
 }
 
 
@@ -38,7 +37,10 @@ void Update_App(f64 delta_time, bool* update_surface)
 	
 	*update_surface = true;
 	Clear_Canvas(&s_canvas, Put_Color(20, 20, 20));
-	
-	GUI_Handle_Input(&s_gui, &s_platform);
-	GUI_Draw_Widgets(&s_gui, &s_canvas, &s_interim_mem);
+		
+	SL_Input();
+	//Random_Test_UI();
+	//AUTO_TEST();
+	//Do_Theme_Menu();
+	//Do_New_Event_Frame();
 }

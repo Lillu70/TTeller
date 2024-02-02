@@ -8,7 +8,7 @@ static inline u32 Put_Color(u8 r, u8 g, u8 b, u8 a = 0xff)
 }
 
 
-// Returns the lenght of the buffer, excluding the null terminator.
+// Returns the lenght of the buffer. Does NOT include the null terminator.
 static u32 Null_Terminated_Buffer_Lenght(u8* buffer)
 {
 	u8* b;
@@ -33,6 +33,7 @@ static inline void Mem_Copy(void* dest, void* source, u32 byte_count)
 {
 	Assert(dest);
 	Assert(source);
+	Assert(byte_count);
 	
 	for(u32 i = 0; i < byte_count; ++i)
 	{
@@ -54,6 +55,8 @@ static inline void Mem_Zero(void* mem, u32 byte_count)
 static void Remove_Element_From_Packed_Array(void* array, u32* array_count, u32 element_size, u32 remove_idx)
 {
 	Assert(remove_idx < *array_count);
+	Assert(*array_count > 0);
+	
 	for(u32 i = remove_idx; i < *array_count - 1; ++i)
 	{
 		u8* a = (u8*)array + (i * element_size);
@@ -62,6 +65,41 @@ static void Remove_Element_From_Packed_Array(void* array, u32* array_count, u32 
 	}
 	
 	*array_count -= 1;
+	Mem_Zero((u8*)array + (*array_count * element_size), element_size);
+}
+
+
+static void Remove_Elements_From_Packed_Array(
+	void* array, 
+	u32* array_count,
+	u32 element_size,
+	u32 remove_from_idx,
+	u32 remove_to_idx)
+{
+	
+}
+
+
+static void Insert_Element_Into_Packed_Array(
+	void* array, 
+	void* element, 
+	u32* array_count, 
+	u32 element_size, 
+	u32 insert_idx)
+{
+	Assert(insert_idx < *array_count);
+	Assert(*array_count > 0);
+	
+	for(u32 i = *array_count; i > insert_idx; --i)
+	{
+		u8* a = (u8*)array + (i * element_size);
+		u8* b = a - element_size;
+		Mem_Copy(a, b, element_size);
+	}
+	
+	Mem_Copy(((u8*)array + insert_idx), element, element_size);
+	
+	*array_count += 1;
 }
 
 

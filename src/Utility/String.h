@@ -5,14 +5,58 @@
 struct String
 {
 	char* buffer;
-	u32 lenght;
-	u32 capacity;
+	u32 lenght;		// Character count of the string. Does not include the null terminator.
+	u32 capacity; 	// The memory reserved for the string.
 	
 	General_Allocator* alloc;
 	
+	// CONSIDER: To member function or not? For some reason feels good here.
 	void append_character(char c);
+	void insert_at(u32 idx, char c);
+	void remove_at(u32 idx);
+	void erase(u32 from, u32 to);
 	void pop_last();
 };
+
+
+struct String_View
+{
+	char* buffer = 0;
+	u32 lenght = 0;
+};
+
+
+String_View Create_String_View(String* str)
+{
+	Assert(str);
+	Assert(str->buffer);
+	Assert(str->lenght);
+	
+	String_View result = {str->buffer, str->lenght};
+	
+	return result;
+}
+
+
+String_View Create_String_View(char* c_str)
+{
+	Assert(c_str);
+	String_View result = {c_str, Null_Terminated_Buffer_Lenght(c_str)};
+	return result;
+}
+
+
+String_View Create_String_View(String* str, u32 start, u32 lenght)
+{
+	Assert(str);
+	Assert(str->buffer);
+	Assert(str->lenght);
+	Assert(str->buffer + start + lenght <= str->buffer + str->lenght);
+	
+	String_View result = {str->buffer + start, lenght};
+	
+	return result;
+}
 
 
 static void String_Init_Alloc(String* str, u32 capacity)
@@ -39,6 +83,24 @@ static void Init_String(String* str, General_Allocator* allocator, u32 capacity)
 		String_Init_Alloc(str, capacity);
 	else
 		str->buffer = 0;
+}
+
+
+// Takes a null terminted C style string, as an argument. Lenght of it, determines capacity.
+static void Init_String(String* str, General_Allocator* allocator, char* c_str)
+{
+	Assert(allocator);
+	Assert(c_str);
+	
+	u32 lenght = Null_Terminated_Buffer_Lenght(c_str);
+	
+	str->lenght = lenght;
+	str->alloc = allocator;
+	
+	String_Init_Alloc(str, lenght + 1);
+	
+	Mem_Copy(str->buffer, c_str, lenght);
+	str->buffer[lenght] = 0;
 }
 
 
@@ -76,6 +138,56 @@ void String::pop_last()
 	buffer[lenght - 1] = 0;
 	lenght -= 1;
 }
+
+
+void String::insert_at(u32 idx, char c)
+{
+	Assert(idx <= lenght);
+	
+	if(idx == lenght)
+	{
+		append_character(c);
+	}
+	else
+	{
+		// "append_character" Is used to grow the string if need be,
+		// but it also increases the lenght by one. Normaly this is desired.
+		// Problem is that "Insert_Element_Into_Packed_Array" also increases the character
+		// count. We don't want to increase lenght twise so as a hack,
+		// after appending lenght is reduced by one, so it ends up being tracked corretly.
+		
+		append_character(0);
+		lenght -= 1; // :(
+		
+		// TODO: Make a Insert_Element_Into_Packed_Byte_Array function.
+		// A version of the function that assumes size 1.
+		Insert_Element_Into_Packed_Array(buffer, &c, &lenght, sizeof(*buffer), idx);
+	}
+}
+
+
+void String::remove_at(u32 idx)
+{
+	Assert(idx <= lenght);
+	
+	if(idx == lenght)
+		pop_last();
+	else
+	{
+		// TODO: Make a Remove_Element_From_Packed_Byte_Array function.
+		// A version of the function that assumes size 1.
+		Remove_Element_From_Packed_Array(buffer, &lenght, sizeof(*buffer), idx);
+	}
+}
+
+
+// "To" is exclusive.
+void String::erase(u32 from, u32 to)
+{
+	for(u32 i = from; i < to; ++i)
+		remove_at(from);
+}
+
 
 // BEWARE: when doing this to a pointer to a string. Dreference or you WILL fuck up the pointer.
 static void operator += (String& str, char c)

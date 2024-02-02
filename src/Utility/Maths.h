@@ -18,6 +18,16 @@ static inline T Min(T value, T min)
 	T result = (value < min)? value : min;
 	return result;
 }
+
+
+template<typename T>
+static inline void Swap(T* a, T* b)
+{
+	T temp = *a;
+	
+	*a = *b;
+	*b = temp;
+}
 #endif
 
 static inline f32 Sin(f32 value)
@@ -108,7 +118,21 @@ static inline f32 Round(f32 real)
 }
 
 
-static inline v2f Hadamar(v2f a, v2f b)
+static inline v2f Round(v2f v)
+{
+	v2f result = v2f{Round(v.x), Round(v.y)};
+	return result;
+}
+
+
+static inline v2f Hadamar_Division(v2f a, v2f b)
+{
+	v2f result = {a.x / b.x, a.y / b.y};
+	return result;
+}
+
+
+static inline v2f Hadamar_Product(v2f a, v2f b)
 {
 	v2f result = {a.x * b.x, a.y * b.y};
 	return result;
@@ -234,4 +258,36 @@ static inline f32 Clamp_To_Barycentric(f32 real)
 		return 0;
 	
 	return real;
+}
+
+
+static inline u32 Noise_Squirrel3(i32 np, u32 seed)
+{
+	constexpr u32 BIT_NOISE1 = 0xB5297A3D;
+	constexpr u32 BIT_NOISE2 = 0x68E31DA4;
+	constexpr u32 BIT_NOISE3 = 0x1B56C4E9;
+	
+	i32 mangled = np;
+	mangled *= BIT_NOISE1;
+	mangled += seed;
+	mangled ^= (mangled >> 8);
+	mangled += BIT_NOISE2;
+	mangled ^= (mangled << 8);
+	mangled *= BIT_NOISE3;
+	mangled ^= (mangled >> 8);
+	return mangled;
+}
+
+
+static inline u32 Noise_Squirrel3_2D(v2i np, u32 seed)
+{
+	constexpr int PRIME_NUMBER = 198491317;
+	return Noise_Squirrel3(np.x + (PRIME_NUMBER * np.y), seed);
+}
+
+
+static inline f32 Clamp_Zero_To_One(f32 real)
+{
+	f32 result = Max(0.f, Min(1.f, real));
+	return result;
 }

@@ -1,32 +1,20 @@
 
 #pragma once
 
-// TODO: Add function definations.
+static thread_local v2f GUI_AUTO_FIT 			= v2f{0, 0};
 
+static thread_local v2f GUI_AUTO_TOP_CENTER 	= v2f{0, 0};
+static thread_local v2f GUI_AUTO_TOP_RIGHT 		= v2f{0, 0};
+static thread_local v2f GUI_AUTO_TOP_LEFT 		= v2f{0, 0};
 
-/*
+static thread_local v2f GUI_AUTO_MIDDLE_RIGHT	= v2f{0, 0};
+static thread_local v2f GUI_AUTO_MIDDLE_LEFT	= v2f{0, 0};
 
-*/
+static thread_local v2f GUI_AUTO_BOTTOM_CENTER 	= v2f{0, 0};
+static thread_local v2f GUI_AUTO_BOTTOM_RIGHT 	= v2f{0, 0};
+static thread_local v2f GUI_AUTO_BOTTOM_LEFT 	= v2f{0, 0};
 
-enum class GUI_Widget_Type : u16
-{
-	none = 0,
-	button,
-	slider,
-	checkbox,
-	key_listener,
-	list_button,
-	input_field,
-	COUNT
-};
-
-
-enum class GUI_Static_Widget_Type : u16
-{
-	none = (u16)GUI_Widget_Type::COUNT,
-	text,
-	image
-};
+static thread_local v2f GUI_AUTO_MIDDLE 		= v2f{0, 0};
 
 
 struct GUI_Theme
@@ -43,25 +31,45 @@ struct GUI_Theme
 	Font font;
 };
 
-
-enum class GUI_Menu_Actions
+ 
+struct GUI_Input_Acceleration_Behavior
 {
-	back = 0,
-	enter,
-	up,
-	down,
-	left,
-	right,
-	mouse,
-	COUNT
+	f64 input_speed_up_time = 0.2f;
+	f64 input_delay_time = 0.1f;
+	f64 max_speed_up_factor = 50.f;
 };
 
 
-enum class GUI_Link_Direction : u8
+struct GUI_Highlight
 {
-	up  = 0,
-	down
+	i32 idx = 0;
+	i32 highlight_count = 0;
 };
+
+namespace GUI_Menu_Actions
+{
+	enum : u32
+	{
+		back = 0,
+		enter,
+		up,
+		down,
+		left,
+		right,
+		mouse,
+		COUNT
+	};
+}
+
+
+namespace GUI_Link_Direction
+{
+	enum Type : i8
+	{
+		up  = 1,
+		down = -1
+	};	
+}
 
 
 enum class GUI_Build_Direction : u8
@@ -95,230 +103,129 @@ enum class GUI_Anchor : u8
 };
 
 
-struct GUI_Widget_Header
+enum class GUI_Defered_Render_Type
 {
-	GUI_Widget_Type type = GUI_Widget_Type::none;	
-	v2f position = {};
-	v2f dimensions = {};
-	GUI_Theme* theme = 0;
+	none = 0,
+	dropdown_button
 };
 
 
-struct GUI_Static_Widget_Header
-{
-	GUI_Static_Widget_Type type = GUI_Static_Widget_Type::none;
-	u16 highlight_idx = U16_MAX;
-	
-	v2f position = {};
-	GUI_Theme* theme = 0;
-};
-
-
-struct GUI_Button
-{
-	char* text = 0;
-	v2f text_scale = v2f{1, 1};
-	u32 event_id = 0;
-	void(*on_click)(u32) = 0;
-};
-
-
-struct GUI_List_Button
-{
-	char* text = 0;
-	v2f text_scale = v2f{1, 1};
-	u32 event_id = 0;
-	u32 list_element_count = 2;
-	void(*on_select)(u32, u32) = 0;
-};
-
-
-struct GUI_List_Button_Element
-{
-	char* text;
-};
-
-
-struct GUI_Input_Field
-{
-	String* str = 0;
-	bool(*character_check)(GUI_Input_Field*, char) = 0;
-	v2f text_scale = v2f{1, 1};
-	u16 character_limit = U16_MAX;
-};
-
-
-struct GUI_Text
-{
-	char* text = 0;
-	v2f text_scale = v2f{1,1};
-	bool is_title = 0;
-};
-
-
-struct GUI_Slider
-{	
-	f32 value = 0; // 0-1.f
-	f32 step = 0.01f;
-	f32 min = 0;
-	f32 max = 1;
-	f32 action_speed_up_time = 1.f;
-	f32 action_tick_rate = 0.05f;
-	
-	void(*on_value_change)(GUI_Slider*) = 0;
-};
-
-
-struct GUI_Checkbox
-{
-	bool is_checked = 0;
-	void(*on_value_change)(GUI_Checkbox*) = 0;
-};
-
-
-struct GUI_Key_Listener
-{
-	Action* action_array = 0;   //ptr
-	u32 action_idx = 0;         //offset
-	void(*on_trigger)(Key_Code, Button, Action*, u32) = 0;
-};
-
-
-struct GUI_Selection_State
-{
-	// NOTE: This shit is a fucking trainwreck..
-	// Having to type this "handler->selection_state.element.XXXXXX.thing",
-	// When accessing these gets old very fast.
-	// CONSIDER: A better way of doing this.
-	
-	union Element
-	{
-		struct Button
-		{
-			bool is_pressed;
-		};
-		Button button;
-		
-		struct List_Button
-		{
-			bool is_pressed;
-			bool is_open;
-			u32 selected_idx;
-		};
-		List_Button list_button;
-		
-		struct Checkbox
-		{
-			bool is_pressed;
-		};
-		Checkbox checkbox;
-		
-		struct Slider
-		{
-			bool is_clicked;
-			
-			f64 last_time_stamp = 0;
-			f32 full_action_time = 0;
-			f32 accum_action_time = 0;
-		};
-		Slider slider;
-		
-		struct Input_Field
-		{
-			u32 write_cursor_position = 0;
-			f64 flicker_start_time = 0;
-			
-			static constexpr f64 flicker_delay = 3.0;
-			
-			bool is_active = 0;
-			bool is_pressed = 0;
-			bool draw_cursor = 0;
-		};
-		Input_Field input_field;
-	};
-	Element element = {};
-	
-	bool cursor_on_selection = false;
-};
-
-
-struct GUI_Frame
-{
-	u16 widget_count = 0;
-	u16 static_widget_count = 0;
-	
-	// CONSIDER: Frame could use a selection ptr instead.
-	//		At this point the memory is stable and is reference safe.
-	u16 selected_idx = U16_MAX;
-	
-	GUI_Link_Direction ld = GUI_Link_Direction::up;
-	
-	void* memory = 0; 
-	GUI_Widget_Header** random_access_table = 0;
-	GUI_Widget_Header* widgets = 0;
-	GUI_Static_Widget_Header* static_widgets = 0;
-	
-	
-	void(*on_frame_close)() = 0;
-	void(*on_back_action)() = 0;
-	GUI_Frame* prev_frame = 0;
-};
-
-
-struct GUI_Handler
-{
-	GUI_Frame active_frame = GUI_Frame();
-	
-	v2i last_cursor_position = v2i{-1, -1};
-	
-	GUI_Selection_State selection_state = {};
-
-	GUI_Theme default_theme = GUI_Theme();
-	Action actions[(u32)GUI_Menu_Actions::COUNT] = {};
-};
-
-
-// TODO: Rename this thing!
-struct GUI_Add_Result
-{
-	GUI_Widget_Header* widget = 0;
-	u16 idx = 0;
-};
-
-
-struct Placement_Storage
+struct GUI_Placement
 {
 	v2f pos;
 	v2f dim;
-	GUI_Build_Direction bl;
+	
+	Rect rect;
 };
 
 
-struct GUI_Builder
+struct GUI_Button_State
 {
-	Linear_Allocator* allocator = 0;
-	Linear_Allocator allocator_state_copy = {};
+	bool is_pressed_down;
+};
+
+
+struct GUI_Slider_State
+{
+	f64 input_start_time;
+	f64 next_input_time;
 	
-	GUI_Theme* theme = 0;
+	bool is_held_down;
+};
+
+
+struct GUI_Dropdown_Button_State
+{
+	char** element_names;
+	GUI_Theme* theme;
 	
-	GUI_Link_Direction link_direction = GUI_Link_Direction::up;
-	GUI_Build_Direction build_direction = GUI_Build_Direction::down_center;
-	GUI_Anchor anchor = GUI_Anchor::center;
+	u32 selected_element_idx;
+	u32 element_count;
+	Rect open_rect;
+	v2f text_scale;
+	v2f pos;
+	v2f dim;
 	
+	bool is_pressed_down;
+	bool is_open;
+};
+
+
+struct GUI_SL_Input_Field_State
+{
+	u32 view_offset = 0;
+	u32 write_cursor_position = 0;
+	u32 text_select_start_point = 0;
+	f64 flicker_start_time = 0;
+	f64 next_input_time = 0;
+	f64 input_start_time = 0;
+	
+	bool text_select_mode = 0;
+	bool handel_drag_mode = 0;
+	bool is_pressed_down = 0;
+	bool is_active = 0;
+	bool draw_cursor = 0;
+
+	static constexpr f64 flicker_delay = 3.0;
+	static constexpr f64 input_delay = 0.4;
+	static constexpr f64 input_speed_up_time = 0.5;
+	static constexpr f64 max_speed_up_factor = 10;
+};
+
+
+union GUI_Element_State
+{
+	GUI_Button_State button;
+	GUI_Slider_State slider;
+	GUI_Dropdown_Button_State dropdown_button;
+	GUI_SL_Input_Field_State sl_input_field;
+};
+
+
+struct GUI_Layout
+{
+	GUI_Anchor anchor;
+	GUI_Build_Direction build_direction;
+	
+	GUI_Theme* theme;
+
 	v2f last_element_pos = {};
 	v2f last_element_dim = {};
 	
-	u16 widget_count = 0;
-	u16 static_widget_count = 0;
+	bool one_time_skip_padding = false;
+};
+
+
+// Some data has to be persistent across frames,
+// some done not. How to seperate them?
+struct GUI_Context
+{
+	// CONSIDER: These variables, need further thought. How are they set? When?
+	Canvas* canvas = 0;
+	Platform_Calltable* platform = 0;
+	Action actions[GUI_Menu_Actions::COUNT] = {}; // <- Make this global?
 	
-	u16 selected_idx = 0;
+	i32 selected_index = 0;
+	i32 widget_count = 0; 
+	u32 selected_id = 0;
 	
-	u16 widget_memory_count = 0;
-	u16 static_widget_memory_count = 0;
+	i32 last_widget_count = 0;
+	v2i last_cursor_position;
+	v2i cursor_position;
 	
-	GUI_Add_Result first_element = {};
-	GUI_Add_Result last_element = {};
+	Rect cursor_mask_area = {};
 	
-	Placement_Storage placement_stack[5] = {};
-	u32 placement_stack_count = 0;
+	GUI_Layout layout;
+	
+	u32 layout_stack_count = 0;
+	GUI_Layout layout_stack[5];
+	
+	GUI_Defered_Render_Type defered_render = GUI_Defered_Render_Type::none;
+	
+	GUI_Element_State selection_state = {};
+	
+	bool cursor_mask_validation = 0;
+	bool cursor_mask_enabled = 0;
+	
+	bool disable_kc_navigation = 0; // kc = Keyboard/Controller
 };

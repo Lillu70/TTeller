@@ -521,7 +521,7 @@ static void Draw_Text(
 
 	v2i cursor = {};
 
-	v2f glyph_size = Hadamar(v2f{f32(font->char_width), f32(font->char_height)}, scale);
+	v2f glyph_size = Hadamar_Product(v2f{f32(font->char_width), f32(font->char_height)}, scale);
 
 	for(; *text; ++text, ++cursor.x)
 	{
@@ -540,7 +540,55 @@ static void Draw_Text(
 		
 		font_offset *= font->char_height;
 		
-		v2f p = Hadamar(v2i::Cast<f32>(cursor), glyph_size) + pos;
+		v2f p = Hadamar_Product(v2i::Cast<f32>(cursor), glyph_size) + pos;
+		Draw_Glypgh(canvas, p, scale, color, font_offset, font);
+	}
+}
+
+
+static void Draw_Text(
+	Canvas* canvas,
+	String_View text,
+	v2f pos,
+	u32 color,
+	Font* font,
+	v2f scale)
+{
+	Assert(canvas);
+	Assert(font);
+	Assert(scale.x > 0);
+	Assert(scale.y > 0);
+	
+	#if 0
+	if(scale == v2f{1.f, 1.f})
+	{
+		Draw_Text(canvas, text, pos, color, font);
+		return;
+	}
+	#endif
+
+	v2i cursor = {};
+
+	v2f glyph_size = Hadamar_Product(v2f{f32(font->char_width), f32(font->char_height)}, scale);
+
+	for(char* ptr = text.buffer; ptr < text.buffer + text.lenght; ++ptr, ++cursor.x)
+	{
+		u8 glyph = (*ptr);
+		i32 font_offset = (i32)glyph - 33;
+		
+		if(glyph == '\n')
+		{
+			cursor.x = -1;
+			cursor.y += 1;
+			continue;	
+		}
+		
+		if(font_offset < 0 || font_offset > 93)
+			continue;
+		
+		font_offset *= font->char_height;
+		
+		v2f p = Hadamar_Product(v2i::Cast<f32>(cursor), glyph_size) + pos;
 		Draw_Glypgh(canvas, p, scale, color, font_offset, font);
 	}
 }
@@ -564,7 +612,7 @@ static void Draw_Glypgh(
 	f32 uf = Componentwise_Mult({inv_fraction.x, fraction.y});
 	f32 rf = Componentwise_Mult({fraction.x, inv_fraction.y});
 	
-	v2f glyph_size = Hadamar(v2f{f32(font->char_width), f32(font->char_height)}, scale);
+	v2f glyph_size = Hadamar_Product(v2f{f32(font->char_width), f32(font->char_height)}, scale);
 	v2f ceil_p = Ceil(pos + glyph_size);
 	v2i floor_int_p = v2f::Cast<i32>(floor_p);
 
@@ -678,6 +726,9 @@ static void Draw_Glypgh(
 
 static void Draw_Vertical_Line(Canvas* canvas, v2f pos, f32 height, u32 color)
 {
+	if(pos.x < 0 || pos.x >= canvas->dim.x)
+		return;
+	
 	v2f floor_p = Floor(pos);
 	v2f ceil_p = Ceil(pos);
 	
@@ -687,11 +738,17 @@ static void Draw_Vertical_Line(Canvas* canvas, v2f pos, f32 height, u32 color)
 	v3f up_color = Unpack_Color(color);
 	
 	i32 y_start = (i32)floor_p.y;
-	i32 y_end = (i32)(ceil_p.y + height);
+	i32 y_end = (i32)(ceil_p.y + height) - 1;
+	
+	y_start = Max(y_start, 0);
+	y_end = Min(y_end, i32(canvas->dim.y - 1));
+	
+	if(y_end <= y_start)
+		return;
 	
 	if(fraction.x)
 	{
-		for(i32 y = y_start + 1; y <= i32(ceil_p.y + height - 1); ++y)
+		for(i32 y = y_start + 1; y <= y_end - 1; ++y)
 		{
 			Blend_Pixel_With_Color(canvas, v2i{i32(floor_p.x), y}, up_color, inv_fraction.x);
 			Blend_Pixel_With_Color(canvas, v2i{i32(floor_p.x) + 1, y}, up_color, fraction.x);
@@ -709,8 +766,8 @@ static void Draw_Vertical_Line(Canvas* canvas, v2f pos, f32 height, u32 color)
 		}
 	}
 	else if(fraction.y)
-	{	
-		for(i32 y = (i32)floor_p.y + 1; y <= ceil_p.y + height - 1; ++y)
+	{
+		for(i32 y = y_start+ 1; y <= y_end - 1; ++y)
 		{	
 			Set_Pixel(canvas, v2i{i32(floor_p.x), y}, color);
 		}
@@ -720,7 +777,7 @@ static void Draw_Vertical_Line(Canvas* canvas, v2f pos, f32 height, u32 color)
 	}
 	else
 	{
-		for(i32 y = (i32)floor_p.y; y <= ceil_p.y + height; ++y)
+		for(i32 y = y_start; y <= y_end; ++y)
 		{	
 			Set_Pixel(canvas, v2i{i32(floor_p.x), y}, color);
 		}
