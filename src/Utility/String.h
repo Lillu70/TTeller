@@ -8,7 +8,7 @@ struct String
 	u32 lenght;		// Character count of the string. Does not include the null terminator.
 	u32 capacity; 	// The memory reserved for the string.
 	
-	General_Allocator* alloc;
+	Allocator_Shell* alloc;
 	
 	// CONSIDER: To member function or not? For some reason feels good here.
 	void append_character(char c);
@@ -16,6 +16,7 @@ struct String
 	void remove_at(u32 idx);
 	void erase(u32 from, u32 to);
 	void pop_last();
+	void free();
 };
 
 
@@ -61,8 +62,6 @@ String_View Create_String_View(String* str, u32 start, u32 lenght)
 
 static void String_Init_Alloc(String* str, u32 capacity)
 {
-	// NOTE: 2 then has to be the minimum for capacity ?
-	
 	capacity = Max(str->alloc->min_alloc_size, capacity);
 	str->capacity = capacity;
 	
@@ -71,7 +70,7 @@ static void String_Init_Alloc(String* str, u32 capacity)
 }
 
 
-static void Init_String(String* str, General_Allocator* allocator, u32 capacity)
+static void Init_String(String* str, Allocator_Shell* allocator, u32 capacity)
 {
 	Assert(allocator);
 	
@@ -87,7 +86,7 @@ static void Init_String(String* str, General_Allocator* allocator, u32 capacity)
 
 
 // Takes a null terminted C style string, as an argument. Lenght of it, determines capacity.
-static void Init_String(String* str, General_Allocator* allocator, char* c_str)
+static void Init_String(String* str, Allocator_Shell* allocator, char* c_str)
 {
 	Assert(allocator);
 	Assert(c_str);
@@ -189,8 +188,47 @@ void String::erase(u32 from, u32 to)
 }
 
 
-// BEWARE: when doing this to a pointer to a string. Dreference or you WILL fuck up the pointer.
+void String::free()
+{
+	if(buffer)
+		alloc->free(buffer);
+
+	buffer = 0;
+	lenght = 0;
+	capacity = 0;
+}
+
+
 static void operator += (String& str, char c)
 {
 	str.append_character(c);
+}
+
+
+// Buffer size is assumed to be 11 or greater.
+static char* U32_To_Char_Buffer(u8* buffer, u32 integer)
+{
+	// TODO: This works, but's odd and not very intuitive, so rethink and rework this.
+	
+	u32 buffer_size = 11;
+	
+	buffer[buffer_size - 1] = 0;
+	
+	u32 ascii_numeric_offset = 48;
+	u32 last_non_zero = buffer_size - 2;
+	for(u32 i = 0; i < buffer_size - 1; ++i)
+	{
+		u32 digit = 0;
+		if(i > 0)
+			digit = (u32)(integer / Pow32(10, i)) % 10;	
+		else
+			digit = integer % 10;
+		u32 write_pos = buffer_size - 2 - i;
+		if(digit)
+			last_non_zero = write_pos;
+		
+		buffer[write_pos] = ascii_numeric_offset + digit;
+	}
+	
+	return (char*)(buffer + last_non_zero);
 }

@@ -32,16 +32,15 @@ static inline v4f Unpack_Color_With_Alpha(u32 color)
 }
 
 
-static inline void Init_Canvas(Canvas* canvas, u32* buffer, v2u dim)
+static inline bool Init_Canvas(Canvas* canvas, u32* buffer, v2u dim)
 {
 	Assert(canvas);
-	Assert(buffer);
-	
-	Assert(dim.x != 0);
-	Assert(dim.y != 0);
+	//Assert(buffer); buffer can be null if the window size is 0.
 	
 	canvas->buffer = buffer;
 	canvas->dim = dim;
+	
+	return buffer != 0;
 }
 
 

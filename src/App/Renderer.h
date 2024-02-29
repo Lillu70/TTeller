@@ -23,7 +23,7 @@ static inline v3f Unpack_Color(u32 color);
 static inline v4f Unpack_Color_With_Alpha(u32 color);
 
 
-static inline void Init_Canvas(Canvas* canvas, u32* buffer, v2u dim);
+static inline bool Init_Canvas(Canvas* canvas, u32* buffer, v2u dim);
 
 // Does bounds checking.
 static inline bool Get_Pixel_Idx(Canvas* canvas, v2i p, u32* out_idx);

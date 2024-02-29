@@ -35,6 +35,11 @@ static LRESULT Win32_Message_Handler(HWND win_handle, UINT message, WPARAM wpara
 			
 		}break;
 		
+		case WM_MOUSEWHEEL:
+		{
+			s_app.scroll_delta = f32(GET_WHEEL_DELTA_WPARAM(wparam)) / WHEEL_DELTA;
+		}break;
+		
 		case WM_SIZING:
 		case WM_SIZE:
 		{
@@ -43,6 +48,9 @@ static LRESULT Win32_Message_Handler(HWND win_handle, UINT message, WPARAM wpara
 			
 			s_app.window_width = client_rect.right - client_rect.left;
 			s_app.window_height = client_rect.bottom - client_rect.top;
+			
+			s_app.flags |= (1 << (u32)App_Flags::window_has_resized);
+			
 			s_app.force_update_surface = true;
 		}break;
 		
@@ -183,7 +191,7 @@ static void Win32_Init(
 			i32 border_width = (window_width - client_rect.right);
 			i32 border_height = (window_height - client_rect.bottom);
 			
-			u32 scale = 2;
+			u32 scale = 1;
 			
 			i32 new_width = window_width * scale + border_width;
 			i32 new_height = window_height * scale + border_height;
@@ -240,6 +248,7 @@ static void Win32_Init(
 static void Win32_Flush_Events()
 {
 	s_app.typing_information = {};
+	s_app.scroll_delta = 0;
 	
 	// The message dispatch loop.
 	{	
@@ -319,6 +328,8 @@ static void Win32_Flush_Events()
 
 static void Win32_Update_Surface(bool update_from_game)
 {
+	s_app.flags &= ~(1 << (u32)App_Flags::window_has_resized);
+	
 	if(s_bitmap.memory && (update_from_game || s_app.force_update_surface))
 	{
 		s_app.force_update_surface = false;
@@ -387,11 +398,13 @@ static void Win32_Set_Flag(App_Flags flag, bool value)
 			s_app.force_update_surface = true;
 			DWORD dwStyle = GetWindowLongA(s_app.window, GWL_STYLE);
 			
+			// TODO: Does this send a resize message?
+			
 			if(value) // Set fullscreen to true.
 			{
 				
 				if (!GetWindowPlacement(s_app.window, &s_app.window_placement))
-				Terminate;
+					Terminate;
 				
 				MONITORINFO mi = { sizeof(mi) };
 				
@@ -423,7 +436,7 @@ static void Win32_Set_Flag(App_Flags flag, bool value)
 		}break;
 		
 		default:
-			//Unhandeled flag
+			// Unhandeled flag
 			Terminate;
 	}
 }
@@ -453,9 +466,14 @@ static u32 Win32_Get_Window_Height()
 }
 
 
-static u32* Win32_Get_Pixel_Buffer()
+static Pixel_Buffer Win32_Get_Pixel_Buffer()
 {
-	return s_bitmap.memory;
+	Pixel_Buffer result;
+	result.memory = s_bitmap.memory;
+	result.width = s_bitmap.width;
+	result.height = s_bitmap.height;
+	
+	return result;
 }
 
 
@@ -651,6 +669,50 @@ static Char_Array Win32_Get_Typing_Information()
 }
 
 
+static char* Win32_Get_Clipboard_Data_As_Text()
+{
+	char* result = 0;
+	
+	if (OpenClipboard(NULL))
+	{
+		HANDLE h = GetClipboardData(CF_TEXT);
+		result = (char*)h;
+		
+		CloseClipboard();		
+	}
+	
+	return result;
+}
+
+
+static void Win32_Set_Clipboard_Data_As_Text(char* data, u32 lenght)
+{
+    // Set clipboard data
+    if(OpenClipboard(NULL)) 
+	{
+		// Allocate string for cwd
+		HGLOBAL handle = GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, lenght + 1);
+		char* dest = (char*)GlobalLock(handle);
+		dest[lenght] = 0;
+		Mem_Copy(dest, data, lenght);
+		
+		GlobalUnlock(handle);
+		
+		EmptyClipboard();
+		
+		SetClipboardData(CF_TEXT, handle);
+		
+		CloseClipboard();
+	}
+}
+
+
+static f32 Win32_Get_Scroll_Wheel_Delta()
+{
+	return s_app.scroll_delta;
+}
+
+
 static Platform_Calltable Win32_Get_Calltable()
 {
 	Platform_Calltable ct = {};
@@ -672,5 +734,8 @@ static Platform_Calltable Win32_Get_Calltable()
 	ct.Get_File_Size = Win32_Get_File_Size;
 	ct.Read_File = Win32_Read_File;
 	ct.Get_Typing_Information = Win32_Get_Typing_Information;
+	ct.Get_Clipboard_Data_As_Text = Win32_Get_Clipboard_Data_As_Text;
+	ct.Set_Clipboard_Data_As_Text = Win32_Set_Clipboard_Data_As_Text;
+	ct.Get_Scroll_Wheel_Delta = Win32_Get_Scroll_Wheel_Delta;
 	return ct;
 }

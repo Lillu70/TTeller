@@ -1,14 +1,16 @@
 
 #pragma once
 
-
-enum class App_Flags
+// TODO: Make these pre-shifted.
+// Add comon bit-field procedures into utility.
+enum class App_Flags : u32
 {
 	is_running = 0,
 	wants_to_exit,
 	is_focused,
 	is_fullscreen,
 	cursor_is_visible,
+	window_has_resized
 };
 
 
@@ -19,13 +21,20 @@ struct Char_Array
 };
 
 
+struct Pixel_Buffer
+{
+	i32 width = 0, height = 0;
+	u32* memory = 0;
+};
+
+
 struct Platform_Calltable
 {
 	u32  (*Get_Window_Width)() = 0;
 	
 	u32  (*Get_Window_Height)() = 0;
 	
-	u32* (*Get_Pixel_Buffer)() = 0;
+	Pixel_Buffer (*Get_Pixel_Buffer)() = 0;
 	
 	i32  (*Get_Pixel_Buffer_Width)() = 0;
 	
@@ -38,6 +47,8 @@ struct Platform_Calltable
 	void (*Set_Flag)(App_Flags flag, bool val) = 0;
 	
 	bool (*Get_Keyboard_Key_Down)(Key_Code) = 0;
+	
+	f32  (*Get_Scroll_Wheel_Delta)() = 0;
 	
 	Char_Array (*Get_Typing_Information)() = 0;
 	
@@ -56,4 +67,8 @@ struct Platform_Calltable
 	bool (*Get_File_Size)(const char*, u32*) = 0;
 	
 	bool (*Read_File)(const char*, u8*, u32) = 0;
+	
+	char* (*Get_Clipboard_Data_As_Text)() = 0;
+	
+	void (*Set_Clipboard_Data_As_Text)(char*, u32) = 0;
 };

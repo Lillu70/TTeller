@@ -1,18 +1,22 @@
 
 #pragma once
 
+// TODO: Add screen overlap testing to all widgets, to avoid drawing if completly ouside of the canvas.
+// TODO: SL input field has a bug, more info at the definition.
 
-static inline v2f GUI_Get_Point_In_Placement_Space(
-	GUI_Placement p, 
-	v2f point, 
-	GUI_Theme* theme)
+
+static inline bool GUI_Is_Context_Ready(GUI_Context* context)
 {
-	v2f internal_dim = p.dim - (v2f{} + f32(theme->outline_thickness)) * 2;
-	
-	f32 rel_cursor_x = Min(internal_dim.x, Max(0.f, point.x - p.rect.min.x));
-	f32 rel_cursor_y = Min(internal_dim.y, Max(0.f, point.y - p.rect.min.y));
-	
-	v2f result = Hadamar_Division(v2f{rel_cursor_x, rel_cursor_y}, internal_dim); 
+	bool result = context->flags & GUI_Context_Flags::context_ready;
+	return result;
+}
+
+
+static Rect GUI_Get_Bounds_In_Pixel_Space(GUI_Context* context)
+{
+	Rect result = context->bounds_rel_anchor_base;
+	result.min -= context->anchor_base;
+	result.max -= context->anchor_base;
 	
 	return result;
 }
@@ -44,11 +48,9 @@ static inline void GUI_Pop_Layout(GUI_Context* context)
 }
 
 
-static inline void GUI_Set_Default_Menu_Actions(GUI_Context* context)
+static inline void GUI_Set_Default_Menu_Actions(Action* actions)
 {
-	Assert(context);
-	
-	Action* actions = &context->actions[0];
+	Assert(actions);
 	
 	*(actions + GUI_Menu_Actions::mouse) 	= Make_Action(Key_Code::MOUSE_LEFT, Button::NONE);
 	*(actions + GUI_Menu_Actions::up) 		= Make_Action(Key_Code::UP, Button::DPAD_UP);
@@ -57,19 +59,6 @@ static inline void GUI_Set_Default_Menu_Actions(GUI_Context* context)
 	*(actions + GUI_Menu_Actions::right) 	= Make_Action(Key_Code::RIGHT, Button::DPAD_RIGHT);
 	*(actions + GUI_Menu_Actions::enter) 	= Make_Action(Key_Code::ENTER, Button::BUT_A);
 	*(actions + GUI_Menu_Actions::back) 	= Make_Action(Key_Code::ESC, Button::BUT_X);
-}
-
-
-static inline Rect GUI_Get_Dropdown_Button_Open_Rect(v2f pos, v2f dim, u32 element_count)
-{
-	f32 half_dim_y = dim.y / 2;
-	
-	v2f center = v2f{pos.x, pos.y - (half_dim_y * f32(element_count) - half_dim_y)};
-	
-	v2f new_dim = v2f{dim.x, dim.y * f32(element_count)};
-	
-	Rect result = Create_Rect_Center(center, new_dim);
-	return result;
 }
 
 
@@ -149,6 +138,22 @@ static inline v2f GUI_Tight_Fit_Text(char* text, v2f text_scale, Font* font)
 }
 
 
+static inline void GUI_Update_Bounds(GUI_Context* context, Rect rect)
+{
+	if(rect.min.x < context->bounds_rel_anchor_base.min.x)
+		context->bounds_rel_anchor_base.min.x = rect.min.x;
+	
+	if(rect.min.y < context->bounds_rel_anchor_base.min.y)
+		context->bounds_rel_anchor_base.min.y = rect.min.y;
+		
+	if(rect.max.x > context->bounds_rel_anchor_base.max.x)
+		context->bounds_rel_anchor_base.max.x = rect.max.x;
+	
+	if(rect.max.y > context->bounds_rel_anchor_base.max.y)
+		context->bounds_rel_anchor_base.max.y = rect.max.y;
+}
+
+
 static inline GUI_Placement GUI_Get_Placement(GUI_Context* context, v2f* dim, v2f* pos)
 {
 	GUI_Layout* layout = &context->layout;
@@ -175,8 +180,9 @@ static inline GUI_Placement GUI_Get_Placement(GUI_Context* context, v2f* dim, v2
 	
 	if(!pos)
 	{
+		Assert(last_element_dim.x * last_element_dim.y > 0);
 		
-		v2f offset; 
+		v2f offset;
 		switch(layout->build_direction)
 		{
 			case GUI_Build_Direction::up_center:
@@ -310,7 +316,7 @@ static inline GUI_Placement GUI_Get_Placement(GUI_Context* context, v2f* dim, v2
 			pos = &p;
 			
 			anchor = GUI_Anchor::top_right;
-			p = {f32(context->canvas->dim.x - padding), f32(context->canvas->dim.y - padding)};
+			p = v2f{f32(context->canvas->dim.x - padding), f32(context->canvas->dim.y - padding)};
 		}
 		else if(pos == &GUI_AUTO_TOP_LEFT)
 		{
@@ -363,7 +369,7 @@ static inline GUI_Placement GUI_Get_Placement(GUI_Context* context, v2f* dim, v2
 		}
 		
 		v2f half_dim = result.dim / 2;
-		result.pos = *pos;
+		result.pos = context->anchor_base + *pos;
 		
 		switch(anchor)
 		{
@@ -417,7 +423,9 @@ static inline GUI_Placement GUI_Get_Placement(GUI_Context* context, v2f* dim, v2
 	layout->last_element_dim = result.dim;
 	
 	result.rect = Create_Rect_Center(result.pos, result.dim);
-	
+
+	GUI_Update_Bounds(context, result.rect);
+
 	return result;
 }
 
@@ -437,8 +445,9 @@ static inline v2f GUI_Calc_Centered_Text_Position(char* text, v2f scale, v2f pos
 
 static inline void GUI_Reset_Selection_State(GUI_Context* context)
 {
-	context->cursor_mask_enabled = false;
-	context->cursor_mask_validation = false;
+	u32 flag_mask = GUI_Context_Flags::cursor_mask_enabled | GUI_Context_Flags::cursor_mask_validation;
+	Inverse_Bit_Mask(&context->flags, flag_mask);
+	
 	context->defered_render = GUI_Defered_Render_Type::none;
 	context->selection_state = {};
 	context->selected_id = 0;
@@ -446,33 +455,47 @@ static inline void GUI_Reset_Selection_State(GUI_Context* context)
 
 
 static inline void GUI_Begin_Context(
-	GUI_Context* context,  
-	GUI_Anchor anchor,
-	GUI_Build_Direction build_direction,
+	GUI_Context* context,
+	Platform_Calltable* platform,
+	Canvas* canvas,
+	Action* actions,
 	GUI_Theme* theme,
+	v2i canvas_pos = v2i{0, 0},
+	GUI_Anchor anchor = GUI_Anchor::top_left,
+	GUI_Build_Direction build_direction = GUI_Build_Direction::down_left,
 	GUI_Link_Direction::Type ld = GUI_Link_Direction::up)
 {
+	Assert(canvas);
+	Assert(theme);
 	Assert(context->widget_count == 0);
+	Assert(!GUI_Is_Context_Ready(context));
+	Assert(platform);
+	Assert(actions);
 	
-	context->layout = GUI_Layout();
+	context->actions = actions;
+	context->platform = platform;
+	context->canvas = canvas;
+	context->canvas_pos = canvas_pos;
+	context->flags |= GUI_Context_Flags::context_ready;
+	context->layout = {};
+	context->layout.last_element_pos = context->anchor_base;
 	context->layout_stack_count = 0;
 	context->layout.anchor = anchor;
 	context->layout.build_direction = build_direction;
 	context->layout.theme = theme;
+	context->selected_element_dim = {};
+	context->selected_element_pos = {};
+	context->bounds_rel_anchor_base = { {F32_MAX, F32_MAX}, {-F32_MAX, -F32_MAX} };
 	
-	context->cursor_mask_validation = false;
-	
-	// Handle input.
-	Action* actions = context->actions;
-	Update_Actions(context->platform, actions, GUI_Menu_Actions::COUNT);
+	Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::cursor_mask_validation);
 	
 	if(Is_Flag_Set(context->platform->Get_Flags(), (u32)App_Flags::is_focused))
 	{
-		if(context->disable_kc_navigation)
+		if(context->flags & GUI_Context_Flags::disable_kc_navigation)
 		{
-			context->disable_kc_navigation = false;
+			Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::disable_kc_navigation);
 		}
-		else
+		else if(Bit_Not_Set(context->flags, GUI_Context_Flags::ignore_selection))
 		{
 			if(actions[GUI_Menu_Actions::up].Is_Pressed())
 			{
@@ -487,13 +510,20 @@ static inline void GUI_Begin_Context(
 			}			
 		}
 		
-		context->cursor_position = context->platform->Get_Cursor_Position();
+		context->cursor_position = context->platform->Get_Cursor_Position() - context->canvas_pos;
+		context->cursor_fpos = v2i::Cast<f32>(context->cursor_position);
 	}
+	
+	context->canvas_rect = Create_Rect_Min_Dim(v2f{0}, v2u::Cast<f32>(context->canvas->dim));
 }
 
 
 static inline void GUI_End_Context(GUI_Context* context)
 {
+	Assert(context);
+	Assert(context->layout_stack_count == 0);
+	
+	
 	// Sometimes you have to rendering some things at the end in order to insure that,
 	// draw order is correct.
 	// TODO: That said, this is a temprory placeholder, that carrise manny issues.
@@ -553,25 +583,24 @@ static inline void GUI_End_Context(GUI_Context* context)
 	
 	context->defered_render = GUI_Defered_Render_Type::none;
 	
-	if(!context->cursor_mask_validation)
+	if(Bit_Not_Set(context->flags, GUI_Context_Flags::cursor_mask_validation))
 	{
-		context->cursor_mask_enabled = false;
+		Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::cursor_mask_enabled);
 		context->cursor_mask_area = {};
 	}
 	
-	if(context->widget_count > 0 &&
-		context->selected_index > context->widget_count - 1 &&
-		context->widget_count < context->last_widget_count)
-	{
-		context->selected_index = context->widget_count - 1;
-	}
-	
-	context->last_cursor_position = context->cursor_position;
-	context->last_widget_count = context->widget_count;
-	
 	
 	// Selection wrapping.
+	if(Bit_Not_Set(context->flags, GUI_Context_Flags::ignore_selection) && 
+		Bit_Not_Set(context->flags, GUI_Context_Flags::disable_wrapping))
 	{
+		if(context->widget_count > 0 &&
+			context->selected_index > context->widget_count - 1 &&
+			context->widget_count < context->last_widget_count)
+		{
+			context->selected_index = context->widget_count - 1;
+		}
+		
 		if(context->selected_index < 0)
 		{
 			context->selected_index = context->widget_count - 1;
@@ -585,10 +614,365 @@ static inline void GUI_End_Context(GUI_Context* context)
 		}
 	}
 	
+	context->last_widget_count = context->widget_count;
+	Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::disable_wrapping);
+	
+	// GUI scrolling
+	if(context->flags & GUI_Context_Flags::enable_dynamic_sliders)
+	{
+		f32 padding = context->layout.theme->padding;
+		
+		v2f canvas_dim = v2u::Cast<f32>(context->canvas->dim);
+		
+		f32 canvas_height = canvas_dim.y;
+		f32 canvas_width = canvas_dim.x;
+		f32 canvas_bottom = 0;
+		
+		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(context);
+		
+		// Recovery points if sliderds schange effective canvas size.
+		Rect bounds_recovery = bounds;
+		
+		f32 y_factor = 0;
+		{
+			if(bounds.min.y >= 0)
+				bounds.min.y = 0;
+			else
+				bounds.min.y -= padding;
+			
+			if(bounds.max.y < canvas_height)
+				bounds.max.y = canvas_height;
+			
+			else
+			{
+				bounds.max.y += padding;
+				y_factor = bounds.max.y - canvas_height;
+			}			
+		}
+		
+		f32 x_factor = 0;
+		{
+			if(bounds.max.x < canvas_width)
+				bounds.max.x = canvas_width;
+			
+			else
+				bounds.max.x += padding;
+			
+			if(bounds.min.x >= 0)
+				bounds.min.x = 0;
+			
+			else
+			{
+				bounds.min.x -= padding;
+				x_factor = 0 - bounds.min.x;
+			}
+		}
+		
+		v2f selected_element_half_dim = context->selected_element_dim / 2;
+		
+		// NOTE: Done up here as the window sliders can cause selected_element records to be modified.
+		f32 selected_element_max_y = context->selected_element_pos.y + selected_element_half_dim.y;
+		f32 selected_element_min_y = context->selected_element_pos.y - selected_element_half_dim.y;	
+		f32 selected_element_max_x = context->selected_element_pos.x + selected_element_half_dim.x;
+		f32 selected_element_min_x = context->selected_element_pos.x - selected_element_half_dim.x;	
+		
+		bool selected_element_is_window_slider = false;
+		bool shift_down = context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT) || 
+			context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT);
+		
+		// Dynamic sliders!
+		{		
+			f32 slider_girth = context->dynamic_slider_girth;
+			f32 gui_height = bounds.max.y - bounds.min.y;
+			
+			bool enable_vertical_slider = gui_height > canvas_height && 
+				context->canvas->dim.x > slider_girth &&
+				context->canvas->dim.y > context->layout.theme->outline_thickness * 2;
+			
+			if(enable_vertical_slider)
+			{
+				canvas_width -= slider_girth;
+				
+				// Recover max.x and recalc.
+				bounds.max.x = bounds_recovery.max.x;
+				if(bounds.max.x < canvas_width)
+					bounds.max.x = canvas_width;
+				else
+					bounds.max.x += padding;
+			}
+			
+			f32 gui_width = bounds.max.x - bounds.min.x;
+			bool enable_horizontal_slider = gui_width > canvas_width && 
+				context->canvas->dim.y > slider_girth &&
+				context->canvas->dim.x > context->layout.theme->outline_thickness * 2;
+			
+			if(enable_horizontal_slider)
+			{
+				f32 canvas_bottom_and_height = canvas_height;
+				canvas_bottom = slider_girth;
+				canvas_height -= slider_girth;
+				
+				// Recover min/max.y and recalc.	
+				bounds.max.y = bounds_recovery.max.y;
+				bounds.min.y = bounds_recovery.min.y;
+				{
+					if(bounds.min.y >= canvas_bottom)
+						bounds.min.y = canvas_bottom;
+					else
+					{
+						//if(bounds.min.y > 0)
+						//	bounds.min.y = 0;
+						
+						bounds.min.y -= padding;
+					}
+					
+					if(bounds.max.y < canvas_bottom_and_height)
+						bounds.max.y = canvas_bottom_and_height;
+					
+					else
+					{
+						bounds.max.y += padding;
+						y_factor = bounds.max.y - canvas_height;
+					}
+				}
+				
+				gui_height = bounds.max.y - bounds.min.y;
+				
+				if(!enable_vertical_slider)
+				{
+					enable_vertical_slider = gui_height > canvas_height && 
+						context->canvas->dim.x > slider_girth &&
+						context->canvas->dim.y > context->layout.theme->outline_thickness * 2;
+					
+					if(enable_vertical_slider)
+					{
+						canvas_width -= slider_girth;
+						
+						// Recover max.x and recalc.
+						bounds.max.x = bounds_recovery.max.x;
+						if(bounds.max.x < canvas_width)
+							bounds.max.x = canvas_width;
+						else
+							bounds.max.x += padding;
+					}
+				}
+			}
+			
+			if(enable_vertical_slider && enable_horizontal_slider)
+			{
+				v2f min = v2f{canvas_dim.x - slider_girth, 0};
+				v2f dim = v2f{0} + slider_girth;
+				
+				u32 color = context->layout.theme->outline_color;
+				Draw_Filled_Rect(context->canvas, Create_Rect_Min_Dim(min, dim), color);
+			}
+			
+			f32 mouse_scroll;
+			if(context->flags & GUI_Context_Flags::disable_mouse_scroll)
+				mouse_scroll = 0;
+			else
+				mouse_scroll = context->platform->Get_Scroll_Wheel_Delta();
+			
+			v2f anchor_base = context->anchor_base;
+			context->anchor_base = {};
+			
+			if(enable_vertical_slider)
+			{
+				context->layout.anchor = GUI_Anchor::top_right;
+				
+				f32 slider_max = (gui_height / canvas_height) - 1;
+				v2f slider_dim = {slider_girth, canvas_height};
+				f32 slider_value = (anchor_base.y + y_factor) / canvas_height;
+				
+				GUI_One_Time_Skip_Padding(context);
+				GUI_Do_Handle_Slider(
+					context, 
+					&GUI_AUTO_TOP_RIGHT, 
+					&slider_dim, 
+					&slider_value,
+					slider_max, 
+					0,
+					GUI_Cardinal_Direction::up_down);
+				
+				f32 local_scroll_v = (!shift_down)? mouse_scroll : 0;
+				f32 scroll_delta = local_scroll_v / canvas_height * GUI_MOUSE_SCROLL_SPEED;
+				slider_value -= scroll_delta;
+				
+				if(context->flags & GUI_Context_Flags::maxout_vertical_slider)
+					slider_value = slider_max;
+				
+				slider_value = Clamp_Zero_To_Max(slider_value, slider_max);
+	
+				anchor_base.y = (slider_value * canvas_height) - y_factor;
+				
+				// Selects the slider when using mouse scroll.
+				if(local_scroll_v != 0)
+					context->selected_index = context->widget_count - 1;
+				
+				
+				if(Bit_Not_Set(context->flags, GUI_Context_Flags::ignore_selection) && 
+					context->selected_index == context->widget_count - 1)
+				{
+					selected_element_is_window_slider = true;
+					context->flags |= GUI_Context_Flags::disable_kc_navigation;
+					context->flags |= GUI_Context_Flags::disable_wrapping;
+					
+					v2f pos = context->layout.last_element_pos;
+					v2f dim = context->layout.last_element_dim;
+					Rect window_slider_rect;
+					
+					// NOTE: This is an unsafe union access!
+					if(context->selection_state.slider.is_held_down)
+						window_slider_rect = Create_Rect_Min_Dim(v2f{0}, canvas_dim);
+					
+					else
+					{
+						window_slider_rect = Create_Rect_Center(pos, dim);
+					}
+					
+					if(Is_Point_Inside_Rect(context->cursor_fpos, window_slider_rect))
+					{
+						context->flags |= GUI_Context_Flags::cursor_mask_validation;
+						context->flags |= GUI_Context_Flags::cursor_mask_enabled;
+	
+						context->cursor_mask_area = window_slider_rect;
+					}
+				}
+			}
+			else
+			{
+				anchor_base.y = 0;
+			}
+			
+			if(enable_horizontal_slider)
+			{
+				context->layout.anchor = GUI_Anchor::bottom_left;
+				
+				f32 slider_max = (gui_width / canvas_width) - 1;
+				v2f slider_dim = {canvas_width, slider_girth};
+				f32 slider_value = (-(anchor_base.x - x_factor)) / canvas_width;
+				
+				GUI_One_Time_Skip_Padding(context);
+				GUI_Do_Handle_Slider(
+					context, 
+					&GUI_AUTO_BOTTOM_LEFT, 
+					&slider_dim, 
+					&slider_value,
+					slider_max, 
+					0,
+					GUI_Cardinal_Direction::left_right);
+				
+				f32 local_scroll_v = (shift_down)? mouse_scroll : 0;
+				f32 scroll_delta = local_scroll_v / canvas_width * GUI_MOUSE_SCROLL_SPEED;
+				slider_value -= scroll_delta;
+				
+				if(context->flags & GUI_Context_Flags::maxout_horizontal_slider)
+					slider_value = slider_max;
+				
+				slider_value = Clamp_Zero_To_Max(slider_value, slider_max);
+				
+				anchor_base.x = -(slider_value * canvas_width) + x_factor;
+				
+				// Selects the slider when using mouse scroll.
+				if(local_scroll_v != 0)
+					context->selected_index = context->widget_count - 1;
+				
+				if(Bit_Not_Set(context->flags, GUI_Context_Flags::ignore_selection) && 
+					context->selected_index == context->widget_count - 1)
+				{
+					selected_element_is_window_slider = true;
+					context->flags |= GUI_Context_Flags::disable_kc_navigation;
+					context->flags |= GUI_Context_Flags::disable_wrapping;
+					
+					v2f pos = context->layout.last_element_pos;
+					v2f dim = context->layout.last_element_dim;
+					Rect window_slider_rect;
+					
+					// NOTE: This is an unsafe union access!
+					if(context->selection_state.slider.is_held_down)
+						window_slider_rect = Create_Rect_Min_Dim(v2f{0}, canvas_dim);
+					
+					else
+					{
+						window_slider_rect = Create_Rect_Center(pos, dim);
+					}
+					
+					if(Is_Point_Inside_Rect(context->cursor_fpos, window_slider_rect))
+					{
+						context->flags |= GUI_Context_Flags::cursor_mask_validation;
+						context->flags |= GUI_Context_Flags::cursor_mask_enabled;
+	
+						context->cursor_mask_area = window_slider_rect;
+					}
+				}
+			}
+			else
+			{
+				anchor_base.x = 0;
+			}
+			
+			context->anchor_base = anchor_base;
+		}
+		
+		if(Bit_Not_Set(context->flags, GUI_Context_Flags::ignore_selection) 
+			&& !selected_element_is_window_slider)
+		{
+			f32 true_canvas_height = canvas_dim.y;
+		
+			f32 padding_2 = padding * 2;
+			
+			f32 padded_e_height = selected_element_max_y - selected_element_min_y + padding_2;
+			if(padded_e_height < canvas_height)
+			{
+				// Selection below the canvas.
+				if(selected_element_min_y < canvas_bottom)
+				{
+					f32 dif = canvas_bottom - selected_element_min_y + padding;
+					context->anchor_base.y += dif;
+				}
+				
+				// Selection above the canvas.
+				else if(selected_element_max_y > true_canvas_height)
+				{
+					f32 dif = true_canvas_height - selected_element_max_y - padding;
+					context->anchor_base.y += dif;
+				}
+				
+			}
+			
+			f32 padded_e_width 	= selected_element_max_x - selected_element_min_x + padding_2;
+			if(padded_e_width < canvas_width)
+			{				
+				// Selection left the canvas.
+				if(selected_element_min_x < 0)
+				{
+					f32 dif = 0 - selected_element_min_x + padding;
+					context->anchor_base.x += dif;
+				}
+				
+				// Selection right the canvas.
+				else if(selected_element_max_x > canvas_width)
+				{
+					f32 dif = canvas_width - selected_element_max_x - padding;
+					context->anchor_base.x += dif;
+				}			
+			}
+		}
+	}
+	
 	// Reset state.
 	{
-		context->widget_count = 0;	
+		context->last_cursor_position = context->cursor_position;
+		
+		u32 reset_mask = 
+			GUI_Context_Flags::context_ready | 
+			GUI_Context_Flags::maxout_horizontal_slider | 
+			GUI_Context_Flags::maxout_vertical_slider;
+		
+		Inverse_Bit_Mask(&context->flags, reset_mask);
+		context->widget_count = 0;
 		context->layout = {}; // Unnessery?
+		context->canvas = 0;
 	}
 }
 
@@ -597,7 +981,7 @@ static inline void GUI_End_Context(GUI_Context* context)
 // by the calling code. Usually that would be the line number from the __LINE__ macro.
 // There is really no gurantee that there wont be ID collissions. This really is just hoping
 // the program is correct, where randomly it might not be.
-// TODO: upgrade to use a 64 bite nouse function to at least reduce the change of collissions.
+// TODO: upgrade to use a 64 bite noise function to at least reduce the change of collissions.
 static u32 GUI_Generate_ID(Rect rect, u32 mangle_factor)
 {
 	v2i np = v2f::Cast<i32>(Round(rect.min + rect.max));
@@ -613,54 +997,43 @@ static u32 GUI_Generate_ID(Rect rect, u32 mangle_factor)
 
 static inline bool GUI_Is_Element_Selected(GUI_Context* context, bool cursor_on_selection, u32 id)
 {
+	// TODO: Again re-think this.. just kind of awfull.
 	bool result = false;
 	
 	// This is the selected element.
-	if(context->selected_index == context->widget_count)
+	if(Bit_Not_Set(context->flags, GUI_Context_Flags::ignore_selection) &&
+		context->selected_index == context->widget_count)
 	{
 		// Buuut, it seems to be a different widget?
 		if(id != context->selected_id)
 		{
 			GUI_Reset_Selection_State(context);
-			context->selected_id = id;		
+			context->selected_id = id;
 		}
+		
+		context->selected_element_pos = context->layout.last_element_pos;
+		context->selected_element_dim = context->layout.last_element_dim;
 		
 		result = true;
 	}
-	else if(context->cursor_mask_enabled &&
-		Is_Point_Inside_Rect(v2i::Cast<f32>(context->cursor_position), context->cursor_mask_area))
-	{
-		// Just a capture clause for cursor on a masked reagion.
-	}
-	// If the cursor has moved and it is on the element. Make it selected.
-	else if((context->cursor_position != context->last_cursor_position && cursor_on_selection))
+	else if(cursor_on_selection && context->cursor_position != context->last_cursor_position &&
+		Is_Point_Inside_Rect(context->cursor_fpos, context->canvas_rect) &&
+		!((context->flags & GUI_Context_Flags::cursor_mask_enabled) && 
+		Is_Point_Inside_Rect(context->cursor_fpos, context->cursor_mask_area))
+	)
 	{
 		GUI_Reset_Selection_State(context);
 		context->selected_index = context->widget_count;
 		context->selected_id = id;
 		
+		context->selected_element_pos = context->layout.last_element_pos;
+		context->selected_element_dim = context->layout.last_element_dim;		
 		result = true;
-	}
-	
+
+		Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::ignore_selection);
+	}		
+
 	context->widget_count += 1; // Suprising side effect! But better to do it here than forget to do it ouside.
-	return result;
-}
-
-
-static inline bool GUI_Selected_Element_Is_Pressed(GUI_Context* context, bool cursor_on_selection)
-{
-	bool result = context->actions[GUI_Menu_Actions::enter].Is_Pressed() ||
-		(cursor_on_selection && context->actions[GUI_Menu_Actions::mouse].Is_Pressed());
-
-	return result;
-}
-
-
-static inline bool GUI_Selected_Element_Is_Released(GUI_Context* context, bool cursor_on_selection)
-{
-	bool result = context->actions[GUI_Menu_Actions::enter].Is_Released() ||
-		(cursor_on_selection && context->actions[GUI_Menu_Actions::mouse].Is_Released());
-
 	return result;
 }
 
@@ -668,11 +1041,17 @@ static inline bool GUI_Selected_Element_Is_Released(GUI_Context* context, bool c
 static inline bool GUI_On_Release_Action(
 	GUI_Context* context, bool cursor_on_selection, bool* is_pressed_down)
 {
-	if(GUI_Selected_Element_Is_Pressed(context, cursor_on_selection))
+	bool pressed = context->actions[GUI_Menu_Actions::enter].Is_Pressed() ||
+		(cursor_on_selection && context->actions[GUI_Menu_Actions::mouse].Is_Pressed());
+	
+	bool released = context->actions[GUI_Menu_Actions::enter].Is_Released() ||
+		(cursor_on_selection && context->actions[GUI_Menu_Actions::mouse].Is_Released());
+	
+	if(pressed)
 	{
 		*is_pressed_down = true;
 	}
-	else if(*is_pressed_down && GUI_Selected_Element_Is_Released(context, cursor_on_selection))
+	else if(*is_pressed_down && released)
 	{
 		*is_pressed_down = false;
 		return true;
@@ -687,10 +1066,36 @@ static inline bool GUI_On_Release_Action(
 }
 
 
+static inline void GUI_SL_Input_Field_Conditional_Erase_Selection(GUI_SL_Input_Field_State* state, String* str)
+{
+	if(state->text_select_mode)
+	{
+		u32 p0 = state->write_cursor_position;
+		u32 p1 = state->text_select_start_point;
+		
+		if(p0 != p1)
+		{
+			if(p0 > p1)
+				Swap(&p0, &p1);
+			
+			str->erase(p0, p1);
+			
+			state->write_cursor_position = p0;
+		}
+		
+		state->text_select_mode = false;
+	}
+}
+
+
 static void GUI_Do_Spacing(
 	GUI_Context* context, 
 	v2f* dim)
 {
+	Assert(GUI_Is_Context_Ready(context));
+	
+	Rect bounds = context->bounds_rel_anchor_base;
+	
 	GUI_One_Time_Skip_Padding(context);
 	if(dim)
 	{
@@ -707,6 +1112,8 @@ static void GUI_Do_Spacing(
 	{		
 		GUI_Get_Placement(context, dim, 0);
 	}
+	
+	context->bounds_rel_anchor_base = bounds;
 }
 
 
@@ -715,9 +1122,11 @@ static void GUI_Do_Text(
 	v2f* pos, 
 	char* text,
 	GUI_Highlight highlight = GUI_Highlight_Nothing(),
-	v2f text_scale = v2f{1.f, 1.f}, 
+	v2f text_scale = GUI_DEFAULT_TEXT_SCALE,
 	bool is_title = false)
 {
+	Assert(GUI_Is_Context_Ready(context));
+	
 	// --------------------------------------------------------------------------
 	
 	GUI_Theme* theme = context->layout.theme;
@@ -730,21 +1139,21 @@ static void GUI_Do_Text(
 	
 	// --------------------------------------------------------------------------
 	
-	bool is_highlighted = highlight.highlight_count && 
-		context->selected_index >= highlight.idx && 
-		context->selected_index < highlight.idx + highlight.highlight_count;
-	
-	u32 color;
-	if(is_title)
-		color = theme->title_color;
-	else
-		color = is_highlighted? theme->selected_color : theme->outline_color;
-	
-	Draw_Text(context->canvas, (u8*)text, text_p, color, &theme->font, text_scale);
+	if(Rects_Overlap(p.rect, context->canvas_rect))
+	{
+		bool is_highlighted = Bit_Not_Set(context->flags, GUI_Context_Flags::ignore_selection) && 
+			highlight.highlight_count && context->selected_index >= highlight.idx && 
+			context->selected_index < highlight.idx + highlight.highlight_count;
+		
+		u32 color;
+		if(is_title)
+			color = theme->title_color;
+		else
+			color = is_highlighted? theme->selected_color : theme->outline_color;
+		
+		Draw_Text(context->canvas, (u8*)text, text_p, color, &theme->font, text_scale);		
+	}
 }
-
-
-
 
 
 static bool GUI_Do_Button(
@@ -752,8 +1161,10 @@ static bool GUI_Do_Button(
 	v2f* pos, 
 	v2f* dim, 
 	char* text, 
-	v2f text_scale = v2f{1, 1})
+	v2f text_scale = GUI_DEFAULT_TEXT_SCALE)
 {
+	Assert(GUI_Is_Context_Ready(context));
+	
 	// --------------------------------------------------------------------------
 	
 	GUI_Theme* theme = context->layout.theme;
@@ -768,7 +1179,7 @@ static bool GUI_Do_Button(
 	
 	u32 id = GUI_Generate_ID(p.rect, __LINE__);
 	
-	bool cursor_on_selection = Is_Point_Inside_Rect(v2i::Cast<f32>(context->cursor_position), p.rect);
+	bool cursor_on_selection = Is_Point_Inside_Rect(context->cursor_fpos, p.rect);
 	bool is_selected = GUI_Is_Element_Selected(context, cursor_on_selection, id);
 	
 	// --------------------------------------------------------------------------
@@ -798,6 +1209,7 @@ static bool GUI_Do_Button(
 	}
 	
 	// Draw
+	if(Rects_Overlap(p.rect, context->canvas_rect))
 	{
 		Draw_Filled_Rect_With_Outline(
 			context->canvas, 
@@ -827,6 +1239,8 @@ static bool GUI_Do_Fill_Slider(
 	f32 step = 0.01f,
 	GUI_Input_Acceleration_Behavior inp_accel = GUI_Input_Acceleration_Behavior())
 {
+	Assert(GUI_Is_Context_Ready(context));
+	
 	Assert(step > 0);
 	Assert(max > min);
 	Assert(value);
@@ -837,9 +1251,7 @@ static bool GUI_Do_Fill_Slider(
 	
 	u32 id = GUI_Generate_ID(p.rect, __LINE__);
 	
-	v2f cursor_position = v2i::Cast<f32>(context->cursor_position);
-	
-	bool cursor_on_selection = Is_Point_Inside_Rect(cursor_position, p.rect);
+	bool cursor_on_selection = Is_Point_Inside_Rect(context->cursor_fpos, p.rect);
 	bool is_selected = GUI_Is_Element_Selected(context, cursor_on_selection, id);
 	
 	GUI_Theme* theme = context->layout.theme;
@@ -870,7 +1282,7 @@ static bool GUI_Do_Fill_Slider(
 		if(state->is_held_down)
 		{
 			f32 internal_width = p.dim.x - (f32(theme->outline_thickness) * 2);
-			f32 rel_cursor_x = Min(internal_width, Max(0.f, cursor_position.x - p.rect.min.x));
+			f32 rel_cursor_x = Min(internal_width, Max(0.f, context->cursor_fpos.x - p.rect.min.x));
 			
 			f32 fill_percent = rel_cursor_x / internal_width;
 			f32 fill = (max - min) * fill_percent;
@@ -908,6 +1320,7 @@ static bool GUI_Do_Fill_Slider(
 	}
 	
 	// Draw
+	if(Rects_Overlap(p.rect, context->canvas_rect))
 	{
 		f32 d = max - min;
 		Assert(d > 0);
@@ -930,17 +1343,209 @@ static bool GUI_Do_Fill_Slider(
 }
 
 
-static bool GUI_Do_Checkbox(GUI_Context* context, v2f* pos, v2f* dim, bool* value)
+static bool GUI_Do_Handle_Slider(
+	GUI_Context* context, 
+	v2f* pos, 
+	v2f* dim, 
+	f32* value,
+	f32 max,
+	f32 min,
+	GUI_Cardinal_Direction cardinal_dir,
+	f32 step_count,
+	GUI_Input_Acceleration_Behavior inp_accel)
 {
+	Assert(GUI_Is_Context_Ready(context));
+	
+	static constexpr f32 min_handle_width = 3.f;
+	
+	f32 pre_val = *value;
+	
+	if(*value < min)
+		*value = min;
+	
+	if(*value > max)
+		*value = max;
+	
 	// --------------------------------------------------------------------------
 	
 	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
 	
 	u32 id = GUI_Generate_ID(p.rect, __LINE__);
 	
-	v2f cursor_position = v2i::Cast<f32>(context->cursor_position);
+	bool cursor_on_selection = Is_Point_Inside_Rect(context->cursor_fpos, p.rect);
+	bool is_selected = GUI_Is_Element_Selected(context, cursor_on_selection, id);
 	
-	bool cursor_on_selection = Is_Point_Inside_Rect(cursor_position, p.rect);
+	GUI_Theme* theme = context->layout.theme;
+	
+	// --------------------------------------------------------------------------
+	
+	u32 outline_color = theme->outline_color;
+	u32 handle_color = theme->selected_color;
+	
+	
+	v2f internal_dim = p.dim - (f32(theme->outline_thickness) * 2);
+	
+	f32 range = max - min;
+	f32 possibility_space = range + 1;
+	v2f handle_pos = p.pos;
+	
+	f32 bar_internal_lenght = internal_dim.elements[u8(cardinal_dir)];
+	
+	if(step_count == 0)
+		step_count = bar_internal_lenght;
+	
+	
+	f32 handle_lenght = Max(bar_internal_lenght / possibility_space, min_handle_width);
+	f32 half_handle_lenght = handle_lenght / 2;
+	f32 slidable_lenght = bar_internal_lenght - handle_lenght;
+	
+	f32 divizor = possibility_space - 1;
+	
+	if(divizor == 0) // CONSIDER: Epsilon?
+		divizor = 1;
+	
+	f32 directional_offset = 
+		(-bar_internal_lenght / 2 + half_handle_lenght) + ((*value - min) * (slidable_lenght / divizor));
+	
+	v2f handle_dim;
+	
+	switch(cardinal_dir)
+	{
+		case GUI_Cardinal_Direction::left_right:
+		{
+			handle_dim = v2f{handle_lenght, internal_dim.y};
+			handle_pos += v2f{directional_offset, 0};
+		}break;
+		
+		
+		case GUI_Cardinal_Direction::up_down:
+		{
+			handle_dim = v2f{internal_dim.x, handle_lenght};
+			handle_pos += v2f{0, -directional_offset};
+		}break;
+	}
+	
+	Rect handle_rect = Create_Rect_Center(handle_pos, handle_dim);
+	
+	bool cursor_on_handle = Is_Point_Inside_Rect(context->cursor_fpos, handle_rect);
+	if(is_selected)
+	{
+		if(cursor_on_handle)
+		{
+			handle_color = theme->title_color;
+		}
+		
+		GUI_Slider_State* state = &context->selection_state.slider;
+		
+		outline_color = theme->selected_color;
+		f32 step = possibility_space / step_count;
+		
+		// Handle mouse input -----------------
+		if(context->actions[GUI_Menu_Actions::mouse].Is_Pressed() && cursor_on_selection)
+		{
+			if(cursor_on_handle)
+				state->drag_offset = context->cursor_fpos - handle_pos;
+			else
+				state->drag_offset = v2f{0};
+			
+			state->is_held_down = true;
+		}
+		
+		
+		if(context->actions[GUI_Menu_Actions::mouse].Is_Up())
+			state->is_held_down = false;
+		
+		
+		if(state->is_held_down)
+		{
+			f32 cursor_pos_on_sliding_axis = context->cursor_fpos.elements[u8(cardinal_dir)];
+			cursor_pos_on_sliding_axis -= state->drag_offset.elements[u8(cardinal_dir)];
+			
+			f32 y_flip = (1 - (f32(cardinal_dir) * 2));
+			
+			f32 rel_cursor = 
+				cursor_pos_on_sliding_axis - (p.pos.elements[u8(cardinal_dir)] - (bar_internal_lenght / 2));
+			
+			rel_cursor -= half_handle_lenght * y_flip;
+			
+			rel_cursor = (f32(cardinal_dir) * bar_internal_lenght) + (rel_cursor * y_flip);
+			
+			
+			f32 percent = rel_cursor / slidable_lenght;
+			
+			f32 v = (percent * range);
+			f32 steps = Round(v / step);
+			v = step * steps;
+			
+			v += min;
+			v = Min(v, max);
+			v = Max(v, min);
+			
+			*value = v;
+		}
+		
+		f64 time = context->platform->Get_Time_Stamp();
+		
+		// Handle input Keyboard/Controller.
+		Action* left = context->actions + GUI_Menu_Actions::left;
+		Action* right = context->actions + GUI_Menu_Actions::right; 
+		
+		if(left->Is_Pressed() || right->Is_Pressed())
+		{
+			state->input_start_time = 0;
+			state->next_input_time = 0;
+		}	
+		
+		if(left->Is_Down())
+		{
+			handle_color = theme->title_color;
+			while(GUI_Accelerated_Tick(&inp_accel, time, &state->input_start_time, &state->next_input_time))
+			{
+				f32 new_value = *value - step;
+				*value = Min(max, Max(min, new_value));	
+			}
+		}
+
+		
+		if(right->Is_Down())
+		{
+			handle_color = theme->title_color;
+			while(GUI_Accelerated_Tick(&inp_accel, time, &state->input_start_time, &state->next_input_time))
+			{
+				f32 new_value = *value + step;
+				*value = Min(max, Max(min, new_value));
+			}
+		}
+	}
+	
+	// Draw
+	if(Rects_Overlap(p.rect, context->canvas_rect))
+	{
+		Draw_Filled_Rect_With_Outline(
+			context->canvas, 
+			p.rect, 
+			theme->background_color,
+			theme->outline_thickness, 
+			outline_color);
+		
+		Draw_Filled_Rect(context->canvas, handle_rect, handle_color);		
+	}
+	
+	return pre_val != *value;
+}	
+
+
+static bool GUI_Do_Checkbox(GUI_Context* context, v2f* pos, v2f* dim, bool* value)
+{
+	Assert(GUI_Is_Context_Ready(context));
+	
+	// --------------------------------------------------------------------------
+	
+	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
+	
+	u32 id = GUI_Generate_ID(p.rect, __LINE__);
+	
+	bool cursor_on_selection = Is_Point_Inside_Rect(context->cursor_fpos, p.rect);
 	bool is_selected = GUI_Is_Element_Selected(context, cursor_on_selection, id);
 	
 	GUI_Theme* theme = context->layout.theme;
@@ -950,7 +1555,7 @@ static bool GUI_Do_Checkbox(GUI_Context* context, v2f* pos, v2f* dim, bool* valu
 	bool pre_val = *value;
 	
 	
-	u32 outline_color;
+	u32 outline_color = theme->outline_color;
 	if(is_selected)
 	{
 		GUI_Button_State* state = &context->selection_state.button;
@@ -964,10 +1569,6 @@ static bool GUI_Do_Checkbox(GUI_Context* context, v2f* pos, v2f* dim, bool* valu
 			outline_color = theme->down_color;
 		else
 			outline_color = theme->selected_color;
-	}
-	else
-	{
-		outline_color = theme->outline_color;
 	}
 	
 	// Draw
@@ -998,8 +1599,10 @@ static u32 GUI_Do_Dropdown_Button(
 	char* text,
 	u32 element_count,
 	char** element_names,
-	v2f text_scale = v2f{1.f, 1.f})
+	v2f text_scale = GUI_DEFAULT_TEXT_SCALE)
 {
+	Assert(GUI_Is_Context_Ready(context));
+	
 	Assert(element_count > 0);
 	
 	// --------------------------------------------------------------------------
@@ -1030,26 +1633,32 @@ static u32 GUI_Do_Dropdown_Button(
 	
 	
 	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
-	u32 id = GUI_Generate_ID(p.rect, __LINE__);
 	
-	v2f cursor_position = v2i::Cast<f32>(context->cursor_position);
+	Rect id_rect = {p.rect.min - context->anchor_base, p.rect.max - context->anchor_base};
 	
-	bool cursor_on_selection = Is_Point_Inside_Rect(cursor_position, p.rect);
+	u32 id = GUI_Generate_ID(id_rect, __LINE__);
+	
+	bool cursor_on_selection = Is_Point_Inside_Rect(context->cursor_fpos, p.rect);
 	bool is_selected = GUI_Is_Element_Selected(context, cursor_on_selection, id);
 	
 	// --------------------------------------------------------------------------
 	
-	u32 outline_color;
+	u32 outline_color = outline_color = theme->outline_color;
 	
 	u32 result = 0;
 	
-	Rect open_rect = GUI_Get_Dropdown_Button_Open_Rect(p.pos, p.dim, element_count);
+	f32 half_dim_y = p.dim.y / 2;
+	v2f open_center = v2f{p.pos.x, p.pos.y - (half_dim_y * f32(element_count) - half_dim_y)};	
+	v2f open_dim = v2f{p.dim.x, p.dim.y * f32(element_count)};
+	
+	Rect open_rect = Create_Rect_Center(open_center, open_dim);
+	
 	
 	if(is_selected)
 	{
 		GUI_Dropdown_Button_State* state = &context->selection_state.dropdown_button;
 		
-		bool cursor_is_in_open_rect = Is_Point_Inside_Rect(v2i::Cast<f32>(context->cursor_position), open_rect);
+		bool cursor_is_in_open_rect = Is_Point_Inside_Rect(context->cursor_fpos, open_rect);
 		
 		if(state->is_open)
 		{
@@ -1061,7 +1670,11 @@ static u32 GUI_Do_Dropdown_Button(
 			}
 			else
 			{
-				context->disable_kc_navigation = true;
+				GUI_Update_Bounds(context, open_rect);
+				context->selected_element_pos = open_center;
+				context->selected_element_dim = open_dim;
+				
+				context->flags |= GUI_Context_Flags::disable_kc_navigation;
 				
 				// KC controls
 				if(context->actions[GUI_Menu_Actions::up].Is_Pressed())
@@ -1094,7 +1707,7 @@ static u32 GUI_Do_Dropdown_Button(
 					f32 level = p.pos.y - p.dim.y / 2;
 					for(u32 i = 0; i < element_count; ++i)
 					{
-						if(f32(context->cursor_position.y) > level)
+						if(f32(context->cursor_fpos.y) > level)
 						{
 							if(context->cursor_position != context->last_cursor_position || 
 								context->actions[GUI_Menu_Actions::mouse].Is_Pressed())
@@ -1131,7 +1744,9 @@ static u32 GUI_Do_Dropdown_Button(
 			if(GUI_On_Release_Action(context, cursor_on_selection, &state->is_pressed_down))
 			{
 				state->is_open = true;
-			}			
+				if(context->actions[GUI_Menu_Actions::mouse].Is_Released())
+					state->selected_element_idx = 0;
+			}
 		}		
 		
 		// Re-check if the box is open or not. May have changed in the above code block.
@@ -1140,8 +1755,8 @@ static u32 GUI_Do_Dropdown_Button(
 			context->defered_render = GUI_Defered_Render_Type::dropdown_button;
 			
 			context->cursor_mask_area = open_rect;
-			context->cursor_mask_enabled = true;
-			context->cursor_mask_validation = true;
+			context->flags |= GUI_Context_Flags::cursor_mask_enabled;
+			context->flags |= GUI_Context_Flags::cursor_mask_validation;
 			
 			state->selected_element_idx = Min(state->selected_element_idx, element_count - 1);
 			state->element_count = element_count;
@@ -1155,12 +1770,9 @@ static u32 GUI_Do_Dropdown_Button(
 			return 0; // Skip the rest of the function. Drawring is handled in the End_Context function.
 		}
 	}
-	else
-	{
-		outline_color = theme->outline_color;
-	}
 	
 	// Draw closed mode.
+	if(Rects_Overlap(p.rect, context->canvas_rect))
 	{
 		Draw_Filled_Rect_With_Outline(
 			context->canvas, 
@@ -1180,57 +1792,78 @@ static u32 GUI_Do_Dropdown_Button(
 }
 
 
-//TODO: Should only take a width, as height is determined by the font and text scale.
+// TODO: Fix a bug with scaled up SLs, characters overflow the widget.
 static bool GUI_Do_SL_Input_Field(
 	GUI_Context* context, 
 	v2f* pos, 
-	v2f* dim,
+	f32* width,
 	String* str,
-	u32 character_limit = 0,
-	v2f text_scale = v2f{1.f, 1.f},
-	bool (*character_check)(char*) = 0)
+	u32 character_limit = 256,
+	v2f text_scale = GUI_DEFAULT_TEXT_SCALE,
+	bool (*character_check)(char*) = 0,
+	GUI_Input_Acceleration_Behavior keyboard_acceleration = {0.2, 0.3, 30})
 {
+	Assert(GUI_Is_Context_Ready(context));
+
+	Assert(str);
+	
 	static constexpr f32 min_handle_width = 3.f;
-	
-	// --------------------------------------------------------------------------
-	
-	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
-	
-	u32 id = GUI_Generate_ID(p.rect, __LINE__);
-	
-	v2f cursor_position = v2i::Cast<f32>(context->cursor_position);
-	
-	bool cursor_on_selection = Is_Point_Inside_Rect(cursor_position, p.rect);
-	bool is_selected = GUI_Is_Element_Selected(context, cursor_on_selection, id);
 	
 	GUI_Theme* theme = context->layout.theme;
 	Font* font = &theme->font;
 	
+	f32 outline_thickness = f32(theme->outline_thickness);
+	f32 char_width = f32(font->char_width) * text_scale.x;
+	f32 char_height = f32(font->char_height) * text_scale.y;
+	
+	f32 bar_height = Ceil(char_height * 0.33f);
+	
+	v2f dim;
+	{
+		f32 _width = width? *width : context->layout.last_element_dim.x;
+		f32 _height = char_height + bar_height + outline_thickness * 2;
+		if((u32)_height % 2)
+			_height += 1;
+		
+		dim = {_width, _height};		
+	}
+	
 	// --------------------------------------------------------------------------
+	
+	GUI_Placement p = GUI_Get_Placement(context, &dim, pos);
+	
+	u32 id = GUI_Generate_ID(p.rect, __LINE__);
+	
+
+	bool cursor_on_selection = Is_Point_Inside_Rect(context->cursor_fpos, p.rect);
+	bool is_selected = GUI_Is_Element_Selected(context, cursor_on_selection, id);
+	
+	
+	// --------------------------------------------------------------------------
+	
+	bool result = false;
 	
 	u32 outline_color = theme->outline_color;
 	u32 view_offset = 0;
-	u32 view_limit; // Amount of charactes that can fit inside the text area.
 	
 	v2f text_p = p.pos + v2f{1, -1} * f32(theme->outline_thickness) + v2f{2,-2} +
 		Hadamar_Product(v2f{-1, 1}, (p.dim / 2));
-	text_p.y -= text_scale.y * f32(font->char_height);
+	text_p.y -= char_height;
 	
-	f32 char_width = f32(font->char_width) * text_scale.x;
-	f32 char_height = f32(font->char_height) * text_scale.y;
+	u32 view_limit; // Amount of charactes that can fit inside the text area.
 	// Calculate view limit.
 	{
-		f32 w = (text_p.x - (p.pos - p.dim / 2).x) * 2;
-		view_limit = (u32)Round_To_Signed_Int32((p.dim.x - w) / char_width);	
+		// w: dif between text_p and p.pos twice.
+		f32 w = (text_p.x - p.rect.min.x) * 2;
+		view_limit = (u32)Floor((p.dim.x - w) / char_width);	
 	}
 	
+	// "Bar" is the slider area at the bottom.
 	v2f bar_dim;
 	v2f bar_center;
 	Rect bar_rect;
 	
 	{
-		f32 outline_thickness = f32(theme->outline_thickness);
-		f32 bar_height = Ceil(font->char_height * text_scale.y) * 0.33f;
 		f32 bar_offset_y = p.dim.y / 2 - bar_height / 2 - outline_thickness;
 		bar_dim = { p.dim.x - outline_thickness * 2, bar_height };
 		bar_center = p.pos - v2f{0, bar_offset_y};
@@ -1257,6 +1890,7 @@ static bool GUI_Do_SL_Input_Field(
 		
 		// Handle input
 		bool mouse_pressed_down = context->actions[GUI_Menu_Actions::mouse].Is_Pressed();
+		bool mouse_is_down = context->actions[GUI_Menu_Actions::mouse].Is_Down();
 		
 		if(state->is_active)
 		{
@@ -1266,61 +1900,43 @@ static bool GUI_Do_SL_Input_Field(
 				draw_cursor = false;
 				state->is_active = false;
 				state->view_offset = 0;
-				context->cursor_mask_validation = false;
-				context->cursor_mask_enabled = false;
+				
+				u32 mask = 
+					GUI_Context_Flags::cursor_mask_validation | GUI_Context_Flags::cursor_mask_enabled;
+				Inverse_Bit_Mask(&context->flags, mask);
+				
+				
 				context->cursor_position = v2i{-1, -1};
 			}
 			else
 			{
-				context->cursor_mask_validation = true;
-				context->cursor_mask_enabled = true;
+				context->flags |= GUI_Context_Flags::cursor_mask_validation;
+				context->flags |= GUI_Context_Flags::cursor_mask_enabled;	
+				
 				context->cursor_mask_area = Create_Rect_Min_Dim(v2f{0,0}, v2u::Cast<f32>(context->canvas->dim));
 				
 				u32 wcp = state->write_cursor_position;
 				
 				Char_Array typing_info = context->platform->Get_Typing_Information();
-	
+				
 				for(u32 i = 0; i < typing_info.count; ++i)
 				{
 					char c = typing_info.buffer[i];
 					
-					if(c == '\b'/*BACKSPACE*/)
+					switch(c)
 					{
-						if(state->text_select_mode) 
+						case '\x1': // CTRL A (Select all)
 						{
-							u32 p0 = state->write_cursor_position;
-							u32 p1 = state->text_select_start_point;
+							state->write_cursor_position = str->lenght;
+							state->text_select_start_point = 0;
+							state->text_select_mode = true;
 							
-							if(p0 != p1)
-							{
-								if(p0 > p1)
-									Swap(&p0, &p1);
-								
-								str->erase(p0, p1);
-								
-								state->write_cursor_position = p0;
-							}
-							
-							state->text_select_mode = false;
-							continue;
-						}
+						}break;
 						
-						if(str->lenght > 0)
+						
+						case '\x3': // CTRL C (Copy selection to clipboard)
 						{
-							state->write_cursor_position -= 1;
-							if(state->write_cursor_position > wcp)
-								state->write_cursor_position = 0;
-							
-							str->remove_at(state->write_cursor_position);
-						}
-					}
-					else if(c >= 32 && c <= 127 && 
-						(character_limit == 0 || str->lenght < character_limit) &&
-						(!character_check || (character_check && character_check(&c))))
-					{
-						if(state->text_select_mode) 
-						{
-							if(state->text_select_mode) 
+							if(state->text_select_mode)
 							{
 								u32 p0 = state->write_cursor_position;
 								u32 p1 = state->text_select_start_point;
@@ -1330,44 +1946,125 @@ static bool GUI_Do_SL_Input_Field(
 									if(p0 > p1)
 										Swap(&p0, &p1);
 									
-									str->erase(p0, p1);
+									char* buffer_start = str->buffer + p0;
+									u32 buffer_lenght = p1 - p0;
 									
-									state->write_cursor_position = p0;
+									context->platform->Set_Clipboard_Data_As_Text(buffer_start, buffer_lenght);
 								}
+							}
+							
+						}break;
+						
+						
+						case '\x18': // CTRL X (Copy selection to clipboard, then delete selection)
+						{
+							if(state->text_select_mode)
+							{
+								u32 p0 = state->write_cursor_position;
+								u32 p1 = state->text_select_start_point;
 								
-								state->text_select_mode = false;
+								if(p0 != p1)
+								{
+									if(p0 > p1)
+										Swap(&p0, &p1);
+									
+									char* buffer_start = str->buffer + p0;
+									u32 buffer_lenght = p1 - p0;
+									
+									context->platform->Set_Clipboard_Data_As_Text(buffer_start, buffer_lenght);
+	
+									str->erase(p0, p1);
+									state->write_cursor_position = p0;
+									state->text_select_mode = false;
+								}
+							}
+							
+						}break;
+						
+						
+						case '\x16': // CTRL V (Paste from clipboard)
+						{
+							GUI_SL_Input_Field_Conditional_Erase_Selection(state, str);
+							
+							char* clip_buffer = context->platform->Get_Clipboard_Data_As_Text();
+							if(clip_buffer)
+							{
+								for(char cb = *clip_buffer; cb; ++clip_buffer, cb = *clip_buffer)
+								{
+									if(cb >= 32 && cb <= 127 && 
+										(character_limit == 0 || str->lenght < character_limit) &&
+										(!character_check || (character_check && character_check(&cb))))
+									{
+										str->insert_at(state->write_cursor_position, *clip_buffer);
+										state->write_cursor_position += 1;										
+									}
+								}
+							}
+							
+						}break;
+						
+						
+						case '\r': // ENTER hopefully, depends on the OS?
+						{
+							result = true;
+							
+							GUI_Reset_Selection_State(context);
+						}break;
+						
+						
+						case '\b': // BACKSPACE
+						{
+							if(state->text_select_mode) 
+							{
+								GUI_SL_Input_Field_Conditional_Erase_Selection(state, str);
+								continue;
+							}
+							
+							if(str->lenght > 0)
+							{
+								state->write_cursor_position -= 1;
+								if(state->write_cursor_position > wcp)
+									state->write_cursor_position = 0;
+								
+								str->remove_at(state->write_cursor_position);
+							}
+							
+						}break;
+						
+						
+						default:
+						{
+							if(c >= 32 && c <= 127 && (character_limit == 0 || str->lenght < character_limit) &&
+								(!character_check || (character_check && character_check(&c))))
+							{
+								GUI_SL_Input_Field_Conditional_Erase_Selection(state, str);
+								
+								str->insert_at(state->write_cursor_position, c);
+								state->write_cursor_position += 1;
 							}
 						}
-						
-						str->insert_at(state->write_cursor_position, c);
-						state->write_cursor_position += 1;
 					}
 				}
 				
+				
+				// NOTE: string lenght is a dependancy for f_lenght, thefore it's updated here,
+				// now that the final lenght for the frame is known.
 				f_lenght = f32(str->lenght) + 1.f;
 				handle_width = Max(bar_dim.x * view_limit / f_lenght, min_handle_width);
 				
 				f64 time = context->platform->Get_Time_Stamp();
 				state->draw_cursor = !(time > state->flicker_start_time) || (u64)time % 2;
 				
-				//TODO: Provede a way for the user to set these.
-				GUI_Input_Acceleration_Behavior accel;
-				accel.input_speed_up_time = state->input_speed_up_time;
-				accel.input_delay_time = state->input_delay;
-				accel.max_speed_up_factor = state->max_speed_up_factor;
-				
-				Action* left = context->actions + GUI_Menu_Actions::left;
-				Action* right = context->actions + GUI_Menu_Actions::right;
-				
-				if(left->Is_Pressed() || right->Is_Pressed())
+				if(context->actions[GUI_Menu_Actions::left].Is_Pressed() ||
+					context->actions[GUI_Menu_Actions::right].Is_Pressed())
 				{
 					state->input_start_time = 0;
 					state->next_input_time = 0;
-				}	
+				}
 				
 				// Arrowkey/controller input 
-				while(left->Is_Down() &&
-					GUI_Accelerated_Tick(&accel, time, &state->input_start_time, &state->next_input_time))
+				while(context->actions[GUI_Menu_Actions::left].Is_Down() && GUI_Accelerated_Tick(
+					&keyboard_acceleration, time, &state->input_start_time, &state->next_input_time))
 				{
 					if(shift_down)
 					{
@@ -1394,8 +2091,8 @@ static bool GUI_Do_SL_Input_Field(
 				}
 				
 				
-				while(right->Is_Down() &&
-					GUI_Accelerated_Tick(&accel, time, &state->input_start_time, &state->next_input_time))
+				while(context->actions[GUI_Menu_Actions::right].Is_Down() && GUI_Accelerated_Tick(
+					&keyboard_acceleration, time, &state->input_start_time, &state->next_input_time))
 				{		
 					if(shift_down)
 					{
@@ -1421,10 +2118,10 @@ static bool GUI_Do_SL_Input_Field(
 				}
 				
 				// mouse behavior with cursor and handle bar.
-				if(str->lenght)
+				if(str->lenght > 0)
 				{
-					bool mouse_y_on_text_area = 
-						(cursor_position.y >= text_p.y && cursor_position.y < text_p.y + char_height);
+					bool mouse_y_on_text_area = (context->cursor_fpos.y >= text_p.y &&
+						context->cursor_fpos.y < text_p.y + char_height);
 					
 					if(mouse_pressed_down && mouse_y_on_text_area)
 					{
@@ -1439,18 +2136,55 @@ static bool GUI_Do_SL_Input_Field(
 						else
 							state->text_select_mode = false;
 						
-						f32 rel_cursor_x = cursor_position.x - text_p.x;
+						f32 rel_cursor_x = context->cursor_fpos.x - text_p.x;
+						if(rel_cursor_x < 0)
+							rel_cursor_x = 0;
+						
 						u32 click_p = Max(u32(0), Min((u32)Round(rel_cursor_x / char_width), view_limit));
 						
+						
 						state->write_cursor_position = Min(state->view_offset + click_p, str->lenght);
+						
+						state->click_p = click_p;
+						state->mouse_press_down_point = state->write_cursor_position;
+						state->mouse_hold_time = time + state->mouse_hold_delay;
 					}
+					
+					
+					if(mouse_is_down)
+					{						
+						if(state->mouse_hold_time != 0)
+						{
+							// mouse drag selection!
+							
+							f32 rel_cursor_x = context->cursor_fpos.x - text_p.x;
+							if(rel_cursor_x < 0)
+								rel_cursor_x = 0;
+							
+							u32 click_p = Max(u32(0), Min((u32)Round(rel_cursor_x / char_width), view_limit));
+							
+							if(time >= state->mouse_hold_time || click_p != state->click_p)
+							{
+								state->click_p = click_p;
+								state->mouse_hold_time = time + state->mouse_hold_delay;
+								state->write_cursor_position = Min(state->view_offset + click_p, str->lenght);
+								state->text_select_start_point = state->mouse_press_down_point;
+								state->text_select_mode = true;								
+							}
+						}
+					}
+					else
+					{
+						state->mouse_hold_time = 0;
+					}
+					
 					
 					if(str->lenght >= view_limit)
 					{
 						v2f shrink_bar_dim = bar_dim - v2f{handle_width / 2, 0};
 						Rect shrink_bar = Create_Rect_Center(bar_center, shrink_bar_dim);	
 						
-						if(mouse_pressed_down && Is_Point_Inside_Rect(cursor_position, bar_rect))
+						if(mouse_pressed_down && Is_Point_Inside_Rect(context->cursor_fpos, bar_rect))
 						{
 							state->handel_drag_mode = true;
 							state->text_select_mode = false;
@@ -1458,20 +2192,27 @@ static bool GUI_Do_SL_Input_Field(
 						
 						if(state->handel_drag_mode)
 						{
-							if(context->actions[GUI_Menu_Actions::mouse].Is_Down())
+							if(mouse_is_down)
 							{
 								state->flicker_start_time = time + state->flicker_delay;
 								
-								f32 rel_shrink_bar_x = cursor_position.x - shrink_bar.min.x;
+								f32 rel_shrink_bar_x = context->cursor_fpos.x - shrink_bar.min.x;
+								
 								f32 percent = Clamp_Zero_To_One(rel_shrink_bar_x / shrink_bar_dim.x);
-							
+								
+								// +1 here to allow scrolling 1 "slot" into the white space at the end.
 								state->view_offset = (u32)Round(f32(str->lenght - view_limit + 1) * percent);
-	
+								
+		
 								if(state->write_cursor_position < state->view_offset + 1)
+								{
 									state->write_cursor_position = state->view_offset + 1;
+								}
 								
 								else if(state->write_cursor_position > state->view_offset + view_limit - 1)
+								{
 									state->write_cursor_position = state->view_offset + view_limit - 1;
+								}
 							}
 							else
 								state->handel_drag_mode = false;
@@ -1485,47 +2226,29 @@ static bool GUI_Do_SL_Input_Field(
 				if(wcp != state->write_cursor_position)
 					state->flicker_start_time = time + state->flicker_delay;
 				
-				
-				// View offset handling.
+				// View offset snapping! v2.0
 				{
-					// Yes, trying to wrap ones head around all of these conditionals is madness.
-					// Therefore some helpfull comments! Hopefylly they aren't outdated!
-					// Also the check order of these matters, for the logic it self and to prevent
-					// tests that would underflow and crash if done in the wrong circumstance.
-					
-					bool underflow_protection = state->write_cursor_position > state->view_offset;
-		
-					// When the string can fit into a view, reset the view bar.
-					if(str->lenght < view_limit)
+					if(str->lenght < view_limit || state->write_cursor_position == 0)
 					{
 						state->view_offset = 0;
 					}
 					
-					// Scroll the view leftwards when the right hand side of the view port is, farthen than
-					// there is text to show. Or in other words prevent whitespace when looking past the string. 
-					else if(state->write_cursor_position >= state->view_offset + 1 &&
-						state->view_offset + view_limit + 1 > str->lenght)
+					else if(state->write_cursor_position == str->lenght)
 					{
 						state->view_offset = str->lenght - view_limit + 1;
 					}
 					
-					// When the write cursor is beyond the right side of view, 
-					// scroll the view to the right keep it inside.
-					else if(underflow_protection &&
-						state->write_cursor_position - state->view_offset > view_limit - 1)
+					else if(state->view_offset + view_limit > str->lenght + 1)
 					{
-						state->view_offset = state->write_cursor_position - (view_limit - 1);
+						state->view_offset = str->lenght + 1 - view_limit;
 					}
 					
-					// Used as an underflow protection on top of the obvious.
-					else if(state->write_cursor_position == 0)
+					else if(state->write_cursor_position > state->view_offset + view_limit - 1)
 					{
-						state->view_offset = 0;
+						state->view_offset = state->write_cursor_position - view_limit + 1;
 					}
 					
-					// When the write cursor is beyond the left side of view, 
-					// scroll the view to the right left it inside.
-					else if(state->write_cursor_position <= state->view_offset + 1)
+					else if(state->write_cursor_position < state->view_offset + 1)
 					{
 						state->view_offset = state->write_cursor_position - 1;
 					}
@@ -1553,7 +2276,8 @@ static bool GUI_Do_SL_Input_Field(
 	}
 
 	
-	// Draw
+	// Draw -------------------------------------------------------------------------------------------
+	if(Rects_Overlap(p.rect, context->canvas_rect))
 	{		
 		Draw_Filled_Rect_With_Outline(
 			context->canvas, 
@@ -1564,7 +2288,7 @@ static bool GUI_Do_SL_Input_Field(
 		
 		// If the text can fit in the box, move it down so it's centered.
 		if(str->lenght < view_limit)
-			text_p.y = p.pos.y - (font->char_height * text_scale.y) / 2;
+			text_p.y = p.pos.y - char_height / 2;
 		
 		if(text_select_mode)
 		{
@@ -1580,13 +2304,16 @@ static bool GUI_Do_SL_Input_Field(
 				p0 = Max(i32(0), i32(p0 - view_offset));
 				p1 = Min(i32(view_limit), i32(p1 - view_offset));
 				p1 -= p0;
-			
-				v2f selection_pos = {text_p.x + p0 * char_width, text_p.y};
-				v2f selection_dim = {p1 * char_width, char_height};
 				
-				Rect select_rect = Create_Rect_Min_Dim(selection_pos, selection_dim);
-				
-				Draw_Filled_Rect(context->canvas, select_rect, theme->title_color);
+				if(p1 != 0)
+				{
+					v2f selection_pos = {text_p.x + p0 * char_width, text_p.y};
+					v2f selection_dim = {p1 * char_width, char_height};
+					
+					Rect select_rect = Create_Rect_Min_Dim(selection_pos, selection_dim);
+					
+					Draw_Filled_Rect(context->canvas, select_rect, theme->title_color);					
+				}
 			}
 		}
 		
@@ -1603,18 +2330,20 @@ static bool GUI_Do_SL_Input_Field(
 				text_scale);
 		}
 		
-		// CONSIDER: Draw the cursor with different collor when at the maximum character limit.
 		if(draw_cursor)
 		{
 			v2f cursor_p = text_p;
 			
-			cursor_p.x += f32(write_cursor_position - view_offset) * f32(font->char_width);
+			cursor_p.x += f32(write_cursor_position - view_offset) * char_width;
+			
+			u32 cursor_color = (str->lenght < character_limit || character_limit == 0)? 
+				theme->write_cursor_color : theme->write_cursor_limit_color;
 			
 			Draw_Vertical_Line(
 				context->canvas, 
 				cursor_p, 
 				f32(font->char_height) * text_scale.y, 
-				theme->outline_color);					
+				cursor_color);
 		}
 		
 		// bar area.
@@ -1633,5 +2362,5 @@ static bool GUI_Do_SL_Input_Field(
 		
 	}
 	
-	return false;
+	return result;
 }

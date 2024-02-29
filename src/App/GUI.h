@@ -16,6 +16,9 @@ static thread_local v2f GUI_AUTO_BOTTOM_LEFT 	= v2f{0, 0};
 
 static thread_local v2f GUI_AUTO_MIDDLE 		= v2f{0, 0};
 
+static thread_local v2f GUI_DEFAULT_TEXT_SCALE 	= v2f{2, 2};
+
+static thread_local f32 GUI_MOUSE_SCROLL_SPEED 	= 50;
 
 struct GUI_Theme
 {
@@ -26,6 +29,8 @@ struct GUI_Theme
 	u32 outline_color = Put_Color(110, 110, 130);
 	u32 text_color = WHITE;
 	u32 title_color = Put_Color(210, 210, 230);
+	u32 write_cursor_color = BLACK;
+	u32 write_cursor_limit_color = RED;
 	f32 padding = 10;
 	
 	Font font;
@@ -45,6 +50,7 @@ struct GUI_Highlight
 	i32 idx = 0;
 	i32 highlight_count = 0;
 };
+
 
 namespace GUI_Menu_Actions
 {
@@ -110,6 +116,13 @@ enum class GUI_Defered_Render_Type
 };
 
 
+enum class GUI_Cardinal_Direction : u8
+{
+	left_right = 0,
+	up_down
+};
+
+
 struct GUI_Placement
 {
 	v2f pos;
@@ -129,6 +142,7 @@ struct GUI_Slider_State
 {
 	f64 input_start_time;
 	f64 next_input_time;
+	v2f drag_offset;
 	
 	bool is_held_down;
 };
@@ -156,9 +170,12 @@ struct GUI_SL_Input_Field_State
 	u32 view_offset = 0;
 	u32 write_cursor_position = 0;
 	u32 text_select_start_point = 0;
+	u32 mouse_press_down_point = 0;
+	u32 click_p = 0;
 	f64 flicker_start_time = 0;
 	f64 next_input_time = 0;
 	f64 input_start_time = 0;
+	f64 mouse_hold_time = 0;
 	
 	bool text_select_mode = 0;
 	bool handel_drag_mode = 0;
@@ -166,10 +183,8 @@ struct GUI_SL_Input_Field_State
 	bool is_active = 0;
 	bool draw_cursor = 0;
 
+	static constexpr f64 mouse_hold_delay = 0.1;
 	static constexpr f64 flicker_delay = 3.0;
-	static constexpr f64 input_delay = 0.4;
-	static constexpr f64 input_speed_up_time = 0.5;
-	static constexpr f64 max_speed_up_factor = 10;
 };
 
 
@@ -188,7 +203,7 @@ struct GUI_Layout
 	GUI_Build_Direction build_direction;
 	
 	GUI_Theme* theme;
-
+	
 	v2f last_element_pos = {};
 	v2f last_element_dim = {};
 	
@@ -196,24 +211,49 @@ struct GUI_Layout
 };
 
 
-// Some data has to be persistent across frames,
-// some done not. How to seperate them?
+namespace GUI_Context_Flags
+{
+	enum : u32
+	{
+		ignore_selection 			= 1 << 0,
+		enable_dynamic_sliders 		= 1 << 1,
+		cursor_mask_validation 		= 1 << 2,
+		cursor_mask_enabled 		= 1 << 3,
+		disable_wrapping 			= 1 << 4,
+		disable_kc_navigation 		= 1 << 5,
+		disable_mouse_scroll 		= 1 << 6,
+		context_ready 				= 1 << 7,
+		maxout_vertical_slider 		= 1 << 8,
+		maxout_horizontal_slider	= 1 << 9,
+	
+	}; // max shift is 31
+}
+
+
 struct GUI_Context
 {
-	// CONSIDER: These variables, need further thought. How are they set? When?
 	Canvas* canvas = 0;
 	Platform_Calltable* platform = 0;
-	Action actions[GUI_Menu_Actions::COUNT] = {}; // <- Make this global?
+	Action* actions;
+	Rect bounds_rel_anchor_base = {};
 	
+	u32 flags = 0;
 	i32 selected_index = 0;
 	i32 widget_count = 0; 
 	u32 selected_id = 0;
+	f32 dynamic_slider_girth = 15.f;
 	
 	i32 last_widget_count = 0;
 	v2i last_cursor_position;
 	v2i cursor_position;
+	v2f cursor_fpos;
+	v2i canvas_pos = {};
+	v2f anchor_base = {};
+	v2f selected_element_pos = {};
+	v2f selected_element_dim = {};
 	
 	Rect cursor_mask_area = {};
+	Rect canvas_rect = {};
 	
 	GUI_Layout layout;
 	
@@ -223,9 +263,18 @@ struct GUI_Context
 	GUI_Defered_Render_Type defered_render = GUI_Defered_Render_Type::none;
 	
 	GUI_Element_State selection_state = {};
-	
-	bool cursor_mask_validation = 0;
-	bool cursor_mask_enabled = 0;
-	
-	bool disable_kc_navigation = 0; // kc = Keyboard/Controller
 };
+
+
+static bool GUI_Do_Handle_Slider(
+	GUI_Context* context, 
+	v2f* pos, 
+	v2f* dim, 
+	f32* value,
+	f32 max = 100,
+	f32 min = 0,
+	GUI_Cardinal_Direction cardinal_dir = GUI_Cardinal_Direction::left_right,
+	f32 step_count = 0,
+	GUI_Input_Acceleration_Behavior inp_accel = GUI_Input_Acceleration_Behavior());
+	
+	
