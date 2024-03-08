@@ -19,9 +19,9 @@ static const char* APP_TITLE = "Nalkapeli";
 
 
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
-{    
-	Win32_Init(instance, 620, 480, CW_USEDEFAULT, CW_USEDEFAULT, APP_TITLE, APP_MEMORY_SIZE);
-		
+{
+	Win32_Init(instance, 620 * 2, 480 * 2, CW_USEDEFAULT, CW_USEDEFAULT, APP_TITLE, APP_MEMORY_SIZE);
+	
 	Platform_Calltable calltable = Win32_Get_Calltable();
 	Init_App(calltable, s_app.game_state_memory, APP_MEMORY_SIZE);
 	

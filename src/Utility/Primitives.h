@@ -30,6 +30,7 @@ static constexpr u32 DEG_HALF_CIRCLE = DEG_FULL_CIRCLE / 2;
 static constexpr f32 F32_MAX = 3.402823466e+38F;
 static constexpr f64 F64_MAX = 1.7976931348623157E+308;
 static constexpr u32 U32_MAX = 0xFFFFFFFF;
+static constexpr i32 I32_MAX = 2147483647;
 static constexpr u16 U16_MAX = 0xFFFF;
 
 #define WHITE 0xffffffff
@@ -40,11 +41,10 @@ static constexpr u16 U16_MAX = 0xFFFF;
 #define BLUE 0xff0000ff
 #define MAGENTA 0xffff00ff
 
-
 #define KiB 1024
 #define MiB KiB * KiB
 
-#include "Vector.h"
+#include "Vector.h" // v2i, v2u, v2f 
 
 struct Rect
 {

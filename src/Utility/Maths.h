@@ -113,7 +113,11 @@ static inline v2f Ceil(v2f v)
 
 static inline f32 Round(f32 real)
 {
-	f32 result = (f32)((i32)(real + 0.5f));
+	f32 shift = 0.5f;
+	if(real < 0)
+		shift *= -1;
+	
+	f32 result = (f32)((i32)(real + shift));
 	return result;
 }
 
@@ -290,4 +294,56 @@ static inline f32 Clamp_Zero_To_One(f32 real)
 {
 	f32 result = Max(0.f, Min(1.f, real));
 	return result;
+}
+
+
+static inline f32 Clamp_Zero_To_Max(f32 real, f32 max)
+{
+	f32 result = Max(0.f, Min(max, real));
+	return result;
+}
+
+
+static inline u32 Pow32(u32 base, u32 exp)
+{
+	u32 result = 1;
+	for(;;)
+	{
+		if (exp & 1)
+			result *= base;
+		
+		exp >>= 1;
+		
+		if (!exp)
+			break;
+		
+		base *= base;
+	}
+	
+	return result;
+}
+
+
+static inline bool Rects_Overlap(Rect a_rect, Rect b_rect)
+{
+	Assert(a_rect.min.x < a_rect.max.x);
+	Assert(a_rect.min.y < a_rect.max.y);
+	
+	Assert(b_rect.min.x < b_rect.max.x);
+	Assert(b_rect.min.y < b_rect.max.y);
+	
+	
+	if(a_rect.max.x < b_rect.min.x)
+		return false;
+	
+	if(a_rect.max.y < b_rect.min.y)
+		return false;
+	
+	if(a_rect.min.x > b_rect.max.x)
+		return false;
+	
+	if(a_rect.min.y > b_rect.max.y)
+		return false;
+	
+	return true;
 }

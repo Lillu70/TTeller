@@ -4,55 +4,79 @@
 #define AUTO 0
 
 static GUI_Theme s_theme = {};
-static GUI_Context s_gui;
-static String input_field_text;
+static GUI_Context s_all_events;
+static GUI_Context s_all_events_banner;
+static GUI_Context s_event_editor;
+static GUI_Context s_event_editor_banner;
 
 
-struct Participation_Requirement
+enum class Menus : u32
 {
-	static inline const char* type_names[] = 
-		{"Ominaisuus", "Esine Merkki", "Hahmo Merkki"};
+	none = 0,
+	event_editor_participents,
+	all_events,
+};
+
+
+struct Event_State
+{
+	static constexpr u32 max_participent_count = 100;
+	Dynamic_Array<Participent>* participents;
+	String name;
+};
+
+
+struct Global_Data
+{
+	Action menu_actions[GUI_Menu_Actions::COUNT] = {};
 	
-	enum class Type
+	Menus active_menu;
+	
+	Dynamic_Array<Event_State>* all_events = 0;
+	u32 active_event_index = 0;
+};
+static Global_Data s_global_data = Global_Data();
+
+
+static inline Event_State* Push_New_Event(char* def_name = "Uusi tapahtuma")
+{
+	Assert(s_global_data.all_events);
+	
+	Event_State* event = Push(&s_global_data.all_events, &s_allocator);
+	event->participents = Create_Dynamic_Array<Participent>(&s_allocator, 4);
+	Init_String(&event->name, &s_allocator, def_name);
+	
+	return event;
+}
+
+
+static void Delete_All_Participants_From_Event(Event_State* event)
+{
+	for(Participent* p = Begin(event->participents); p < End(event->participents); ++p)
 	{
-		character_stat = 0,
-		mark_item,
-		mark_personal,
-		COUNT
-	};
+		Participation_Requirement* reg_array = Begin(p->reqs);
+		
+		for(Participation_Requirement* r = Begin(p->reqs); r < End((p->reqs)); ++r)
+			Make_Requirement_Hollow(r);
+		
+		s_allocator.free(p->reqs);
+	}
 	
-	Type type;
-};
-
-
-struct Participent
-{
-	u32 requirement_count = 0;
-	Participation_Requirement requirements[5];
-};
-
-
-struct New_Event_State
-{
-	static inline const char* p[] = {"/k1", "/k2", "/k3", "/k4"};
-	u32 participent_count = 0;
-	Participent participents[4];
-	
-	String event_name;
-};
-static New_Event_State s_new_event_state;
+	event->participents->count = 0;
+}
 
 
 static inline void Init_GUI()
-{	
-	s_gui.platform = &s_platform;
-	s_gui.canvas = &s_canvas;
+{
+	GUI_Set_Default_Menu_Actions(&s_global_data.menu_actions[0]);
+
+	GUI_DEFAULT_TEXT_SCALE = v2f{2, 2};
 	
-	Init_String(&input_field_text, &s_mem, "Type text here.");
+	s_global_data.active_menu = Menus::none;
+	s_global_data.all_events = Create_Dynamic_Array<Event_State>(&s_allocator, 12);
 	
 	v3<u8> c;
 	f32 g;
-	
 	{		
 		c = {165, 80, 80};
 		s_theme.selected_color = Put_Color(c.r, c.g, c.b);
@@ -74,471 +98,459 @@ static inline void Init_GUI()
 	s_theme.font.data_buffer = (u8*)&s_terminus_font[0];
 	s_theme.font.char_width = s_terminus_font_char_width;
 	s_theme.font.char_height = s_terminus_font_char_height;
-
-	GUI_Set_Default_Menu_Actions(&s_gui);
-	Init_String(&s_new_event_state.event_name, &s_mem, "Uusi tapahtumagargaerg aerg aergaergargaergrg argargaergaergaerg");	
 }
 
 
-static void AUTO_TEST()
+static void Do_All_Events_Frame()
 {
-	GUI_Begin_Context(&s_gui, GUI_Anchor::top_right, GUI_Build_Direction::down_left, &s_theme);
+	Action* actions = s_global_data.menu_actions;
 	
-	GUI_Do_Button(&s_gui, &GUI_AUTO_TOP_CENTER, 	&GUI_AUTO_FIT, "Button");
-	GUI_Do_Button(&s_gui, &GUI_AUTO_TOP_LEFT, 		&GUI_AUTO_FIT, "Button");
-	GUI_Do_Button(&s_gui, &GUI_AUTO_TOP_RIGHT, 		&GUI_AUTO_FIT, "Button");
-	GUI_Do_Button(&s_gui, &GUI_AUTO_MIDDLE_RIGHT, 	&GUI_AUTO_FIT, "Button");
-	GUI_Do_Button(&s_gui, &GUI_AUTO_MIDDLE_LEFT, 	&GUI_AUTO_FIT, "Button");
-	GUI_Do_Button(&s_gui, &GUI_AUTO_BOTTOM_CENTER, 	&GUI_AUTO_FIT, "Button");
-	GUI_Do_Button(&s_gui, &GUI_AUTO_BOTTOM_RIGHT, 	&GUI_AUTO_FIT, "Button");
-	GUI_Do_Button(&s_gui, &GUI_AUTO_BOTTOM_LEFT, 	&GUI_AUTO_FIT, "Button");
-	GUI_Do_Button(&s_gui, &GUI_AUTO_MIDDLE, 		&GUI_AUTO_FIT, "Button");
+	// Banner
+	static constexpr u32 banner_height = 225;
+	v2u banner_dim = s_canvas.dim;
 	
-	GUI_End_Context(&s_gui);
-}
+	banner_dim.y = Min(s_canvas.dim.y, banner_height);
+	
+	u32 banner_offset = banner_dim.x * banner_dim.y;
+	u32* canvas_top = s_canvas.buffer + s_canvas.dim.x * s_canvas.dim.y;
+	u32* banner_buffer = canvas_top - banner_offset;
+	
+	Canvas banner_canvas;
+	Init_Canvas(&banner_canvas, banner_buffer, banner_dim);
+	Clear_Canvas(&banner_canvas, Put_Color(40, 40, 40));
+	
+	v2i banner_canvas_pos = v2i{0, i32(s_canvas.dim.y - banner_dim.y)};
 
-
-static void Do_Color_Editor_Widget(u32* color, v2f slider_dim, char* text)
-{
-	GUI_Do_Text(&s_gui, AUTO, text, GUI_Highlight_Next(&s_gui, 3));
-	
-	GUI_Input_Acceleration_Behavior accel = {0.1, 0.05, 10000};
-	
-	v3f upc = Unpack_Color(*color);
-	
-	GUI_Do_Text(&s_gui, AUTO, "Red:", GUI_Highlight_Next(&s_gui));
-	GUI_One_Time_Skip_Padding(&s_gui);
-	if(GUI_Do_Fill_Slider(&s_gui, AUTO, &slider_dim, &upc.r, 255, 1, 1.f, accel))
+	GUI_Context* context = &s_all_events_banner;
+	GUI_Begin_Context(context, &s_platform, &banner_canvas, actions, &s_theme, banner_canvas_pos);
+	if(Is_Point_Inside_Rect(context->cursor_fpos, context->canvas_rect))
 	{
-		*color = Put_Color((u8)upc.r, (u8)upc.g, (u8)upc.b);
+		Inverse_Bit_Mask(&s_all_events_banner.flags, GUI_Context_Flags::disable_mouse_scroll);
+		s_all_events.flags |= 
+			GUI_Context_Flags::ignore_selection | GUI_Context_Flags::disable_mouse_scroll;
 	}
 	
+	GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "Kaikki Tapahtumat", {}, v2f{4, 4}, true);
 	
-	GUI_Do_Text(&s_gui, AUTO, "Green:", GUI_Highlight_Next(&s_gui));
-	GUI_One_Time_Skip_Padding(&s_gui);
-	if(GUI_Do_Fill_Slider(&s_gui, AUTO, &slider_dim, &upc.g, 255, 1, 1.f, accel))
+	if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Luo uusi"))
 	{
-		*color = Put_Color((u8)upc.r, (u8)upc.g, (u8)upc.b);
+		#if 0
+		s_global_data.active_menu = Menus::event_editor_participents;
+		#endif
+		
+		Push_New_Event();
+		s_global_data.active_event_index = s_global_data.all_events->count - 1;
 	}
 	
+	GUI_End_Context(context);
 	
-	GUI_Do_Text(&s_gui, AUTO, "Blue:", GUI_Highlight_Next(&s_gui));
-	GUI_One_Time_Skip_Padding(&s_gui);
-	if(GUI_Do_Fill_Slider(&s_gui, AUTO, &slider_dim, &upc.b, 255, 1, 1.f, accel))
+	v2u menu_dim = v2u{s_canvas.dim.x, s_canvas.dim.y - banner_dim.y};
+	if(menu_dim.y == 0)	
+		return;
+	
+	Canvas menu_canvas;
+	Init_Canvas(&menu_canvas, s_canvas.buffer, menu_dim);
+	
+	context = &s_all_events;
+	GUI_Begin_Context(context, &s_platform, &menu_canvas, actions, &s_theme);
+	if(Is_Point_Inside_Rect(context->cursor_fpos, context->canvas_rect))
 	{
-		*color = Put_Color((u8)upc.r, (u8)upc.g, (u8)upc.b);
+		Inverse_Bit_Mask(&s_all_events.flags, GUI_Context_Flags::disable_mouse_scroll);
+		s_all_events_banner.flags |= 
+			GUI_Context_Flags::ignore_selection | GUI_Context_Flags::disable_mouse_scroll;
 	}
-}
-
-
-static void Do_Theme_Menu()
-{
-	GUI_Begin_Context(&s_gui, GUI_Anchor::top_left, GUI_Build_Direction::down_left, &s_theme);
 	
-	v2f slider_dim = v2f{100, 15};
+	GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "Tapahtuma lista:");
 	
-	// Color Editing.
+	
+	Event_State* begin = Begin(s_global_data.all_events);
+	for(u32 i = 0; i < s_global_data.all_events->count; ++i)
 	{
-		v2f spacing = {0, 15};
-		GUI_Layout layout_capture;
+		Event_State* e = begin + i;
 		
-		GUI_Do_Text(&s_gui, &GUI_AUTO_TOP_LEFT, "Theme Editor:", {}, v2f{1.5f, 1.5f}, true);
-		
-		GUI_Do_Text(&s_gui, AUTO, "Colors:", GUI_Highlight_Next(&s_gui, 18), v2f{1.0f, 1.0f});
-		
-		GUI_Push_Layout(&s_gui);
-		
-		Do_Color_Editor_Widget(&s_theme.outline_color, slider_dim, "Outline:");
-
-		GUI_Do_Spacing(&s_gui, &spacing);
-		Do_Color_Editor_Widget(&s_theme.selected_color, slider_dim, "Selected:");
-		
-		layout_capture = s_gui.layout;
-		
-		GUI_Pop_Layout(&s_gui);
-		s_gui.layout.last_element_pos.x += slider_dim.x + spacing.y + s_theme.padding * 2;
-		GUI_Push_Layout(&s_gui);
-		
-		Do_Color_Editor_Widget(&s_theme.background_color, slider_dim, "Background:");
-
-		GUI_Do_Spacing(&s_gui, &spacing);
-		Do_Color_Editor_Widget(&s_theme.down_color, slider_dim, "Down:");
-		
-		GUI_Pop_Layout(&s_gui);
-		s_gui.layout.last_element_pos.x += slider_dim.x + spacing.y + s_theme.padding * 2;
-		
-		Do_Color_Editor_Widget(&s_theme.title_color, slider_dim, "Title:");
-		
-		GUI_Do_Spacing(&s_gui, &spacing);
-		Do_Color_Editor_Widget(&s_theme.text_color, slider_dim, "Text:");		
-	
-		s_gui.layout = layout_capture;
-		
-		GUI_Do_Text(&s_gui, AUTO, "Other Theme Elements:");
-		
-		GUI_Do_Text(&s_gui, AUTO, "Outline thickness:");
-		GUI_One_Time_Skip_Padding(&s_gui);
-		f32 v = f32(s_theme.outline_thickness);
-		if(GUI_Do_Fill_Slider(&s_gui, AUTO, &slider_dim, &v, 5, 0, 1))
+		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "X"))
 		{
-			s_theme.outline_thickness = u32(v);
+			Delete_All_Participants_From_Event(e);
+			s_allocator.free(e->participents);
+			e->name.free();
+			Remove_Element_From_Packed_Array(begin, &s_global_data.all_events->count, sizeof(*e), i--);
+			continue;
 		}
 		
+		GUI_Push_Layout(context);
 		
-		v2f p = {f32(s_canvas.dim.x) - 10, 10};
-		s_gui.layout.anchor = GUI_Anchor::bottom_right;
-		s_gui.layout.build_direction = GUI_Build_Direction::up_right;
+		context->layout.build_direction = GUI_Build_Direction::right_center;
 		
-		v = s_theme.padding;
-		GUI_One_Time_Skip_Padding(&s_gui);
-		if(GUI_Do_Fill_Slider(&s_gui, &p, &slider_dim, &v, 15, 0, 1.f))
+		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, e->name.buffer))
 		{
-			s_theme.padding = v;
+			s_global_data.active_menu = Menus::event_editor_participents;
+			s_global_data.active_event_index = i;
 		}
-		GUI_Do_Text(&s_gui, AUTO, "Padding:");
+		
+		GUI_Pop_Layout(context);
 	}
 	
-	// Test widgets!
-	{
-
-		GUI_Do_Text(&s_gui, &GUI_AUTO_TOP_RIGHT, "Test Widgets:", {}, v2f{2.f, 2.f}, true);
-		s_gui.layout.build_direction = GUI_Build_Direction::down_right;
-		
-		if(GUI_Do_Button(&s_gui, AUTO, &GUI_AUTO_FIT, "This Is a Button"))
-		{
-			
-		}
-		
-		static char* opt[] = {"Option 1", "Option 2", "Something else", "Option 3", "Option 4"};
-		static char* t = "This Is Dropdown Button";
-		switch(u32 s = GUI_Do_Dropdown_Button(&s_gui, AUTO, &GUI_AUTO_FIT, t, Array_Lenght(opt), (char**)&opt))
-		{
-			case 1:
-			{
-				
-			}break;
-			
-			case 2:
-			{
-				
-			}break;
-		}
-		
-		v2f d = {20, 20};
-		static bool b = false;
-		GUI_Do_Checkbox(&s_gui, AUTO, &d, &b);
-		
-		GUI_Push_Layout(&s_gui);
-		s_gui.layout.build_direction = GUI_Build_Direction::left_center;
-		GUI_One_Time_Skip_Padding(&s_gui);
-		GUI_Do_Text(&s_gui, AUTO, "This is a checkbox:");
-		GUI_Pop_Layout(&s_gui);
-		
-		d = { slider_dim.x * 2, 26 };
-		GUI_Do_SL_Input_Field(&s_gui, AUTO, &d, &input_field_text);
-	}
-	
-	GUI_End_Context(&s_gui);
-}
-
-
-static void Random_Test_UI()
-{
-	GUI_Begin_Context(&s_gui, GUI_Anchor::top_left, GUI_Build_Direction::right_center, &s_theme);
-	
-	static u32 button_count = 0;
-
-	{
-		v2f pos = v2f{s_theme.padding, (f32)s_canvas.dim.y - s_theme.padding};
-		v2f dim = v2f{170, 30};
-		
-		if(GUI_Do_Button(&s_gui, &pos, &dim, "New Button!"))
-		{
-			button_count += 1;
-		}
-	}
-	
-	{
-		v2f pp = s_gui.layout.last_element_pos;
-		v2f dd = s_gui.layout.last_element_dim;
-		
-		v2f cc = v2f{20, 20};
-		GUI_Do_Text(&s_gui, AUTO, "Setting 1:", GUI_Highlight_Next(&s_gui));
-		
-		GUI_One_Time_Skip_Padding(&s_gui);
-		
-		bool is_fullscreen = Is_Flag_Set(s_platform.Get_Flags(), (u32)App_Flags::is_fullscreen);
-		if(GUI_Do_Checkbox(&s_gui, AUTO, &cc, &is_fullscreen))
-		{
-			s_platform.Set_Flag(App_Flags::is_fullscreen, is_fullscreen);
-		}
-		
-		
-		s_gui.layout.build_direction = GUI_Build_Direction::down_left;
-		
-		v2f dp_dim = v2f{170, 30};
-		
-		static char* options[] = {"Opt 1", "Opt 2", "Opt 3", "Opt 4", "Lonqg option :)", "Opt 6"};
-		
-		switch(GUI_Do_Dropdown_Button(&s_gui, 0, &GUI_AUTO_FIT, "short", Array_Lenght(options), (char**)&options))
-		{
-			case 1:
-			{
-				
-			}break;
-			
-			case 2:
-			{
-				
-			}break;
-		}
-		
-		f32 y = s_gui.layout.last_element_dim.y;
-		
-		GUI_Do_Text(&s_gui, AUTO, "Character Name:");
-		GUI_One_Time_Skip_Padding(&s_gui);
-		v2f ilp{s_gui.layout.last_element_dim.x, y};
-		GUI_Do_SL_Input_Field(&s_gui, AUTO, &ilp, &input_field_text);
-		
-		GUI_Do_Text(&s_gui, AUTO, "Setting 2:", GUI_Highlight_Next(&s_gui));
-		GUI_One_Time_Skip_Padding(&s_gui);
-		
-		static bool ccv1 = false;
-		if(GUI_Do_Checkbox(&s_gui, AUTO, &cc, &ccv1))
-		{
-			
-		}
-		
-		GUI_Do_Text(&s_gui, AUTO, "Setting 3:", GUI_Highlight_Next(&s_gui));
-		GUI_One_Time_Skip_Padding(&s_gui);
-		
-		static bool ccv2 = false;
-		if(GUI_Do_Checkbox(&s_gui, AUTO, &cc, &ccv2))
-		{
-			
-		}
-		
-		s_gui.layout.last_element_pos = pp;
-		s_gui.layout.last_element_dim = dd;
-	}
-	
-	
-	s_gui.layout.build_direction = GUI_Build_Direction::down_right;
-	
-	for(u32 i = 0; i < button_count; ++i)
-	{
-		if(GUI_Do_Button(&s_gui, AUTO, &GUI_AUTO_FIT, "IMGUI BUTTON"))
-		{
-			button_count -= 1;
-		}
-	}
-	
-	
-	s_gui.layout.build_direction = GUI_Build_Direction::down_left;
-	v2f ld = s_gui.layout.last_element_dim;
-	
-	
-	GUI_Do_Text(&s_gui, AUTO, "Red:", GUI_Highlight_Next(&s_gui));
-	
-	GUI_One_Time_Skip_Padding(&s_gui);
-
-	static f32 r = (u8)Unpack_Color(s_theme.outline_color).r;
-	if(GUI_Do_Fill_Slider(&s_gui, AUTO, &ld, &r, 255, 0, 1.f, {0.1, 0.05, 10000}))
-	{
-		v3f c = Unpack_Color(s_theme.outline_color);
-		s_theme.outline_color = Put_Color((u8)r, (u8)c.g, (u8)c.b);
-	}
-	
-	GUI_Do_Text(&s_gui, AUTO, "Green:", GUI_Highlight_Next(&s_gui));
-	
-	GUI_One_Time_Skip_Padding(&s_gui);
-	
-	static f32 g = (u8)Unpack_Color(s_theme.outline_color).g;
-	if(GUI_Do_Fill_Slider(&s_gui, AUTO, &ld, &g, 255, 1, 1.f, {0.1, 0.05, 10000}))
-	{
-		v3f c = Unpack_Color(s_theme.outline_color);
-		s_theme.outline_color = Put_Color((u8)c.r, (u8)g, (u8)c.b);
-	}
-	
-	GUI_Do_Text(&s_gui, AUTO, "Blue:", GUI_Highlight_Next(&s_gui));
-	
-	GUI_One_Time_Skip_Padding(&s_gui);
-	
-	static f32 b = (u8)Unpack_Color(s_theme.outline_color).b;
-	if(GUI_Do_Fill_Slider(&s_gui, AUTO, &ld, &b, 255, 1, 1.f, {0.1, 0.05, 10000}))
-	{
-		v3f c = Unpack_Color(s_theme.outline_color);
-		s_theme.outline_color = Put_Color((u8)c.r, (u8)c.g, (u8)b);
-	}
-
-
-	GUI_Do_Spacing(&s_gui, AUTO);	
-	
-	GUI_Do_Text(&s_gui, AUTO, "Random test sliders: 3 highlights!", GUI_Highlight_Next(&s_gui, 3));
-	static f32 sval0 = 0.f;
-	GUI_Do_Fill_Slider(&s_gui, AUTO, &ld, &sval0);
-	
-	static f32 sval1 = 0.2f;
-	GUI_Do_Fill_Slider(&s_gui, AUTO, AUTO, &sval1, 1, 0, 0.0005f, {0.01, 0.01, 10000});
-	
-	static f32 sval3 = 1.f;
-	GUI_Do_Fill_Slider(&s_gui, AUTO, AUTO, &sval3, 10, 0, 1.f, {1, 0.2f, 1});
-	
-	v2f spacing = {s_gui.layout.last_element_dim.x, 5};
-	GUI_Do_Spacing(&s_gui, &spacing);
-	
-	GUI_Do_Button(&s_gui, AUTO, &GUI_AUTO_FIT, "Random button at the end.");
-	
-	GUI_End_Context(&s_gui);
+	GUI_End_Context(context);
 }
 
 
 static void Do_New_Event_Frame()
 {
-	New_Event_State* state = &s_new_event_state;
+	Assert(s_global_data.all_events);
+	Assert(s_global_data.all_events->count > s_global_data.active_event_index);
+	Action* actions = s_global_data.menu_actions;
 	
-	GUI_Begin_Context(&s_gui, GUI_Anchor::top_left, GUI_Build_Direction::down_left, &s_theme);
+	Event_State* event = Begin(s_global_data.all_events) + s_global_data.active_event_index;
+
+	// Banner
+	static constexpr u32 banner_height = 225;
+	v2u banner_dim = s_canvas.dim;
 	
-	GUI_Do_Text(&s_gui, &GUI_AUTO_TOP_LEFT, "Luo uusi tapahtuma.", {}, v2f{2,2}, true);
-	GUI_Do_Text(&s_gui, AUTO, "Tapahtuman nimi:");
+	banner_dim.y = Min(s_canvas.dim.y, banner_height);
 	
-	{		
-		v2f d = v2f{182, 26};
-		GUI_Do_SL_Input_Field(&s_gui, AUTO, &d, &state->event_name);
+	u32 banner_offset = banner_dim.x * banner_dim.y;
+	u32* canvas_top = s_canvas.buffer + s_canvas.dim.x * s_canvas.dim.y;
+	u32* banner_buffer = canvas_top - banner_offset;
+	
+	Canvas banner_canvas;
+	Init_Canvas(&banner_canvas, banner_buffer, banner_dim);
+	Clear_Canvas(&banner_canvas, Put_Color(40, 40, 40));
+	
+	v2i banner_canvas_pos = v2i{0, i32(s_canvas.dim.y - banner_dim.y)};
+
+	GUI_Context* context = &s_event_editor_banner;
+	GUI_Begin_Context(context, &s_platform, &banner_canvas, actions, &s_theme, banner_canvas_pos);
+	if(Is_Point_Inside_Rect(context->cursor_fpos, context->canvas_rect))
+	{
+		Inverse_Bit_Mask(&s_event_editor_banner.flags, GUI_Context_Flags::disable_mouse_scroll);
+		s_event_editor.flags |= 
+			GUI_Context_Flags::ignore_selection | GUI_Context_Flags::disable_mouse_scroll;
 	}
 	
-	if(GUI_Do_Button(&s_gui, AUTO, &GUI_AUTO_FIT, "Lisaa uusi osallistuja"))
 	{
-		if(state->participent_count < Array_Lenght(state->participents))
-			state->participent_count += 1;
+		GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "Tapahtuma Editori", {}, v2f{4,4}, true);
+		f32 title_height = context->layout.last_element_dim.y;
+		v2f tile_bounds_max = GUI_Get_Bounds_In_Pixel_Space(context).max;
 		
-	}
+		GUI_Do_Text(context, AUTO, "Tapahtuman nimi:");
+		
+		GUI_Do_SL_Input_Field(context, AUTO, AUTO, &event->name);
 	
-	if(state->participent_count > 0)
-	{
-		GUI_Push_Layout(&s_gui);
-		
-		s_gui.layout.build_direction = GUI_Build_Direction::right_center;
-		
-		if(GUI_Do_Button(&s_gui, AUTO, &GUI_AUTO_FIT, "Poista kaikki osallistujat"))
+		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lisaa uusi osallistuja"))
 		{
-			for(u32 i = 0; i < state->participent_count; ++i)
+			s_event_editor.flags |= GUI_Context_Flags::maxout_horizontal_slider;
+			if(event->participents->count < event->max_participent_count)
 			{
-				*state->participents[i].requirements = {};
-				state->participents[i].requirement_count = 0;
+				Participent* new_participent = Push(&event->participents, &s_allocator);
+				new_participent->reqs = 
+					Create_Dynamic_Array<Participation_Requirement>(&s_allocator, 3);
 			}
-			state->participent_count = 0;
 		}
 		
-		GUI_Pop_Layout(&s_gui);
+		if(event->participents->count > 0)
+		{
+			context->layout.build_direction = GUI_Build_Direction::right_center;
+			
+			if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Poista kaikki osallistujat"))
+				Delete_All_Participants_From_Event(event);
+		}		
+		
+		context->layout.build_direction = GUI_Build_Direction::right_center;
+		
+		f32 padding = context->layout.theme->padding;
+		
+		
+		static constexpr char* back_button_text = "<";
+		v2f back_button_dim = GUI_Tight_Fit_Text(
+			back_button_text, 
+			GUI_DEFAULT_TEXT_SCALE, 
+			&context->layout.theme->font);
+		
+		back_button_dim.x += padding;
+		back_button_dim.y = title_height;
+		f32 menu_buttons_width = back_button_dim.x * 2 + padding * 2 + context->dynamic_slider_girth;
+		f32 back_button_x;
+		
+		if(tile_bounds_max.x + padding > f32(context->canvas->dim.x) - menu_buttons_width)
+		{
+			back_button_x = tile_bounds_max.x + padding;
+		}
+		else
+		{
+			back_button_x = f32(context->canvas->dim.x) - menu_buttons_width;
+		}
+		
+		f32 back_button_y = f32(context->canvas->dim.y) - padding;
+		v2f back_button_pos = v2f{back_button_x, back_button_y};
+		
+		if(GUI_Do_Button(context, &back_button_pos, &back_button_dim, back_button_text))
+		{
+			s_global_data.active_menu = Menus::all_events;
+		}
+		
+		if(GUI_Do_Button(context, AUTO, AUTO, ">"))
+		{
+			
+		}
+		
+	}
+	GUI_End_Context(&s_event_editor_banner);
+
+	// ----------------------------------------------------------------------------------------
+	v2u menu_dim = v2u{s_canvas.dim.x, s_canvas.dim.y - banner_dim.y};
+	if(menu_dim.y == 0)	
+		return;
+	
+	Canvas menu_canvas;
+	Init_Canvas(&menu_canvas, s_canvas.buffer, menu_dim);
+	
+	context = &s_event_editor;
+	GUI_Begin_Context(context, &s_platform, &menu_canvas, actions, &s_theme);
+	if(Is_Point_Inside_Rect(context->cursor_fpos, context->canvas_rect))
+	{
+		Inverse_Bit_Mask(&s_event_editor.flags, GUI_Context_Flags::disable_mouse_scroll);
+		s_event_editor_banner.flags |= GUI_Context_Flags::ignore_selection | GUI_Context_Flags::disable_mouse_scroll;
 	}
 	
-	for(u32 i = 0; i < state->participent_count; ++i)
+	Participent* participents_array = Begin(event->participents);
+	
+	f32 collumn_width = 300;
+	
+	for(u32 p = 0; p < event->participents->count; ++p)
 	{
-		Participent* p = state->participents + i;
+		Participent* parti = participents_array + p;
 		
-		GUI_Push_Layout(&s_gui);
+		GUI_Push_Layout(context);
 		
-		v2f dim = v2f{18, 18};
-		if(GUI_Do_Button(&s_gui, AUTO, &dim, "X"))
+		v2f dim = v2f{36, 36};
+		f32 padding = context->layout.theme->padding;
+		v2f collumn_pos = v2f{collumn_width * p + padding, f32(context->canvas->dim.y - 1) - padding};
+		if(GUI_Do_Button(context, &collumn_pos, &dim, "X"))
 		{
+			for(Participation_Requirement* r = Begin(parti->reqs); r < End((parti->reqs)); ++r)
+				Make_Requirement_Hollow(r);
+			
+			s_allocator.free(parti->reqs);
+			
 			u32 size = sizeof(Participent);
-			Remove_Element_From_Packed_Array(state->participents, &state->participent_count, size, i--);
-			GUI_Pop_Layout(&s_gui);
+			Remove_Element_From_Packed_Array(
+				participents_array, 
+				&event->participents->count, 
+				size, 
+				p--);
+			
+			GUI_Pop_Layout(context);
 			continue;
 		}
 		
-		GUI_Push_Layout(&s_gui);
+		GUI_Push_Layout(context);
 		
-		s_gui.layout.build_direction = GUI_Build_Direction::right_center;
-		GUI_Do_Text(&s_gui, AUTO, (char*)state->p[i]);
+		context->layout.build_direction = GUI_Build_Direction::right_center;
 		
-		GUI_Pop_Layout(&s_gui);
+		u8 typing_marker_buffer[12 + 2] = {0};
+		char* typing_marker;
+		{
+			typing_marker = U32_To_Char_Buffer((u8*)&typing_marker_buffer[2], p + 1);
+			typing_marker -= 1;
+			*typing_marker = 'k';
+			typing_marker -= 1;
+			*typing_marker = '\\';
+		}
+		
+		GUI_Do_Text(context, AUTO, typing_marker, GUI_Highlight_Prev(context));
+		
+		GUI_Pop_Layout(context);
 		
 		if(u32 s = GUI_Do_Dropdown_Button(
-			&s_gui, 
+			context, 
 			AUTO, 
 			&GUI_AUTO_FIT, 
 			"Lisaa vaatimus", 
 			(u32)Participation_Requirement::Type::COUNT, 
 			(char**)Participation_Requirement::type_names))
 		{
-			if(p->requirement_count < Array_Lenght(p->requirements))
+			if(parti->reqs->count < parti->max_requirements)
 			{
-				p->requirements[p->requirement_count] = {(Participation_Requirement::Type)(s - 1)};
-				p->requirement_count += 1;				
+				Participation_Requirement::Type new_type = (Participation_Requirement::Type)(s - 1);
+				
+				Participation_Requirement* new_req = Push(&parti->reqs, &s_allocator);
+				*new_req = { new_type };
+				
+				if(Requirement_Is_Mark_Type(new_type))
+				{
+					Init_String(&new_req->mark, &s_allocator, new_req->initial_mark_capacity);
+					new_req->mark_exists = Exists_Statement::does_have;
+				}						
 			}
 		}
 		
-		for(u32 j = 0; j < p->requirement_count; ++j)
+		Participation_Requirement* requirement_array = Begin(parti->reqs);
+		for(u32 r = 0; r < parti->reqs->count; ++r)
 		{
-			Participation_Requirement* r = p->requirements + j;
+			Participation_Requirement* req = requirement_array + r;
 			
-			if(GUI_Do_Button(&s_gui, AUTO, &dim, "X"))
+			if(GUI_Do_Button(context, AUTO, &dim, "X"))
 			{
+				Make_Requirement_Hollow(req);
+				
 				u32 size = sizeof(Participation_Requirement);
-				Remove_Element_From_Packed_Array(p->requirements, &p->requirement_count, size, j--);
+				Remove_Element_From_Packed_Array(requirement_array, &parti->reqs->count, size, r--);
 			}
 			
-			GUI_Push_Layout(&s_gui);
+			GUI_Push_Layout(context);
 			
-			s_gui.layout.build_direction = GUI_Build_Direction::right_center;
-			GUI_Do_Text(&s_gui, AUTO, (char*)Participation_Requirement::type_names[(u32)r->type]);
+			context->layout.build_direction = GUI_Build_Direction::right_center;
 			
-			GUI_Pop_Layout(&s_gui);
+			char* req_type_text = (char*)Participation_Requirement::type_names[(u32)req->type];
+			GUI_Do_Text(context, AUTO, req_type_text, GUI_Highlight_Prev(context));
+			
+			f32 right_side_x = context->layout.last_element_pos.x + context->layout.last_element_dim.x / 2;
+			
+			GUI_Pop_Layout(context);
+			
+			f32 left_side_x = context->layout.last_element_pos.x - context->layout.last_element_dim.x / 2; 
+			
+			switch(req->type)
+			{
+				case Participation_Requirement::Type::mark_item:
+				case Participation_Requirement::Type::mark_personal:
+				{
+					f32 width = right_side_x - left_side_x;
+					GUI_Do_SL_Input_Field(context, AUTO, &width, &req->mark);
+					
+					if(u32 s = GUI_Do_Dropdown_Button(
+						context, AUTO, AUTO, 
+						(char*)s_exists_statement_names[u32(req->mark_exists)],
+						Array_Lenght(s_exists_statement_names),
+						(char**)s_exists_statement_names))
+					{
+						req->mark_exists = Exists_Statement(s - 1);
+					}
+				}break;
+				
+				case Participation_Requirement::Type::character_stat:
+				{
+					// Stat
+					if(u32 s = GUI_Do_Dropdown_Button(
+						context, AUTO, &GUI_AUTO_FIT, 
+						(char*)Character_Stat::stat_names[u32(req->stat.type)],
+						Array_Lenght(Character_Stat::stat_names),
+						(char**)Character_Stat::stat_names))
+					{
+						req->stat.type = Character_Stat::Stats(s - 1);
+					}
+					
+					GUI_Push_Layout(context);
+					
+					context->layout.build_direction = GUI_Build_Direction::right_center;
+					
+					// Numerical_Relation
+					u32 nr_idx = u32(req->stat_numerical_relation);
+					if(u32 s = GUI_Do_Dropdown_Button(
+						context, AUTO, &GUI_AUTO_FIT, 
+						(char*)s_numerical_relation_names[nr_idx],
+						Array_Lenght(s_numerical_relation_names),
+						(char**)s_numerical_relation_names))
+					{
+						req->stat_numerical_relation = Numerical_Relation(s - 1);
+					}
+					
+					// Target value
+					static const char* value_option_names[] = {"0", "1", "2", "3"};
+					if(u32 s = GUI_Do_Dropdown_Button(
+						context, AUTO, AUTO, 
+						(char*)value_option_names[req->stat_relation_target],
+						Array_Lenght(value_option_names),
+						(char**)value_option_names))
+					{
+						req->stat_relation_target = u16(s - 1);
+					}
+					
+					GUI_Pop_Layout(context);
+					
+					if((req->stat_numerical_relation == Numerical_Relation::greater_than &&
+						req->stat_relation_target == Array_Lenght(value_option_names) - 1) ||
+						(req->stat_numerical_relation == Numerical_Relation::less_than &&
+						req->stat_relation_target == 0))
+					{
+						GUI_Do_Text(context, AUTO, "Mahdoton!", {0}, v2f{1.f,1.f}, true);
+					}
+					else if((req->stat_numerical_relation == Numerical_Relation::less_than_equals &&
+						req->stat_relation_target == Array_Lenght(value_option_names) - 1) || 
+						(req->stat_numerical_relation == Numerical_Relation::greater_than_equals &&
+						req->stat_relation_target == 0))
+					{
+						GUI_Do_Text(context, AUTO, "Aina totta!", {0}, v2f{1.f,1.f}, true);
+					}
+					
+				}break;
+			}
+			
+			v2f spacing = v2f{context->layout.last_element_dim.x, s_theme.padding};
+			GUI_Do_Spacing(context, &spacing);
+			
 		}
+
 		
-		GUI_Pop_Layout(&s_gui);
-		s_gui.layout.last_element_pos.x += 150;	
-		
+		GUI_Pop_Layout(context);
 	}
 	
-	GUI_End_Context(&s_gui);
-}
-
-static void SL_Input()
-{
-	GUI_Begin_Context(&s_gui, GUI_Anchor::top_left, GUI_Build_Direction::down_left, &s_theme);
-	
-	GUI_Do_Text(&s_gui, &GUI_AUTO_TOP_LEFT, "Teksti laatikko testi:", {}, v2f{2,2}, true);
-	v2f d = v2f{250, 26};
-	GUI_Do_SL_Input_Field(&s_gui, AUTO, &d, &s_new_event_state.event_name);
-	
-	GUI_End_Context(&s_gui);
+	GUI_End_Context(context);
 }
 
 
-#if 0
-
-static void GUI_Create_New_Event_Frame();
-
-
-enum class Exists_Statement : u8
+static void Run_Active_Menu()
 {
-	does_not_have = 0,
-	does_have
-};
-
-
-enum class Numerical_Relation : u8
-{
-	equal_to = 0,
-	greater_than,
-	greater_than_equals,
-	less_than,
-	less_than_equals,
-};
-
-
-struct Character_Stat
-{
-	enum class Stats : u8
+	Update_Actions(&s_platform, s_global_data.menu_actions, GUI_Menu_Actions::COUNT);
+	
+	Menus current_menu = s_global_data.active_menu;
+	
+	switch(current_menu)
 	{
-		body = 0,
-		mind
-	};
+		case Menus::none:
+		{
+			s_global_data.active_menu = Menus::all_events;
+		}break;
+		
+		case Menus::event_editor_participents:
+		{
+			Do_New_Event_Frame();
+		}break;
+		
+		case Menus::all_events:
+		{
+			Do_All_Events_Frame();
+		}break;
+		
+		default:
+			Terminate;
+	}
 	
-	Stats type;
-	i8 value;
-};
-#endif
+	
+	if(s_global_data.active_menu != current_menu)
+	{
+		// Menu switched do something maybe?
+		switch(s_global_data.active_menu)
+		{
+			case Menus::event_editor_participents:
+			{
+				u32 f = GUI_Context_Flags::ignore_selection | 
+					GUI_Context_Flags::enable_dynamic_sliders | 
+					GUI_Context_Flags::disable_mouse_scroll;
+				
+				s_event_editor.flags |= f;
+				s_event_editor_banner.flags |= GUI_Context_Flags::enable_dynamic_sliders;				
+			}break;
+			
+			case Menus::all_events:
+			{
+				u32 f = GUI_Context_Flags::ignore_selection | 
+					GUI_Context_Flags::enable_dynamic_sliders | 
+					GUI_Context_Flags::disable_mouse_scroll;
+				
+				s_all_events.flags |= f;
+				s_all_events_banner.flags |= GUI_Context_Flags::enable_dynamic_sliders;				
+			}break;
+		}
+	}
+}

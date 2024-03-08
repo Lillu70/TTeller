@@ -3,6 +3,22 @@
 
 #include "Vector.h"
 
+// v2i ----------------------------------------------------------
+
+static inline v2i operator + (v2i a, v2i b)
+{
+	v2i result = v2i{a.x + b.x, a.y + b.y};
+	return result;
+}
+
+
+static inline v2i operator - (v2i a, v2i b)
+{
+	v2i result = v2i{a.x - b.x, a.y - b.y};
+	return result;
+}
+
+
 // v2f
 // --------------------------------------------------------------
 

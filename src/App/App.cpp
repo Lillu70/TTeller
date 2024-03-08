@@ -9,6 +9,8 @@
 
 void Init_App(Platform_Calltable platform_calltable, void* app_memory, u32 app_memory_size)
 {
+	Init_Shell_From_General_Allocator(&s_allocator, &s_mem);
+	
 	s_platform = platform_calltable;
 	
 	Assert(app_memory_size > INTERIM_MEM_SIZE);
@@ -18,29 +20,34 @@ void Init_App(Platform_Calltable platform_calltable, void* app_memory, u32 app_m
 		s_mem.init(s_interim_mem.memory + s_interim_mem.capacity, app_memory_size - INTERIM_MEM_SIZE);
 	}
 	
-	u32* pixel_buffer = s_platform.Get_Pixel_Buffer();
-	v2i pixel_buffer_dim = v2i{s_platform.Get_Pixel_Buffer_Width(), s_platform.Get_Pixel_Buffer_Height()};
-	
-	Init_Canvas(&s_canvas, pixel_buffer, v2i::Cast<u32>(pixel_buffer_dim));
 	Init_GUI();
-
 }
 
 
 void Update_App(f64 delta_time, bool* update_surface)
 {
+	u32 app_flags = s_platform.Get_Flags();
+	
+	if(Is_Flag_Set(app_flags, (u32)App_Flags::window_has_resized))
+	{
+
+		i32 window_width = s_platform.Get_Window_Width();
+		i32 window_height = s_platform.Get_Window_Height();
+		
+		u32* pixel_buffer = s_platform.Resize_Pixel_Buffer(window_width, window_height);
+		Init_Canvas(&s_canvas, pixel_buffer, v2u{u32(window_width), u32(window_height)});		
+	}
+	
+	if(!s_canvas.buffer)
+		return;
+	
 	s_interim_mem.clear();
 	
-	if(Is_Flag_Set(s_platform.Get_Flags(), (u32)App_Flags::wants_to_exit))
+	if(Is_Flag_Set(app_flags, (u32)App_Flags::wants_to_exit))
 		s_platform.Set_Flag(App_Flags::is_running, false);
-	
 	
 	*update_surface = true;
 	Clear_Canvas(&s_canvas, Put_Color(20, 20, 20));
-		
-	SL_Input();
-	//Random_Test_UI();
-	//AUTO_TEST();
-	//Do_Theme_Menu();
-	//Do_New_Event_Frame();
+	
+	Run_Active_Menu();
 }

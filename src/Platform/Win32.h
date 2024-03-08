@@ -5,6 +5,7 @@ struct Win32_App
 {
 	i32 window_width = 0, window_height = 0;
 	i32 flags = 0;
+	f32 scroll_delta = 0;
 	
 	HDC dc = 0;
 	HINSTANCE instance = 0;
@@ -39,6 +40,7 @@ struct Win32_Bitmap
 	BITMAPINFO info{};
 };
 
+
 static void Win32_Init(HINSTANCE instance, 
 	u32 window_width, 
 	u32 window_height, 
@@ -46,8 +48,9 @@ static void Win32_Init(HINSTANCE instance,
 	u32 window_pos_y, 
 	char* window_title, 
 	u32 app_memory_size);
-static void Win32_Update_Surface(bool update_from_game);
 
+	
+static void Win32_Update_Surface(bool update_from_game);
 static LRESULT Win32_Message_Handler(HWND win_handle, UINT message, WPARAM wparam, LPARAM lParam);
 static u32* Win32_Resize_Pixel_Buffer(i32 new_width, i32 new_height);
 static void Win32_Flush_Events();
@@ -55,7 +58,7 @@ static void Win32_Set_Flag(App_Flags flag, bool value);
 static f64 Win32_Update_Frame_Time();
 static u32 Win32_Get_Window_Width();
 static u32 Win32_Get_window_Height();
-static u32* Win32_Get_Pixel_Buffer();
+static Pixel_Buffer Win32_Get_Pixel_Buffer();
 static i32 Win32_Get_Pixel_Buffer_Width();
 static i32 Win32_Get_Pixel_Buffer_Height();
 static u64 Win32_Get_CPU_Time_Stamp();
@@ -70,6 +73,9 @@ static bool Win32_Write_File(const char* file_name, u8* buffer, u32 bytes_to_wri
 static bool Win32_Get_File_Size(const char* file_name, u32* out_file_size);
 static bool Win32_Read_File(const char* file_name, u8* out_buffer, u32 bytes_to_read);
 static Char_Array Win32_Get_Typing_Information();
+static char* Win32_Get_Clipboard_Data_As_Text();
+static void Win32_Set_Clipboard_Data_As_Text(char* data, u32 lenght);
+static f32 Win32_Get_Scroll_Wheel_Delta();
 
 // ---------------------------------------------------------------
 // Silly maps begin here.
@@ -185,5 +191,3 @@ static constexpr i32 s_keycode_map[(u64)Key_Code::COUNT] =
 	VK_BACK,
 	VK_RETURN
 };
-
-

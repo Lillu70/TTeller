@@ -44,6 +44,7 @@ static inline void Mem_Copy(void* dest, void* source, u32 byte_count)
 	}
 }
 
+
 static inline void Mem_Zero(void* mem, u32 byte_count)
 {
 	u8* mem_start = (u8*)mem;
@@ -66,17 +67,6 @@ static void Remove_Element_From_Packed_Array(void* array, u32* array_count, u32 
 	
 	*array_count -= 1;
 	Mem_Zero((u8*)array + (*array_count * element_size), element_size);
-}
-
-
-static void Remove_Elements_From_Packed_Array(
-	void* array, 
-	u32* array_count,
-	u32 element_size,
-	u32 remove_from_idx,
-	u32 remove_to_idx)
-{
-	
 }
 
 

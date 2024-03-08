@@ -18,12 +18,36 @@
 #endif
 
 
+struct Allocator_Shell
+{
+	void* internal_alloc_adr = 0;
+	void*(*_push)(void*, u32) = 0;
+	void(*_free)(void*, void*) = 0;
+	
+	u32 min_alloc_size = 32;
+	
+	void* push(u32 size)
+	{
+		Assert(_push);
+		return _push(internal_alloc_adr, size);
+	}
+	
+	void free(void* ptr)
+	{
+		Assert(_free);
+		_free(internal_alloc_adr, ptr);
+	}
+};
+
+
+
 struct Free_Block
 {
 	Free_Block* prew_block = 0;
 	Free_Block* next_block = 0;
 	u32 size = 0;
 };
+
 
 struct General_Allocator
 {
@@ -164,15 +188,18 @@ struct General_Allocator
 		Free_Block* fb = first_block;
 		
 		while (fb)
-		{
-
-			//TODO: If with only asserts inside? Change this whole block into a DBCALL.
-			if(fb != first_block)
-			{
-				Assert(fb->prew_block);
-				Assert(address_inside_region((u8*)fb->prew_block));
-			}
+		{			
 			
+			DB_Call({
+				if(fb != first_block)
+				{
+					if(!fb->prew_block)
+						Terminate;
+					
+					if(!address_inside_region((u8*)fb->prew_block))
+						Terminate;
+				}	
+			});
 			
 			// Exact match. Push in here!
 			if (fb->size == size)
@@ -327,11 +354,7 @@ struct General_Allocator
 						)
 					}
 					
-					EMV_Call
-					(
-						test_free_block_allignement();
-						int a = 0;
-					)
+					EMV_Call(test_free_block_allignement();)
 				}
 				
 				// Some block is right after this one. Merge that backwards.
@@ -348,11 +371,8 @@ struct General_Allocator
 					*new_pos = { fb->next_block->prew_block, fb->next_block->next_block, fb->next_block->size + block_size };
 					relink_free_block(new_pos);
 					
-					EMV_Call
-					(
-						test_free_block_allignement();
-						int a = 0;
-					)
+					
+					EMV_Call(test_free_block_allignement();)
 				}
 				
 				// We have a previous block, but we don't allign with it or the it's next block.
@@ -374,11 +394,8 @@ struct General_Allocator
 					else
 						last_block = new_block;
 					
-					EMV_Call
-					(
-						test_free_block_allignement();
-						int a = 0;
-					)
+					
+					EMV_Call(test_free_block_allignement();)
 				}
 			
 			}
@@ -413,11 +430,8 @@ struct General_Allocator
 					first_block->prew_block = new_block;
 					first_block = new_block;
 					
-					EMV_Call
-					(
-						test_free_block_allignement();
-						int a = 0;
-					)
+					
+					EMV_Call(test_free_block_allignement();)
 				}
 			}
 		}
@@ -441,6 +455,18 @@ struct General_Allocator
 			test_free_block_allignement();
 			int a = 0;
 		)
+	}
+	
+	static void* _Static_Push(void* allocator, u32 size)
+	{
+		void* result = ((General_Allocator*)allocator)->push(size);
+		return result;
+	}
+	
+	
+	static void _Static_Free(void* allocator, void* ptr)
+	{
+		((General_Allocator*)allocator)->free(ptr);
 	}
 
 private:
@@ -501,7 +527,47 @@ private:
 		else
 			last_block = fb;
 	}
+	
 };
+
+
+static inline void Init_Shell_From_General_Allocator(
+	Allocator_Shell* shell, 
+	General_Allocator* general_allocator)
+{
+	shell->internal_alloc_adr = general_allocator;
+	shell->_push = General_Allocator::_Static_Push;
+	shell->_free = General_Allocator::_Static_Free;
+	shell->min_alloc_size = General_Allocator::min_alloc_size;
+}
+
+
+#if 1
+// Don't think I want to include stdlib in this project, 
+// but this is here to test Allocator_Shell.
+
+#include <stdlib.h>
+static void* Shell_CMEM_Push(void* _, u32 size)
+{
+	void* result = malloc(size);
+	return result;
+}
+
+
+static void Shell_CMEM_Free(void* _, void* ptr)
+{
+	free(ptr);
+}
+
+
+static inline void Init_Shell_From_CAlloc(Allocator_Shell* shell)
+{
+	shell->internal_alloc_adr = 0;
+	shell->_push = Shell_CMEM_Push;
+	shell->_free = Shell_CMEM_Free;
+	shell->min_alloc_size = 64;
+}
+#endif
 
 
 struct Linear_Allocator
