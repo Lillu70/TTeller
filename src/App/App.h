@@ -3,6 +3,8 @@
 
 #include "..\Utility\Assert.h"
 #include "..\Utility\Primitives.h"
+#include "..\Utility\Intrinsics.h"
+#include "..\Utility\Instrumentation.h"
 #include "..\Utility\Bits.h"
 #include "..\Utility\Vector_Ex.h"
 #include "..\Utility\Maths.h"

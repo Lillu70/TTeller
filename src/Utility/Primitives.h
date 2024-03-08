@@ -3,6 +3,9 @@
 
 #define Array_Lenght(array) sizeof(array) / sizeof(array[0])
 
+#define KiB 1024
+#define MiB KiB * KiB
+
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
@@ -29,20 +32,34 @@ static constexpr u32 DEG_FULL_CIRCLE = 360;
 static constexpr u32 DEG_HALF_CIRCLE = DEG_FULL_CIRCLE / 2;
 static constexpr f32 F32_MAX = 3.402823466e+38F;
 static constexpr f64 F64_MAX = 1.7976931348623157E+308;
+static constexpr u64 U64_MAX = 0xFFFFFFFFFFFFFFFF;
 static constexpr u32 U32_MAX = 0xFFFFFFFF;
 static constexpr i32 I32_MAX = 2147483647;
 static constexpr u16 U16_MAX = 0xFFFF;
 
-#define WHITE 0xffffffff
-#define BLACK 0xff000000
-#define RED 0xffff0000
-#define YELLOW 0xffffff00
-#define GREEN 0xff00ff00
-#define BLUE 0xff0000ff
-#define MAGENTA 0xffff00ff
+// NOTE: Structure of this union is endianess dependant.
+// TODO: Add a ifdef for endianess.
+union Color
+{
+	u32 as_u32;
+	struct
+	{
+		u8 blue;
+		u8 green;
+		u8 red;
+		u8 alpha;
+	};
+};
 
-#define KiB 1024
-#define MiB KiB * KiB
+//TODO: Again, endianess.
+static constexpr Color WHITE = { U32_MAX };
+static constexpr Color BLACK = { 0xFF000000 };
+static constexpr Color RED = { 0xFFFF0000 };
+static constexpr Color YELLOW = { 0xFFFFFF00 };
+static constexpr Color GREEN = { 0xFF00FF00 };
+static constexpr Color BLUE = { 0xFF0000FF };
+static constexpr Color MAGENTA = { 0xFFFF00FF };
+
 
 #include "Vector.h" // v2i, v2u, v2f 
 

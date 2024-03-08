@@ -1,14 +1,22 @@
 
 #pragma once
 
-// TODO: Add screen overlap testing to all widgets, to avoid drawing if completly ouside of the canvas.
-// TODO: SL input field has a bug, more info at the definition.
-
-
 static inline bool GUI_Is_Context_Ready(GUI_Context* context)
 {
 	bool result = context->flags & GUI_Context_Flags::context_ready;
 	return result;
+}
+
+
+static inline void GUI_Reset_Context(GUI_Context* context)
+{
+	// Make sure context is not reset between begin and end.
+	Assert(!GUI_Is_Context_Ready(context));
+	
+	f32 dynamic_slider_girth = context->dynamic_slider_girth;
+	*context = GUI_Context();
+	
+	context->dynamic_slider_girth = dynamic_slider_girth;
 }
 
 
@@ -472,22 +480,26 @@ static inline void GUI_Begin_Context(
 	Assert(platform);
 	Assert(actions);
 	
+	context->layout = {};
+	
 	context->actions = actions;
 	context->platform = platform;
 	context->canvas = canvas;
+	context->layout.theme = theme;
+	
+	context->layout.build_direction = build_direction;
+	context->layout.anchor = anchor;
+	
 	context->canvas_pos = canvas_pos;
-	context->flags |= GUI_Context_Flags::context_ready;
-	context->layout = {};
 	context->layout.last_element_pos = context->anchor_base;
 	context->layout_stack_count = 0;
-	context->layout.anchor = anchor;
-	context->layout.build_direction = build_direction;
-	context->layout.theme = theme;
 	context->selected_element_dim = {};
 	context->selected_element_pos = {};
 	context->bounds_rel_anchor_base = { {F32_MAX, F32_MAX}, {-F32_MAX, -F32_MAX} };
 	
 	Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::cursor_mask_validation);
+	
+	context->flags |= GUI_Context_Flags::context_ready;
 	
 	if(Is_Flag_Set(context->platform->Get_Flags(), (u32)App_Flags::is_focused))
 	{
@@ -550,10 +562,10 @@ static inline void GUI_End_Context(GUI_Context* context)
 			for(u32 i = 0; i < state->element_count; ++i)
 			{
 				char* text = state->element_names[i];
-				u32 text_color;
+				Color text_color = theme->outline_color;
 				if(state->selected_element_idx == i)
 				{
-					u32 bg_color = theme->outline_color;
+					Color bg_color = theme->outline_color;
 					text_color = theme->background_color;
 					
 					if(state->is_pressed_down)
@@ -570,8 +582,6 @@ static inline void GUI_End_Context(GUI_Context* context)
 						theme->outline_thickness, 
 						theme->selected_color);
 				}
-				else
-					text_color = theme->outline_color;
 				
 				v2f text_p = GUI_Calc_Centered_Text_Position(text, state->text_scale, pos, font);
 				Draw_Text(context->canvas, (u8*)text, text_p, text_color, font, state->text_scale);
@@ -763,15 +773,20 @@ static inline void GUI_End_Context(GUI_Context* context)
 				v2f min = v2f{canvas_dim.x - slider_girth, 0};
 				v2f dim = v2f{0} + slider_girth;
 				
-				u32 color = context->layout.theme->outline_color;
+				Color color = context->layout.theme->outline_color;
 				Draw_Filled_Rect(context->canvas, Create_Rect_Min_Dim(min, dim), color);
 			}
 			
 			f32 mouse_scroll;
-			if(context->flags & GUI_Context_Flags::disable_mouse_scroll)
-				mouse_scroll = 0;
-			else
+			if(Bit_Not_Set(context->flags, GUI_Context_Flags::disable_mouse_scroll) &&
+				Is_Point_Inside_Rect(context->cursor_fpos, context->canvas_rect) &&
+				Is_Flag_Set(context->platform->Get_Flags(), (u32)App_Flags::is_focused))
+			{
 				mouse_scroll = context->platform->Get_Scroll_Wheel_Delta();
+			}
+			else
+				mouse_scroll = 0;
+			
 			
 			v2f anchor_base = context->anchor_base;
 			context->anchor_base = {};
@@ -971,7 +986,6 @@ static inline void GUI_End_Context(GUI_Context* context)
 		
 		Inverse_Bit_Mask(&context->flags, reset_mask);
 		context->widget_count = 0;
-		context->layout = {}; // Unnessery?
 		context->canvas = 0;
 	}
 }
@@ -1145,7 +1159,7 @@ static void GUI_Do_Text(
 			highlight.highlight_count && context->selected_index >= highlight.idx && 
 			context->selected_index < highlight.idx + highlight.highlight_count;
 		
-		u32 color;
+		Color color;
 		if(is_title)
 			color = theme->title_color;
 		else
@@ -1186,7 +1200,7 @@ static bool GUI_Do_Button(
 	
 	bool result = false;
 	
-	u32 outline_color;
+	Color outline_color;
 	
 	if(is_selected)
 	{
@@ -1263,7 +1277,7 @@ static bool GUI_Do_Fill_Slider(
 	*value = Min(*value, max);
 	*value = Max(*value, min);
 	
-	u32 bar_color; 
+	Color bar_color; 
 	
 	if(is_selected)
 	{
@@ -1379,9 +1393,8 @@ static bool GUI_Do_Handle_Slider(
 	
 	// --------------------------------------------------------------------------
 	
-	u32 outline_color = theme->outline_color;
-	u32 handle_color = theme->selected_color;
-	
+	Color outline_color = theme->outline_color;
+	Color handle_color = theme->selected_color;
 	
 	v2f internal_dim = p.dim - (f32(theme->outline_thickness) * 2);
 	
@@ -1555,7 +1568,7 @@ static bool GUI_Do_Checkbox(GUI_Context* context, v2f* pos, v2f* dim, bool* valu
 	bool pre_val = *value;
 	
 	
-	u32 outline_color = theme->outline_color;
+	Color outline_color = theme->outline_color;
 	if(is_selected)
 	{
 		GUI_Button_State* state = &context->selection_state.button;
@@ -1643,7 +1656,7 @@ static u32 GUI_Do_Dropdown_Button(
 	
 	// --------------------------------------------------------------------------
 	
-	u32 outline_color = outline_color = theme->outline_color;
+	Color outline_color = outline_color = theme->outline_color;
 	
 	u32 result = 0;
 	
@@ -1792,7 +1805,6 @@ static u32 GUI_Do_Dropdown_Button(
 }
 
 
-// TODO: Fix a bug with scaled up SLs, characters overflow the widget.
 static bool GUI_Do_SL_Input_Field(
 	GUI_Context* context, 
 	v2f* pos, 
@@ -1843,7 +1855,7 @@ static bool GUI_Do_SL_Input_Field(
 	
 	bool result = false;
 	
-	u32 outline_color = theme->outline_color;
+	Color outline_color = theme->outline_color;
 	u32 view_offset = 0;
 	
 	v2f text_p = p.pos + v2f{1, -1} * f32(theme->outline_thickness) + v2f{2,-2} +
@@ -2062,10 +2074,13 @@ static bool GUI_Do_SL_Input_Field(
 					state->next_input_time = 0;
 				}
 				
+				
 				// Arrowkey/controller input 
 				while(context->actions[GUI_Menu_Actions::left].Is_Down() && GUI_Accelerated_Tick(
 					&keyboard_acceleration, time, &state->input_start_time, &state->next_input_time))
 				{
+					bool pre_text_select = state->text_select_mode;
+					
 					if(shift_down)
 					{
 						if(!state->text_select_mode)
@@ -2077,6 +2092,8 @@ static bool GUI_Do_SL_Input_Field(
 					else
 						state->text_select_mode = false;
 					
+					if(pre_text_select && !state->text_select_mode)
+						break;
 					
 					state->write_cursor_position -= 1;
 					
@@ -2093,7 +2110,9 @@ static bool GUI_Do_SL_Input_Field(
 				
 				while(context->actions[GUI_Menu_Actions::right].Is_Down() && GUI_Accelerated_Tick(
 					&keyboard_acceleration, time, &state->input_start_time, &state->next_input_time))
-				{		
+				{
+					bool pre_text_select = state->text_select_mode;
+					
 					if(shift_down)
 					{
 						if(!state->text_select_mode)
@@ -2105,6 +2124,8 @@ static bool GUI_Do_SL_Input_Field(
 					else
 						state->text_select_mode = false;
 					
+					if(pre_text_select && !state->text_select_mode)
+						break;
 					
 					state->write_cursor_position += 1;
 					
@@ -2201,6 +2222,7 @@ static bool GUI_Do_SL_Input_Field(
 								f32 percent = Clamp_Zero_To_One(rel_shrink_bar_x / shrink_bar_dim.x);
 								
 								// +1 here to allow scrolling 1 "slot" into the white space at the end.
+								// (Lookahead)
 								state->view_offset = (u32)Round(f32(str->lenght - view_limit + 1) * percent);
 								
 		
@@ -2259,6 +2281,13 @@ static bool GUI_Do_SL_Input_Field(
 		{
 			if(GUI_On_Release_Action(context, cursor_on_selection, &state->is_pressed_down))
 			{
+				// NOTE: Marikas idea!
+				if(str->lenght > 0)
+				{
+					state->text_select_mode = true;
+					state->text_select_start_point = 0;
+				}
+				
 				state->is_active = true;
 				state->write_cursor_position = str->lenght;
 				state->flicker_start_time = context->platform->Get_Time_Stamp() + state->flicker_delay;
@@ -2336,7 +2365,7 @@ static bool GUI_Do_SL_Input_Field(
 			
 			cursor_p.x += f32(write_cursor_position - view_offset) * char_width;
 			
-			u32 cursor_color = (str->lenght < character_limit || character_limit == 0)? 
+			Color cursor_color = (str->lenght < character_limit || character_limit == 0)? 
 				theme->write_cursor_color : theme->write_cursor_limit_color;
 			
 			Draw_Vertical_Line(

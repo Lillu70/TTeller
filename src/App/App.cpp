@@ -26,6 +26,12 @@ void Init_App(Platform_Calltable platform_calltable, void* app_memory, u32 app_m
 
 void Update_App(f64 delta_time, bool* update_surface)
 {
+	__m128 vA = _mm_set1_ps(1.0f);
+	__m128 vB = _mm_set1_ps(2.0f);
+	__m128 vS = _mm_add_ps(vA, vB);
+	
+	Begin_Timing_Block(internal_run_time);
+	
 	u32 app_flags = s_platform.Get_Flags();
 	
 	if(Is_Flag_Set(app_flags, (u32)App_Flags::window_has_resized))
@@ -40,14 +46,14 @@ void Update_App(f64 delta_time, bool* update_surface)
 	
 	if(!s_canvas.buffer)
 		return;
-	
+	 
 	s_interim_mem.clear();
 	
 	if(Is_Flag_Set(app_flags, (u32)App_Flags::wants_to_exit))
 		s_platform.Set_Flag(App_Flags::is_running, false);
 	
-	*update_surface = true;
-	Clear_Canvas(&s_canvas, Put_Color(20, 20, 20));
 	
 	Run_Active_Menu();
+	
+	End_Timing_Block(internal_run_time);
 }

@@ -22,15 +22,16 @@ static thread_local f32 GUI_MOUSE_SCROLL_SPEED 	= 50;
 
 struct GUI_Theme
 {
-	u32 selected_color = Put_Color(250, 220, 115);
-	u32 background_color = Put_Color(20, 20, 20);
-	u32 down_color = Put_Color(50, 50, 50);
+	Color selected_color = Make_Color(250, 220, 115);
+	Color background_color = Make_Color(20, 20, 20);
+	Color down_color = Make_Color(50, 50, 50);
+	Color outline_color = Make_Color(110, 110, 130);
+	Color text_color = WHITE;
+	Color title_color = Make_Color(210, 210, 230);
+	Color write_cursor_color = BLACK;
+	Color write_cursor_limit_color = RED;
+	
 	u32 outline_thickness = 2;
-	u32 outline_color = Put_Color(110, 110, 130);
-	u32 text_color = WHITE;
-	u32 title_color = Put_Color(210, 210, 230);
-	u32 write_cursor_color = BLACK;
-	u32 write_cursor_limit_color = RED;
 	f32 padding = 10;
 	
 	Font font;

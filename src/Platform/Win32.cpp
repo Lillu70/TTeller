@@ -332,6 +332,8 @@ static void Win32_Update_Surface(bool update_from_game)
 	
 	if(s_bitmap.memory && (update_from_game || s_app.force_update_surface))
 	{
+		// Start_Scope_Timer(blit_surface);
+		
 		s_app.force_update_surface = false;
 		StretchDIBits
 		(
@@ -739,3 +741,92 @@ static Platform_Calltable Win32_Get_Calltable()
 	ct.Get_Scroll_Wheel_Delta = Win32_Get_Scroll_Wheel_Delta;
 	return ct;
 }
+
+#ifdef INSTRUMENTATION
+#include <stdio.h>
+
+static constexpr char* __TIMING_FORMAT_STRING = 
+"Counter: %s:\n\
+\t-Hits:%I64u\n\
+\t-Cycles:%-20I64u Lowest:%-20I64u\n\
+\t-C/H:%-23I64u Lowest:%-20I64u Avg:%-20I64u\n";
+
+static inline void Win32_Report_Timing_Results()
+{
+	/*
+	
+	This is trying to be nothing but a quick hack for displaying timing results.
+	The code is not good and is not trying to be good.
+	
+	*/
+	
+	bool reset_records = Win32_Get_Keyboard_Key_Down(Key_Code::RALT) && Win32_Get_Keyboard_Key_Down(Key_Code::P);
+	
+	static bool output_key_last_state = false;
+	bool output_key_state = Win32_Get_Keyboard_Key_Down(Key_Code::RALT) && Win32_Get_Keyboard_Key_Down(Key_Code::O);
+	
+	static bool output_results = false;
+	if(output_key_last_state == false && output_key_state == true)
+	{
+		output_results = !output_results;
+		reset_records = true;
+	}
+	output_key_last_state = output_key_state;
+	
+	char text_buffer[256];
+	
+	for(u64 i = 0; i < u64(__Time_Table_Names::COUNT); ++i)
+	{
+		Instrumentation_Cycle_Measurement* icm = __timing_table + i;
+		char* label_name = __timing_table_labels[i];
+		
+		if(icm->hit_count > 0)
+		{
+			Assert(icm->accumulated_cycle_count > 0);
+			
+			icm->total_cycle_count += icm->accumulated_cycle_count;
+			icm->total_hit_count += icm->hit_count;
+			
+			u64 cycles_per_hit = icm->accumulated_cycle_count / icm->hit_count;
+			u64 avg_cycles_per_hit = icm->total_cycle_count / icm->total_hit_count;
+			
+			if(reset_records || icm->lowest_cycle_count == 0)
+			{
+				icm->lowest_cycle_count = icm->accumulated_cycle_count;
+				icm->lowest_cycles_per_hit = cycles_per_hit;
+				icm->total_cycle_count = 0;
+				icm->total_hit_count = 0;
+			}
+			else
+			{
+				if(icm->accumulated_cycle_count < icm->lowest_cycle_count)
+					icm->lowest_cycle_count = icm->accumulated_cycle_count;
+				
+				if(cycles_per_hit < icm->lowest_cycles_per_hit)
+					icm->lowest_cycles_per_hit = cycles_per_hit;
+			}
+			
+			
+			if(output_results)
+			{
+				_snprintf_s(
+					text_buffer, 
+					sizeof(text_buffer), 
+					__TIMING_FORMAT_STRING,
+					label_name, 
+					icm->hit_count, 
+					icm->accumulated_cycle_count, icm->lowest_cycle_count,
+					cycles_per_hit, icm->lowest_cycles_per_hit, avg_cycles_per_hit);
+				
+				OutputDebugStringA(text_buffer);				
+			}
+		}
+		
+		icm->hit_count = 0;
+		icm->accumulated_cycle_count = 0;
+	}
+	
+	if(output_results)
+		OutputDebugStringA("\n\n\n");
+}
+#endif

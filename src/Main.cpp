@@ -1,21 +1,26 @@
 
 #pragma once
 
+
 #include <Windows.h>
 #include <Xinput.h>
 
-#include "Utility/Primitives.h"
-#include "Utility/Assert.h"
-#include "Utility/Utility.h"
-#include "Platform/Input.h"
-#include "Platform/Platform_Interface.h"
+#include "Utility\Primitives.h"
+#include "Utility\Intrinsics.h"
+#include "Utility\Instrumentation.h"
+#include "Utility\Assert.h"
+#include "Utility\Utility.h"
+#include "Platform\Input.h"
+#include "Platform\Platform_Interface.h"
 
-#include "Platform/Win32.cpp"
+#include "Platform\Win32.cpp"
 
-#include "App/Main_App.h"
+#include "App\Main_App.h"
 
 static constexpr u32 APP_MEMORY_SIZE = MiB;
 static const char* APP_TITLE = "Nalkapeli";
+
+Declare_Timing_Tables();
 
 
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -29,15 +34,21 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 	    
 	while(Is_Flag_Set(s_app.flags, (u32)App_Flags::is_running))
 	{
+		Begin_Timing_Block(run_time);
+		
 		Win32_Flush_Events();
 		
-		bool update_surface = false;
+		bool update_surface = true;
 		
 		Update_App(frame_time, &update_surface);
 		
 		Win32_Update_Surface(update_surface);
 		
 		frame_time = Win32_Update_Frame_Time();
+		
+		End_Timing_Block(run_time);
+		
+		Instrumentation_Call(Win32_Report_Timing_Results());
 	}
 	
 	return 0;
