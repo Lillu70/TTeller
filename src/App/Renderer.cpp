@@ -432,6 +432,7 @@ static void Draw_Text(
 	Font* font,
 	v2f scale)
 {
+	Assert(text);
 	Assert(canvas);
 	Assert(font);
 	Assert(scale.x > 0);

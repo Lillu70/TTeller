@@ -128,7 +128,10 @@ static inline void Init_GUI()
 		c = {80, 55, 50};
 		s_theme.background_color = Make_Color(c.r, c.g, c.b);
 		g = 2.f;
-		s_theme.outline_color = BLACK;//Put_Color(u8(c.r * g), u8(c.g * g), u8(c.b * g));
+		
+		s_theme.outline_color = BLACK;
+		s_theme.text_color = BLACK;
+		
 	}
 	
 	s_theme.font.data_buffer = (u8*)&s_terminus_font[0];
@@ -535,9 +538,10 @@ static void Do_Event_Editor_Text_Frame()
 	{
 		Event_State* event = Begin(s_global_data.all_events) + s_global_data.active_event_index;
 		
-		GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "Tapahtuma Editori", {}, v2f{4,4}, true);
+		GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "Tapahtuma Teksti", {}, v2f{4,4}, true);
 		f32 title_height = context->layout.last_element_dim.y;
 		v2f tile_bounds_max = GUI_Get_Bounds_In_Pixel_Space(context).max;
+
 		
 		context->layout.build_direction = GUI_Build_Direction::right_center;
 		
@@ -571,6 +575,17 @@ static void Do_Event_Editor_Text_Frame()
 
 	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
+		static String str = {0};
+		if(str.buffer == 0)
+		{
+			Init_String(&str, &s_allocator, "2123123123123123123123123123123");
+		}
+		
+		v2f dim = v2u::Cast<f32>(context->canvas->dim) - 50.f;
+		if(dim.x >= 0 && dim.y >= 0)
+		{
+			GUI_Do_ML_Input_Field(context, &GUI_AUTO_MIDDLE, &dim, &str, 0);			
+		}
 		
 	}; // ----------------------------------------------------------------------------------------
 
@@ -610,7 +625,7 @@ static void Run_Active_Menu()
 			
 			GUI_End_Context(&s_gui);
 			#else
-			s_global_data.active_menu = Menus::all_events;
+			s_global_data.active_menu = Menus::event_editor_text;
 			#endif
 			
 		}break;

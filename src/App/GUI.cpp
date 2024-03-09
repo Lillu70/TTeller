@@ -1030,7 +1030,9 @@ static inline bool GUI_Is_Element_Selected(GUI_Context* context, bool cursor_on_
 		
 		result = true;
 	}
-	else if(cursor_on_selection && context->cursor_position != context->last_cursor_position &&
+	else if(cursor_on_selection && 
+		(context->cursor_position != context->last_cursor_position || 
+		context->actions[GUI_Menu_Actions::mouse].Is_Down()) &&
 		Is_Point_Inside_Rect(context->cursor_fpos, context->canvas_rect) &&
 		!((context->flags & GUI_Context_Flags::cursor_mask_enabled) && 
 		Is_Point_Inside_Rect(context->cursor_fpos, context->cursor_mask_area))
@@ -1080,25 +1082,178 @@ static inline bool GUI_On_Release_Action(
 }
 
 
-static inline void GUI_SL_Input_Field_Conditional_Erase_Selection(GUI_SL_Input_Field_State* state, String* str)
+static bool GUI_Input_Field_Insert_Characters(
+	Platform_Calltable* platform, 
+	GUI_SL_Input_Field_State* state, 
+	String* str,
+	u32 character_limit,
+	u32 wcp,
+	bool (*character_check)(char*))
 {
-	if(state->text_select_mode)
+	bool(*Is_Allowed_Character)(char) = [](char c)
 	{
-		u32 p0 = state->write_cursor_position;
-		u32 p1 = state->text_select_start_point;
-		
-		if(p0 != p1)
+		bool result = (c >= 32 && c <= 127) || c == -28 || c == -60 || c == -10 || c == -42;
+		return result;
+	};
+	
+	
+	void(*Conditional_Erase_Selection)(GUI_SL_Input_Field_State*, String*) =
+		[](GUI_SL_Input_Field_State* state, String* str)
+	{
+		if(state->text_select_mode)
 		{
-			if(p0 > p1)
-				Swap(&p0, &p1);
+			u32 p0 = state->write_cursor_position;
+			u32 p1 = state->text_select_start_point;
 			
-			str->erase(p0, p1);
+			if(p0 != p1)
+			{
+				if(p0 > p1)
+					Swap(&p0, &p1);
+				
+				str->erase(p0, p1);
+				
+				state->write_cursor_position = p0;
+			}
 			
-			state->write_cursor_position = p0;
+			state->text_select_mode = false;
 		}
+	};
+	
+	
+	Char_Array typing_info = platform->Get_Typing_Information();
+	
+	bool result = false;
+	
+	
+	for(u32 i = 0; i < typing_info.count; ++i)
+	{
+		char c = typing_info.buffer[i];
 		
-		state->text_select_mode = false;
+		switch(c)
+		{
+			case '\x1': // CTRL A (Select all)
+			{
+				state->write_cursor_position = str->lenght;
+				state->text_select_start_point = 0;
+				state->text_select_mode = true;
+				
+			}break;
+			
+			
+			case '\x3': // CTRL C (Copy selection to clipboard)
+			{
+				if(state->text_select_mode)
+				{
+					u32 p0 = state->write_cursor_position;
+					u32 p1 = state->text_select_start_point;
+					
+					if(p0 != p1)
+					{
+						if(p0 > p1)
+							Swap(&p0, &p1);
+						
+						char* buffer_start = str->buffer + p0;
+						u32 buffer_lenght = p1 - p0;
+						
+						platform->Set_Clipboard_Data_As_Text(buffer_start, buffer_lenght);
+					}
+				}
+				
+			}break;
+			
+			
+			case '\x18': // CTRL X (Copy selection to clipboard, then delete selection)
+			{
+				if(state->text_select_mode)
+				{
+					u32 p0 = state->write_cursor_position;
+					u32 p1 = state->text_select_start_point;
+					
+					if(p0 != p1)
+					{
+						if(p0 > p1)
+							Swap(&p0, &p1);
+						
+						char* buffer_start = str->buffer + p0;
+						u32 buffer_lenght = p1 - p0;
+						
+						platform->Set_Clipboard_Data_As_Text(buffer_start, buffer_lenght);
+
+						str->erase(p0, p1);
+						state->write_cursor_position = p0;
+						state->text_select_mode = false;
+					}
+				}
+				
+			}break;
+			
+			
+			case '\x16': // CTRL V (Paste from clipboard)
+			{
+				Conditional_Erase_Selection(state, str);
+				
+				char* clip_buffer = platform->Get_Clipboard_Data_As_Text();
+				if(clip_buffer)
+				{
+					for(char cb = *clip_buffer; cb; ++clip_buffer, cb = *clip_buffer)
+					{
+						if(Is_Allowed_Character(cb) && 
+							(character_limit == 0 || str->lenght < character_limit) &&
+							(!character_check || (character_check && character_check(&cb))))
+						{
+							str->insert_at(state->write_cursor_position, *clip_buffer);
+							state->write_cursor_position += 1;										
+						}
+					}
+				}
+				
+			}break;
+			
+			
+			case '\r': // ENTER hopefully, depends on the OS?
+			{
+				result = true;
+				
+				//GUI_Reset_Selection_State(context);
+			}break;
+			
+			
+			case '\b': // BACKSPACE
+			{
+				if(state->text_select_mode) 
+				{
+					Conditional_Erase_Selection(state, str);
+					continue;
+				}
+				
+				if(str->lenght > 0)
+				{
+					state->write_cursor_position -= 1;
+					if(state->write_cursor_position > wcp)
+						state->write_cursor_position = 0;
+					
+					str->remove_at(state->write_cursor_position);
+				}
+				
+			}break;
+			
+			
+			default:
+			{
+				if(Is_Allowed_Character(c) && 
+					(character_limit == 0 || str->lenght < character_limit) &&
+					(!character_check || (character_check && character_check(&c))))
+				{
+					Conditional_Erase_Selection(state, str);
+					
+					str->insert_at(state->write_cursor_position, c);
+					state->write_cursor_position += 1;
+				}
+			}
+		}
 	}
+	
+	return result;
 }
 
 
@@ -1163,7 +1318,7 @@ static void GUI_Do_Text(
 		if(is_title)
 			color = theme->title_color;
 		else
-			color = is_highlighted? theme->selected_color : theme->outline_color;
+			color = is_highlighted? theme->selected_color : theme->text_color;
 		
 		Draw_Text(context->canvas, (u8*)text, text_p, color, &theme->font, text_scale);		
 	}
@@ -1200,7 +1355,7 @@ static bool GUI_Do_Button(
 	
 	bool result = false;
 	
-	Color outline_color;
+	Color outline_color = outline_color = theme->outline_color;
 	
 	if(is_selected)
 	{
@@ -1216,10 +1371,6 @@ static bool GUI_Do_Button(
 			outline_color = theme->down_color;
 		else
 			outline_color = theme->selected_color;
-	}
-	else
-	{
-		outline_color = theme->outline_color;
 	}
 	
 	// Draw
@@ -1858,7 +2009,7 @@ static bool GUI_Do_SL_Input_Field(
 	Color outline_color = theme->outline_color;
 	u32 view_offset = 0;
 	
-	v2f text_p = p.pos + v2f{1, -1} * f32(theme->outline_thickness) + v2f{2,-2} +
+	v2f text_p = p.pos + v2f{1, -1} * outline_thickness + v2f{2,-2} +
 		Hadamar_Product(v2f{-1, 1}, (p.dim / 2));
 	text_p.y -= char_height;
 	
@@ -1885,7 +2036,7 @@ static bool GUI_Do_SL_Input_Field(
 	f32 f_lenght = f32(str->lenght) + 1.f;
 	f32 handle_width = Max(bar_dim.x * view_limit / f_lenght, min_handle_width);
 	
-	bool draw_cursor = false; // I don't think state needs to keep track of this.
+	bool draw_cursor = false;
 	u32 write_cursor_position = 0;
 	
 	bool text_select_mode = false;
@@ -1896,9 +2047,6 @@ static bool GUI_Do_SL_Input_Field(
 		GUI_SL_Input_Field_State* state = &context->selection_state.sl_input_field;
 		
 		draw_cursor = state->draw_cursor && state->is_active;
-		
-		bool shift_down = context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT) || 
-			context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT);
 		
 		// Handle input
 		bool mouse_pressed_down = context->actions[GUI_Menu_Actions::mouse].Is_Pressed();
@@ -1913,158 +2061,28 @@ static bool GUI_Do_SL_Input_Field(
 				state->is_active = false;
 				state->view_offset = 0;
 				
-				u32 mask = 
-					GUI_Context_Flags::cursor_mask_validation | GUI_Context_Flags::cursor_mask_enabled;
-				Inverse_Bit_Mask(&context->flags, mask);
-				
-				
-				context->cursor_position = v2i{-1, -1};
+				Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::cursor_mask_validation);
 			}
 			else
 			{
 				context->flags |= GUI_Context_Flags::cursor_mask_validation;
 				context->flags |= GUI_Context_Flags::cursor_mask_enabled;	
 				
-				context->cursor_mask_area = Create_Rect_Min_Dim(v2f{0,0}, v2u::Cast<f32>(context->canvas->dim));
+				context->cursor_mask_area = context->canvas_rect;
 				
 				u32 wcp = state->write_cursor_position;
 				
-				Char_Array typing_info = context->platform->Get_Typing_Information();
-				
-				bool(*Is_Allowed_Character)(char) = [](char c)
+				if(GUI_Input_Field_Insert_Characters(
+					context->platform, 
+					state, 
+					str, 
+					character_limit, 
+					wcp, 
+					character_check))
 				{
-					bool result = (c >= 32 && c <= 127) || c == -28 || c == -60 || c == -10 || c == -42;
-					return result;
-				};
-				
-				for(u32 i = 0; i < typing_info.count; ++i)
-				{
-					char c = typing_info.buffer[i];
-					
-					switch(c)
-					{
-						case '\x1': // CTRL A (Select all)
-						{
-							state->write_cursor_position = str->lenght;
-							state->text_select_start_point = 0;
-							state->text_select_mode = true;
-							
-						}break;
-						
-						
-						case '\x3': // CTRL C (Copy selection to clipboard)
-						{
-							if(state->text_select_mode)
-							{
-								u32 p0 = state->write_cursor_position;
-								u32 p1 = state->text_select_start_point;
-								
-								if(p0 != p1)
-								{
-									if(p0 > p1)
-										Swap(&p0, &p1);
-									
-									char* buffer_start = str->buffer + p0;
-									u32 buffer_lenght = p1 - p0;
-									
-									context->platform->Set_Clipboard_Data_As_Text(buffer_start, buffer_lenght);
-								}
-							}
-							
-						}break;
-						
-						
-						case '\x18': // CTRL X (Copy selection to clipboard, then delete selection)
-						{
-							if(state->text_select_mode)
-							{
-								u32 p0 = state->write_cursor_position;
-								u32 p1 = state->text_select_start_point;
-								
-								if(p0 != p1)
-								{
-									if(p0 > p1)
-										Swap(&p0, &p1);
-									
-									char* buffer_start = str->buffer + p0;
-									u32 buffer_lenght = p1 - p0;
-									
-									context->platform->Set_Clipboard_Data_As_Text(buffer_start, buffer_lenght);
-	
-									str->erase(p0, p1);
-									state->write_cursor_position = p0;
-									state->text_select_mode = false;
-								}
-							}
-							
-						}break;
-						
-						
-						case '\x16': // CTRL V (Paste from clipboard)
-						{
-							GUI_SL_Input_Field_Conditional_Erase_Selection(state, str);
-							
-							char* clip_buffer = context->platform->Get_Clipboard_Data_As_Text();
-							if(clip_buffer)
-							{
-								for(char cb = *clip_buffer; cb; ++clip_buffer, cb = *clip_buffer)
-								{
-									if(Is_Allowed_Character(cb) && 
-										(character_limit == 0 || str->lenght < character_limit) &&
-										(!character_check || (character_check && character_check(&cb))))
-									{
-										str->insert_at(state->write_cursor_position, *clip_buffer);
-										state->write_cursor_position += 1;										
-									}
-								}
-							}
-							
-						}break;
-						
-						
-						case '\r': // ENTER hopefully, depends on the OS?
-						{
-							result = true;
-							
-							GUI_Reset_Selection_State(context);
-						}break;
-						
-						
-						case '\b': // BACKSPACE
-						{
-							if(state->text_select_mode) 
-							{
-								GUI_SL_Input_Field_Conditional_Erase_Selection(state, str);
-								continue;
-							}
-							
-							if(str->lenght > 0)
-							{
-								state->write_cursor_position -= 1;
-								if(state->write_cursor_position > wcp)
-									state->write_cursor_position = 0;
-								
-								str->remove_at(state->write_cursor_position);
-							}
-							
-						}break;
-						
-						
-						default:
-						{
-							if(Is_Allowed_Character(c) && 
-								(character_limit == 0 || str->lenght < character_limit) &&
-								(!character_check || (character_check && character_check(&c))))
-							{
-								GUI_SL_Input_Field_Conditional_Erase_Selection(state, str);
-								
-								str->insert_at(state->write_cursor_position, c);
-								state->write_cursor_position += 1;
-							}
-						}
-					}
+					GUI_Reset_Selection_State(context);
+					result = true;
 				}
-				
 				
 				// NOTE: string lenght is a dependancy for f_lenght, thefore it's updated here,
 				// now that the final lenght for the frame is known.
@@ -2081,6 +2099,8 @@ static bool GUI_Do_SL_Input_Field(
 					state->next_input_time = 0;
 				}
 				
+				bool shift_down = context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT) || 
+					context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT);
 				
 				// Arrowkey/controller input 
 				while(context->actions[GUI_Menu_Actions::left].Is_Down() && GUI_Accelerated_Tick(
@@ -2361,7 +2381,7 @@ static bool GUI_Do_SL_Input_Field(
 				context->canvas, 
 				Create_String_View(str, view_offset, view_lenght),
 				text_p, 
-				outline_color, 
+				theme->text_color, 
 				&theme->font, 
 				text_scale);
 		}
@@ -2400,3 +2420,211 @@ static bool GUI_Do_SL_Input_Field(
 	
 	return result;
 }
+
+
+static void GUI_Do_ML_Input_Field(
+	GUI_Context* context, 
+	v2f* pos, 
+	v2f* dim,
+	String* str,
+	u32 character_limit = 256,
+	v2f text_scale = GUI_DEFAULT_TEXT_SCALE,
+	bool (*character_check)(char*) = 0,
+	GUI_Input_Acceleration_Behavior keyboard_acceleration = {0.2, 0.3, 30})
+{
+	Assert(GUI_Is_Context_Ready(context));
+	
+	// --------------------------------------------------------------------------
+	
+	GUI_Theme* theme = context->layout.theme;
+
+	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
+	
+	u32 id = GUI_Generate_ID(p.rect, __LINE__);
+	
+	bool cursor_on_selection = Is_Point_Inside_Rect(context->cursor_fpos, p.rect);
+	bool is_selected = GUI_Is_Element_Selected(context, cursor_on_selection, id);
+	
+	// --------------------------------------------------------------------------
+	
+	Font* font = &theme->font;
+	
+	f32 outline_thickness = f32(theme->outline_thickness);
+	f32 char_width = f32(font->char_width) * text_scale.x;
+	f32 char_height = f32(font->char_height) * text_scale.y;
+	
+	v2f text_p = p.pos + v2f{1, -1} * outline_thickness + v2f{2,-2} +
+		Hadamar_Product(v2f{-1, 1}, (p.dim / 2));
+	
+	text_p.y -= char_height;
+	
+	Color box_color = theme->background_color;
+	Color text_color = theme->text_color;
+	Color outline_color = theme->outline_color;
+	
+	u32 view_limit_x;
+	// Calculate view limit.
+	{
+		// w: dif between text_p and p.pos twice.
+		f32 w = (text_p.x - p.rect.min.x) * 2;
+		view_limit_x = (u32)Floor((p.dim.x - w) / char_width);	
+	}
+	
+	bool draw_cursor = false;
+	u32 write_cursor_position = 0;
+	
+	if(is_selected)
+	{
+		GUI_SL_Input_Field_State* state = &context->selection_state.sl_input_field;
+		
+		if(state->is_active)
+		{
+			
+			// Handle input
+			bool mouse_pressed_down = context->actions[GUI_Menu_Actions::mouse].Is_Pressed();
+			bool mouse_is_down = context->actions[GUI_Menu_Actions::mouse].Is_Down();
+			
+			if(context->actions[GUI_Menu_Actions::back].Is_Pressed() || 
+				(!cursor_on_selection && mouse_pressed_down))
+			{
+				draw_cursor = false;
+				state->is_active = false;
+				state->view_offset = 0;
+				
+				Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::cursor_mask_validation);
+				
+				
+			}
+			else
+			{
+				context->flags |= GUI_Context_Flags::cursor_mask_validation;
+				context->flags |= GUI_Context_Flags::cursor_mask_enabled;	
+				
+				context->cursor_mask_area = context->canvas_rect;
+				
+				u32 wcp = state->write_cursor_position;
+				
+				if(GUI_Input_Field_Insert_Characters(
+					context->platform, 
+					state, 
+					str, 
+					character_limit, 
+					wcp, 
+					character_check))
+				{
+					str->insert_at(state->write_cursor_position, '\n');
+					state->write_cursor_position += 1;
+				}
+				
+			}
+			
+			draw_cursor = true;
+			write_cursor_position = state->write_cursor_position;
+		}
+		else
+		{
+			if(GUI_On_Release_Action(context, cursor_on_selection, &state->is_pressed_down))
+			{
+				state->is_active = true;
+				state->write_cursor_position = 0;
+				state->flicker_start_time = context->platform->Get_Time_Stamp() + state->flicker_delay;
+			}
+			
+		}
+		
+		if(state->is_pressed_down)
+			outline_color = theme->down_color;
+		else
+			outline_color = theme->selected_color;
+	}
+	
+	// Draw ---------------------------------------------------------------------
+	if(Rects_Overlap(p.rect, context->canvas_rect))
+	{	
+		Draw_Filled_Rect_With_Outline(
+			context->canvas, 
+			p.rect, 
+			box_color, 
+			theme->outline_thickness, 
+			outline_color);
+		
+		u32 line_start = 0;
+		
+		char* str_begin = str->buffer;
+		char* str_end = str->buffer + str->lenght;
+		int i = 0;
+		for(char* c = str_begin; c < str_end; ++c)
+		{
+			u32 lenght = u32(c - str_begin) - line_start;
+			
+			if(*c == '\n' || lenght >= view_limit_x)
+			{
+				String_View view = {str->buffer + line_start, lenght};
+				Draw_Text(context->canvas, view, text_p, text_color, font, text_scale);
+				if(draw_cursor && write_cursor_position > line_start &&
+					write_cursor_position < line_start + lenght)
+				{
+					draw_cursor = false;
+					v2f cursor_p = text_p;
+					cursor_p.x += f32(write_cursor_position - line_start) * char_width;
+	
+					Color cursor_color = (str->lenght < character_limit || character_limit == 0)? 
+						theme->write_cursor_color : theme->write_cursor_limit_color;
+					
+					Draw_Vertical_Line(
+						context->canvas, 
+						cursor_p, 
+						f32(font->char_height) * text_scale.y, 
+						cursor_color);
+				}
+				
+				
+				text_p.y -= char_height;
+				line_start += lenght + 1;
+			}
+			i++;
+		}
+		Assert(line_start <= str->lenght);
+		
+		if(line_start < str->lenght)
+		{
+			u32 lenght = u32(str->lenght - line_start);
+			String_View view = {str->buffer + line_start, lenght};
+			Draw_Text(context->canvas, view, text_p, text_color, font, text_scale);
+			
+			if(draw_cursor)
+			{
+				v2f cursor_p = text_p;
+				cursor_p.x += f32(write_cursor_position - line_start) * char_width;
+
+				Color cursor_color = (str->lenght < character_limit || character_limit == 0)? 
+					theme->write_cursor_color : theme->write_cursor_limit_color;
+				
+				Draw_Vertical_Line(
+					context->canvas, 
+					cursor_p, 
+					f32(font->char_height) * text_scale.y, 
+					cursor_color);
+			}
+		}
+	}
+}
+
+
+/*
+if(draw_cursor)
+{
+	v2f cursor_p = text_p;
+	
+	cursor_p.x += f32(write_cursor_position - view_offset) * char_width;
+	
+	Color cursor_color = (str->lenght < character_limit || character_limit == 0)? 
+		theme->write_cursor_color : theme->write_cursor_limit_color;
+	
+	Draw_Vertical_Line(
+		context->canvas, 
+		cursor_p, 
+		f32(font->char_height) * text_scale.y, 
+		cursor_color);
+}
+*/

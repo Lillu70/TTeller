@@ -75,13 +75,9 @@ static void Init_String(String* str, Allocator_Shell* allocator, u32 capacity)
 	Assert(allocator);
 	
 	str->lenght = 0;
-	str->capacity = capacity;
 	str->alloc = allocator;
 	
-	if(capacity)
-		String_Init_Alloc(str, capacity);
-	else
-		str->buffer = 0;
+	String_Init_Alloc(str, capacity);
 }
 
 

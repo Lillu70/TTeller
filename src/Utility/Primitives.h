@@ -37,8 +37,9 @@ static constexpr u32 U32_MAX = 0xFFFFFFFF;
 static constexpr i32 I32_MAX = 2147483647;
 static constexpr u16 U16_MAX = 0xFFFF;
 
-// NOTE: Structure of this union is endianess dependant.
-// TODO: Add a ifdef for endianess.
+// NOTE: Structure of this union is endianess dependant. And actually platform dependant. 
+// This is windows color buffer ordering.
+// TODO: ifdef for platform and endianess.
 union Color
 {
 	u32 as_u32;
@@ -50,6 +51,7 @@ union Color
 		u8 alpha;
 	};
 };
+
 
 //TODO: Again, endianess.
 static constexpr Color WHITE = { U32_MAX };
