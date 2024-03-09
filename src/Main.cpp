@@ -31,7 +31,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 	Init_App(calltable, s_app.game_state_memory, APP_MEMORY_SIZE);
 	
 	f64 frame_time = 0;
-	    
+	
 	while(Is_Flag_Set(s_app.flags, (u32)App_Flags::is_running))
 	{
 		Begin_Timing_Block(run_time);

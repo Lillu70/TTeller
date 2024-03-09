@@ -424,102 +424,6 @@ static b32 Sample_Glyph(u8* glyph, u32 char_height, u32 x, u32 y)
 }
 
 
-
-static void Draw_Text(
-	Canvas* canvas,
-	u8* text,
-	v2f pos,
-	Color color,
-	Font* font)
-{
-	Assert(canvas);
-	Assert(font);
-	
-	v2f p = pos;
-	
-	v2f glyph_size = v2f{f32(font->char_width), f32(font->char_height)};
-
-	v2f floor_p = Floor(p);
-	
-	v2f fraction = p - floor_p;
-	v2f inv_fraction = 1.f - fraction;
-	
-	f32 df = Componentwise_Mult(inv_fraction);
-	f32 urf = Componentwise_Mult(fraction);
-	f32 uf = Componentwise_Mult({inv_fraction.x, fraction.y});
-	f32 rf = Componentwise_Mult({fraction.x, inv_fraction.y});
-	
-	v3f c = Unpack_Color(color);
-	
-	for(; *text; ++text, p.x += glyph_size.x)
-	{
-		u8 glyph = (*text);
-		i32 font_offset = (i32)glyph - 33;
-		
-		if(glyph == '\n')
-		{
-			p.x = pos.x - glyph_size.x;
-			p.y -= glyph_size.y;
-			continue;	
-		}
-		
-		if(font_offset < 0 || font_offset > 93)
-			continue;
-		
-		font_offset *= font->char_height;
-		
-		floor_p = Floor(p);
-		
-		for(u32 y = 1; y <= font->char_height; ++y)
-			for(u32 x = 1; x <= font->char_width; ++x)
-			{
-				v2i pixel_p = v2f::Cast<i32>(floor_p);
-				pixel_p.x += (i32)x;
-				pixel_p.y += (i32)y;
-				
-				if(Is_Point_On_Canvas(canvas, pixel_p))
-				{
-					v4f tf;
-					
-					tf.elements[0] = df * Sample_Font(font, font_offset, x, y);
-					tf.elements[1] = rf * Sample_Font(font, font_offset, x - 1, y);
-					tf.elements[2] = uf * Sample_Font(font, font_offset, x, y - 1);
-					tf.elements[3] = urf * Sample_Font(font, font_offset, x - 1, y - 1);
-					
-					f32 color_amount = Componentwise_Add(tf);
-					
-					if(color_amount > 0.01f)
-					{
-						if(color_amount > 0.95 && color_amount < 1.05)
-							Set_Pixel_HZ(canvas, pixel_p, color);
-						else
-							Blend_Pixel_With_Color(canvas, pixel_p, c, color_amount);
-					}
-				}
-			}
-	}
-}
-
-// TODO: Look at the Draw_Text routines and see if they can be simplefied and unified.
-
-static void Draw_Text(
-	Canvas* canvas,
-	u8* text,
-	v2f pos,
-	Color color,
-	Font* font,
-	v2i scale)
-{
-	Draw_Text(
-		canvas,
-		text,
-		pos,
-		color,
-		font,
-		v2i::Cast<f32>(scale));
-}
-
-
 static void Draw_Text(
 	Canvas* canvas,
 	u8* text,
@@ -533,37 +437,15 @@ static void Draw_Text(
 	Assert(scale.x > 0);
 	Assert(scale.y > 0);
 	
-	#if 1
-	if(scale == v2f{1.f, 1.f})
-	{
-		Draw_Text(canvas, text, pos, color, font);
-		return;
-	}
-	#endif
-
 	v2i cursor = {};
 
 	v2f glyph_size = Hadamar_Product(v2f{f32(font->char_width), f32(font->char_height)}, scale);
 
 	for(; *text; ++text, ++cursor.x)
 	{
-		u8 glyph = (*text);
-		i32 font_offset = (i32)glyph - 33;
-		
-		if(glyph == '\n')
-		{
-			cursor.x = -1;
-			cursor.y += 1;
-			continue;	
-		}
-		
-		if(font_offset < 0 || font_offset > 93)
-			continue;
-		
-		font_offset *= font->char_height;
-		
+		u8 c = (*text);
 		v2f p = Hadamar_Product(v2i::Cast<f32>(cursor), glyph_size) + pos;
-		Draw_Glyph(canvas, p, scale, color, font_offset, font);
+		Draw_Glyph(canvas, p, scale, color, c, font);
 	}
 }
 
@@ -580,14 +462,6 @@ static void Draw_Text(
 	Assert(font);
 	Assert(scale.x > 0);
 	Assert(scale.y > 0);
-	
-	#if 0
-	if(scale == v2f{1.f, 1.f})
-	{
-		Draw_Text(canvas, text, pos, color, font);
-		return;
-	}
-	#endif
 
 	v2i cursor = {};
 
@@ -595,25 +469,26 @@ static void Draw_Text(
 
 	for(char* ptr = text.buffer; ptr < text.buffer + text.lenght; ++ptr, ++cursor.x)
 	{
-		u8 glyph = (*ptr);
-		i32 font_offset = (i32)glyph - 33;
-		
-		if(glyph == '\n')
-		{
-			cursor.x = -1;
-			cursor.y += 1;
-			continue;	
-		}
-		
-		if(font_offset < 0 || font_offset > 93)
-			continue;
-		
-		font_offset *= font->char_height;
-		
+		u8 c = (*ptr);
 		v2f p = Hadamar_Product(v2i::Cast<f32>(cursor), glyph_size) + pos;
-		Draw_Glyph(canvas, p, scale, color, font_offset, font);
+		Draw_Glyph(canvas, p, scale, color, c, font);
 	}
 }
+
+/*
+u8 glyph = (*ptr);
+i32 font_offset = (i32)glyph - 33;
+
+if(glyph == '\n')
+{
+	cursor.x = -1;
+	cursor.y += 1;
+	continue;	
+}
+
+if(font_offset < 0 || font_offset > 93)
+	continue;
+*/
 
 
 static void Draw_Glyph(
@@ -621,7 +496,7 @@ static void Draw_Glyph(
 	v2f pos,
 	v2f scale,
 	Color packed_color,
-	i32 font_offset,
+	char character,
 	Font* font)
 {	
 	v2f floor_p = Floor(pos);
@@ -633,9 +508,8 @@ static void Draw_Glyph(
 	v2i max = {i32(ceil_p.x - floor_p.x), i32(ceil_p.y - floor_p.y)};
 
 	// Internal pixels.
-	i32 y_min = 1, y_max = max.y + 1;
-	i32 x_min = 1, x_max = max.x + 1;
-	
+	i32 y_min = 1, y_max = max.y;
+	i32 x_min = 1, x_max = max.x;
 	
 	i32 pixel_x_max = floor_int_p.x + x_max;
 	if(pixel_x_max > i32(canvas->dim.x))
@@ -659,7 +533,42 @@ static void Draw_Glyph(
 	
 	Start_Scope_Timer(render_glyph);
 	
-	u8* glyph = font->data_buffer + font_offset;
+	u8* glyph;
+	if(character >= 33 && character <= 126)
+	{
+		static constexpr u32 font_offset = 33;
+		glyph = font->data_buffer + ((character - font_offset) * font->char_height);
+	}
+	else
+	{
+		// This is fine for couple of supported special characters.
+		switch(character)
+		{
+			case -28: //0xE4 -- ä
+			{
+				glyph = font->data_buffer_sc + (0 * font->char_height);
+			}break;
+			
+			case -10: //0xF6 -- ö
+			{
+				glyph = font->data_buffer_sc + (1 * font->char_height);	
+			}break;
+			
+			case -60: //0xC4 -- Ä
+			{
+				glyph = font->data_buffer_sc + (2 * font->char_height);
+			}break;
+			
+			case -42: //0xD6 -- Ö
+			{
+				glyph = font->data_buffer_sc + (3 * font->char_height);
+			}break;
+			
+			default:
+				return;
+		}
+	}
+
 	v3f unpacked_color = Unpack_Color(packed_color);
 	
 	v2f inv_scale = 1 / scale;
@@ -684,14 +593,17 @@ static void Draw_Glyph(
 	for(i32 y = y_min; y < y_max; ++y)
 	{ 
 		u32 sample_y = u32(y * inv_scale.y);
+		if(sample_y >= font->char_height)
+			break;
+		
 		u32 sample_y_sub = u32((y - 1) * inv_scale.y);
 		
-		u32 row = font->char_height - sample_y;
+		u32 row = (font->char_height - 1) - sample_y;
 		u8 glyph_row = *(glyph + row);
 		
 		__m128i wide_glyph_row = _mm_set1_epi32(glyph_row);
 
-		u32 row_sub = font->char_height - sample_y_sub;
+		u32 row_sub = (font->char_height - 1) - sample_y_sub;
 		u8 glyph_row_sub = *(glyph + row_sub);
 		
 		__m128i wide_glyph_row_sub = _mm_set1_epi32(glyph_row_sub);
@@ -782,12 +694,15 @@ static void Draw_Glyph(
 	for(i32 y = y_min; y < y_max; ++y)
 	{
 		u32 sample_y = u32(y * inv_scale.y);
+		if(sample_y >= font->char_height)
+			break;
+		
 		u32 sample_y_sub = u32((y - 1) * inv_scale.y);
 		
-		u32 row = font->char_height - sample_y;
+		u32 row = (font->char_height - 1) - sample_y;
 		u8 glyph_row = *(glyph + row);
 		
-		u32 row_sub = font->char_height - sample_y_sub;
+		u32 row_sub = (font->char_height - 1) - sample_y_sub;
 		u8 glyph_row_sub = *(glyph + row_sub);
 		
 		i32 pixel_y = floor_int_p.y + y;

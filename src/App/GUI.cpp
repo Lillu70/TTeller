@@ -1931,6 +1931,12 @@ static bool GUI_Do_SL_Input_Field(
 				
 				Char_Array typing_info = context->platform->Get_Typing_Information();
 				
+				bool(*Is_Allowed_Character)(char) = [](char c)
+				{
+					bool result = (c >= 32 && c <= 127) || c == -28 || c == -60 || c == -10 || c == -42;
+					return result;
+				};
+				
 				for(u32 i = 0; i < typing_info.count; ++i)
 				{
 					char c = typing_info.buffer[i];
@@ -2003,7 +2009,7 @@ static bool GUI_Do_SL_Input_Field(
 							{
 								for(char cb = *clip_buffer; cb; ++clip_buffer, cb = *clip_buffer)
 								{
-									if(cb >= 32 && cb <= 127 && 
+									if(Is_Allowed_Character(cb) && 
 										(character_limit == 0 || str->lenght < character_limit) &&
 										(!character_check || (character_check && character_check(&cb))))
 									{
@@ -2046,7 +2052,8 @@ static bool GUI_Do_SL_Input_Field(
 						
 						default:
 						{
-							if(c >= 32 && c <= 127 && (character_limit == 0 || str->lenght < character_limit) &&
+							if(Is_Allowed_Character(c) && 
+								(character_limit == 0 || str->lenght < character_limit) &&
 								(!character_check || (character_check && character_check(&c))))
 							{
 								GUI_SL_Input_Field_Conditional_Erase_Selection(state, str);

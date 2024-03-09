@@ -12,7 +12,7 @@ enum class Exists_Statement : u8
 static const char* s_exists_statement_names[] =
 {
 	"Ei saa olla.",
-	"Taytyy olla."
+	"T\xE4ytyy olla."
 };
 
 

@@ -15,6 +15,8 @@
 #include "..\Platform\Input.h"
 #include "..\Platform\Platform_Interface.h"
 
+#include "Terminus_Font.h"
+
 #include "Renderer.h"
 #include "Renderer.cpp"
 
@@ -22,8 +24,6 @@
 
 #include "GUI.h"
 #include "GUI.cpp"
-
-#include "Terminus_Font.h"
 
 #include "Nalkapeli.h"
 

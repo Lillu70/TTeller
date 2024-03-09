@@ -5,7 +5,8 @@ struct Font
 {
 	u32 char_width = 0;
 	u32 char_height = 0;
-	u8* data_buffer = 0;
+	u8* data_buffer = 0; 	// reqular ascii
+	u8* data_buffer_sc = 0; // äöÄÖ
 };
 
 
@@ -76,26 +77,9 @@ static void Draw_Text(
 	u8* text,
 	v2f pos,
 	Color color,
-	Font* font);
-
-
-static void Draw_Text(
-	Canvas* canvas,
-	u8* text,
-	v2f pos,
-	Color color,
 	Font* font,
 	v2i scale);
 
-
-static void Draw_Text(
-	Canvas* canvas,
-	u8* text,
-	v2f pos,
-	Color color,
-	Font* font,
-	v2f scale);
-	
 	
 static void Draw_Text(
 	Canvas* canvas,
@@ -111,5 +95,5 @@ static void Draw_Glyph(
 	v2f pos,
 	v2f scale,
 	Color color,
-	i32 font_offset,
+	char character,
 	Font* font);

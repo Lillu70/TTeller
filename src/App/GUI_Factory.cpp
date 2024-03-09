@@ -100,7 +100,7 @@ static inline void Init_GUI()
 			if(Requirement_Is_Mark_Type(new_type))
 			{
 				static constexpr char* long_text = 
-					"QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm,.:;!#1234567890";
+					"\xE4\xF6\xC4\xD6QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm,.:;!#1234567890";
 				
 				Init_String(&new_req->mark, &s_allocator, long_text);
 				new_req->mark_exists = Exists_Statement::does_have;
@@ -132,6 +132,7 @@ static inline void Init_GUI()
 	}
 	
 	s_theme.font.data_buffer = (u8*)&s_terminus_font[0];
+	s_theme.font.data_buffer_sc = (u8*)&s_terminus_font_special_characters[0];
 	s_theme.font.char_width = s_terminus_font_char_width;
 	s_theme.font.char_height = s_terminus_font_char_height;
 }
@@ -231,7 +232,7 @@ static void Do_All_Events_Frame()
 		
 		v2f dim = v2f{context->layout.last_element_dim.y, context->layout.last_element_dim.y};
 		GUI_Do_Checkbox(context, AUTO, &dim, &jump_into_new_event);
-		GUI_Do_Text(context, AUTO, "Hyppaa tapahtumaan.", GUI_Highlight_Prev(context));
+		GUI_Do_Text(context, AUTO, "Hypp\xE4\xE4 tapahtumaan.", GUI_Highlight_Prev(context));
 		
 		GUI_Pop_Layout(context);
 	}; // ----------------------------------------------------------------------------------------
@@ -286,7 +287,7 @@ static void Do_Event_Editor_Requirements_Frame()
 		
 		GUI_Do_SL_Input_Field(context, AUTO, AUTO, &event->name);
 	
-		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lisaa uusi osallistuja"))
+		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lis\xE4\xE4 uusi osallistuja"))
 		{
 			s_gui.flags |= GUI_Context_Flags::maxout_horizontal_slider;
 			if(event->participents->count < event->max_participent_count)
@@ -593,7 +594,25 @@ static void Run_Active_Menu()
 	{
 		case Menus::none:
 		{
+			#if 0
+			Clear_Canvas(&s_canvas, WHITE);
+
+			GUI_Begin_Context(&s_gui, &s_platform, &s_canvas,  (Action*)&s_global_data.menu_actions, &s_theme);
+			
+			s_gui.layout.anchor = GUI_Anchor::center;
+			
+			f32 time = f32(s_platform.Get_Time_Stamp());
+			v2f scale = {2.f + Sin(time), 2.f + Cos(time)};
+			
+			v2f p = v2u::Cast<f32>(s_canvas.dim) / 2 + (v2f{Cos(time), Sin(time)} * 100);
+			
+			GUI_Do_Text(&s_gui, &p, "does 1x1 text still work?!", {}, scale);
+			
+			GUI_End_Context(&s_gui);
+			#else
 			s_global_data.active_menu = Menus::all_events;
+			#endif
+			
 		}break;
 		
 		case Menus::event_editor_participents:
