@@ -131,6 +131,7 @@ static inline void Init_GUI()
 		
 		s_theme.outline_color = BLACK;
 		s_theme.text_color = BLACK;
+		s_theme.write_cursor_color = Make_Color(180, 130, 150);
 		
 	}
 	
@@ -578,12 +579,27 @@ static void Do_Event_Editor_Text_Frame()
 		static String str = {0};
 		if(str.buffer == 0)
 		{
-			Init_String(&str, &s_allocator, "2123123123123123123123123123123");
+			Init_String(&str, &s_allocator, 
+"a\n\
+aa\n\
+aaa\n\
+aaaa\n\
+aaaaa\n\
+aaaaaa\n\
+aaaaaaaa\n\
+aaaaaa\n\
+aaaaa\n\
+aaaa\n\
+aaa\n\
+aa\n\
+a");
 		}
 		
 		v2f dim = v2u::Cast<f32>(context->canvas->dim) - 50.f;
 		if(dim.x >= 0 && dim.y >= 0)
 		{
+			
+			//dim = v2f{500, 300};
 			GUI_Do_ML_Input_Field(context, &GUI_AUTO_MIDDLE, &dim, &str, 0);			
 		}
 		
@@ -655,25 +671,9 @@ static void Run_Active_Menu()
 		GUI_Reset_Context(&s_gui);
 		GUI_Reset_Context(&s_gui_banner);
 		
-		
-		// Menu initialization -------------------------------------------------
-		switch(s_global_data.active_menu)
-		{
-			case Menus::event_editor_participents:
-			{
-				u32 f = GUI_Context_Flags::ignore_selection | GUI_Context_Flags::enable_dynamic_sliders; 
-				
-				s_gui.flags |= f;
-				s_gui_banner.flags |= GUI_Context_Flags::enable_dynamic_sliders;				
-			}break;
-			
-			case Menus::all_events:
-			{
-				u32 f = GUI_Context_Flags::ignore_selection | GUI_Context_Flags::enable_dynamic_sliders;
-				
-				s_gui.flags |= f;
-				s_gui_banner.flags |= GUI_Context_Flags::enable_dynamic_sliders;				
-			}break;
-		}
+		u32 f = GUI_Context_Flags::ignore_selection | GUI_Context_Flags::enable_dynamic_sliders; 
+	
+		s_gui.flags |= f;
+		s_gui_banner.flags |= GUI_Context_Flags::enable_dynamic_sliders;
 	}
 }

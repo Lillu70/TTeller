@@ -1088,14 +1088,22 @@ static bool GUI_Input_Field_Insert_Characters(
 	String* str,
 	u32 character_limit,
 	u32 wcp,
+	bool allow_new_line_insertion,
 	bool (*character_check)(char*))
 {
-	bool(*Is_Allowed_Character)(char) = [](char c)
+	bool(*Is_Allowed_Character)(char, bool) = [](char c, bool allow_new_line)
 	{
-		bool result = (c >= 32 && c <= 127) || c == -28 || c == -60 || c == -10 || c == -42;
+		bool result = 
+			(c >= 32 && c <= 127) || 
+			c == -28 ||
+			c == -60 ||
+			c == -10 ||
+			c == -42 ||
+			(allow_new_line && c == '\t') ||
+			(allow_new_line && c == '\n');
+		
 		return result;
 	};
-	
 	
 	void(*Conditional_Erase_Selection)(GUI_SL_Input_Field_State*, String*) =
 		[](GUI_SL_Input_Field_State* state, String* str)
@@ -1128,6 +1136,8 @@ static bool GUI_Input_Field_Insert_Characters(
 	for(u32 i = 0; i < typing_info.count; ++i)
 	{
 		char c = typing_info.buffer[i];
+		if(c == '\r')
+			c = '\n';
 		
 		switch(c)
 		{
@@ -1197,12 +1207,25 @@ static bool GUI_Input_Field_Insert_Characters(
 				{
 					for(char cb = *clip_buffer; cb; ++clip_buffer, cb = *clip_buffer)
 					{
-						if(Is_Allowed_Character(cb) && 
+						if(cb == '\r')
+							cb = '\n';
+						
+						if(Is_Allowed_Character(cb, allow_new_line_insertion) && 
 							(character_limit == 0 || str->lenght < character_limit) &&
 							(!character_check || (character_check && character_check(&cb))))
 						{
-							str->insert_at(state->write_cursor_position, *clip_buffer);
-							state->write_cursor_position += 1;										
+							u32 insert_count = 1;
+							if(cb == '\t')
+							{
+								cb = ' ';
+								insert_count = 4;
+							}
+							
+							for(u32 y = 0; y < insert_count; ++y)
+							{
+								str->insert_at(state->write_cursor_position, *clip_buffer);
+								state->write_cursor_position += 1;
+							}
 						}
 					}
 				}
@@ -1210,11 +1233,13 @@ static bool GUI_Input_Field_Insert_Characters(
 			}break;
 			
 			
-			case '\r': // ENTER hopefully, depends on the OS?
+			case '\n': // ENTER hopefully, depends on the OS?
 			{
 				result = true;
-				
-				//GUI_Reset_Selection_State(context);
+				if(allow_new_line_insertion)
+				{
+					goto DEFAULT_CASE;
+				}
 			}break;
 			
 			
@@ -1240,14 +1265,26 @@ static bool GUI_Input_Field_Insert_Characters(
 			
 			default:
 			{
-				if(Is_Allowed_Character(c) && 
+				DEFAULT_CASE:
+				
+				if(Is_Allowed_Character(c, allow_new_line_insertion) && 
 					(character_limit == 0 || str->lenght < character_limit) &&
 					(!character_check || (character_check && character_check(&c))))
 				{
 					Conditional_Erase_Selection(state, str);
 					
-					str->insert_at(state->write_cursor_position, c);
-					state->write_cursor_position += 1;
+					u32 insert_count = 1;
+					if(c == '\t')
+					{
+						c = ' ';
+						insert_count = 4;
+					}
+					
+					for(u32 y = 0; y < insert_count; ++y)
+					{
+						str->insert_at(state->write_cursor_position, c);
+						state->write_cursor_position += 1;
+					}
 				}
 			}
 		}
@@ -2034,7 +2071,7 @@ static bool GUI_Do_SL_Input_Field(
 	}
 	
 	f32 f_lenght = f32(str->lenght) + 1.f;
-	f32 handle_width = Max(bar_dim.x * view_limit / f_lenght, min_handle_width);
+	f32 handle_width = Max(bar_dim.x * (view_limit / f_lenght), min_handle_width);
 	
 	bool draw_cursor = false;
 	u32 write_cursor_position = 0;
@@ -2077,7 +2114,8 @@ static bool GUI_Do_SL_Input_Field(
 					state, 
 					str, 
 					character_limit, 
-					wcp, 
+					wcp,
+					false,
 					character_check))
 				{
 					GUI_Reset_Selection_State(context);
@@ -2250,7 +2288,8 @@ static bool GUI_Do_SL_Input_Field(
 								
 								// +1 here to allow scrolling 1 "slot" into the white space at the end.
 								// (Lookahead)
-								state->view_offset = (u32)Round(f32(str->lenght - view_limit + 1) * percent);
+								state->view_offset = 
+									(u32)Round(f32(str->lenght - view_limit + 1) * percent);
 								
 		
 								if(state->write_cursor_position < state->view_offset + 1)
@@ -2422,6 +2461,15 @@ static bool GUI_Do_SL_Input_Field(
 }
 
 
+// TODO: 
+// Navigation
+//	-KB
+//	-Mouse
+// Area selection (kb and mouse)
+// Cursor color on character limit
+// Cursor flicker
+// Bar controls
+
 static void GUI_Do_ML_Input_Field(
 	GUI_Context* context, 
 	v2f* pos, 
@@ -2433,6 +2481,10 @@ static void GUI_Do_ML_Input_Field(
 	GUI_Input_Acceleration_Behavior keyboard_acceleration = {0.2, 0.3, 30})
 {
 	Assert(GUI_Is_Context_Ready(context));
+	
+	static constexpr f32 scroll_bar_width = 20.f;
+	static constexpr f32 min_handle_height = 3.f;
+
 	
 	// --------------------------------------------------------------------------
 	
@@ -2470,8 +2522,24 @@ static void GUI_Do_ML_Input_Field(
 		view_limit_x = (u32)Floor((p.dim.x - w) / char_width);	
 	}
 	
+	u32 view_limit_y;
+	{
+		// w: dif between text_p and p.pos twice.
+		f32 h = (p.rect.max.y - (text_p.y + char_height)) * 2;
+		view_limit_y = (u32)Floor((p.dim.y - h) / char_height);		
+	}
+	
+	bool lines_counted = false;
+	bool enable_scroll_bar = false;
 	bool draw_cursor = false;
 	u32 write_cursor_position = 0;
+	u32 line_count = view_limit_y;
+	u32 view_offset = 0;
+	
+	v2f scroll_bar_center = v2f{p.rect.max.x - scroll_bar_width / 2, p.pos.y};
+	v2f scroll_bar_dim = v2f{scroll_bar_width, p.dim.y};
+	v2f scroll_bar_internal_dim = scroll_bar_dim - outline_thickness * 2;
+	Rect scroll_bar_rect = Create_Rect_Center(scroll_bar_center, scroll_bar_dim);
 	
 	if(is_selected)
 	{
@@ -2491,31 +2559,283 @@ static void GUI_Do_ML_Input_Field(
 				state->is_active = false;
 				state->view_offset = 0;
 				
-				Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::cursor_mask_validation);
-				
-				
+				u32 mask = GUI_Context_Flags::cursor_mask_validation | GUI_Context_Flags::disable_kc_navigation;
+				Inverse_Bit_Mask(&context->flags, mask);
 			}
 			else
 			{
 				context->flags |= GUI_Context_Flags::cursor_mask_validation;
 				context->flags |= GUI_Context_Flags::cursor_mask_enabled;	
+				context->flags |= GUI_Context_Flags::disable_kc_navigation;
 				
 				context->cursor_mask_area = context->canvas_rect;
 				
 				u32 wcp = state->write_cursor_position;
 				
-				if(GUI_Input_Field_Insert_Characters(
+				GUI_Input_Field_Insert_Characters(
 					context->platform, 
 					state, 
 					str, 
 					character_limit, 
-					wcp, 
-					character_check))
+					state->write_cursor_position,
+					true,
+					character_check);
+				
+				f64 time = context->platform->Get_Time_Stamp();
+				
+				// Count the number of virtual and real new lines.
+				// If the line count exceeds the view limit, then a scroll bar is enabled and
+				// because that effects the view_limit_x counting has to be restarted.
+				if(str->lenght > view_limit_x * view_limit_y)
 				{
-					str->insert_at(state->write_cursor_position, '\n');
-					state->write_cursor_position += 1;
+					enable_scroll_bar = true;
+					
+					// Calculate view limit.
+					{
+						// w: dif between text_p and p.pos twice.
+						f32 w = (text_p.x - p.rect.min.x) * 2 + scroll_bar_width;
+						view_limit_x = (u32)Floor((p.dim.x - w) / char_width);
+					}
 				}
 				
+				lines_counted = true;
+				
+				u32 cursor_line = 0;
+				u32 characters_before_cursor = 0;
+				u32 characters_on_line_preceding_cursor = 0;
+				bool cursor_on_virtual_line;
+				bool recalc;
+				do
+				{
+					recalc = false;
+					line_count = 0;
+					u32 characters_on_last_line = 0;
+					u32 line_start = 0;
+					char* str_begin = str->buffer;
+					char* str_end = str->buffer + str->lenght;
+					for(char* c = str_begin; c < str_end; ++c)
+					{
+						b32 is_new_line = *c == '\n';
+						u32 exclusive_lenght = u32(c - str_begin) - line_start;
+						
+						if(is_new_line || exclusive_lenght >= view_limit_x)
+						{
+							line_count += 1;
+							u32 effective_leng = exclusive_lenght + is_new_line;
+							
+							// If cursor on this line.
+							if(state->write_cursor_position >= line_start &&
+								state->write_cursor_position < line_start + effective_leng)
+							{
+								characters_before_cursor = state->write_cursor_position - line_start;
+								characters_on_line_preceding_cursor = characters_on_last_line;
+								cursor_on_virtual_line = !is_new_line;
+								cursor_line = line_count;
+							}
+							
+							line_start += effective_leng;
+							
+							characters_on_last_line = effective_leng;
+							
+							if(!is_new_line)
+								c -= 1;
+							
+							if(!enable_scroll_bar && line_count == view_limit_y)
+							{
+								enable_scroll_bar = true;
+								
+								// Calculate view limit.
+								{
+									// w: dif between text_p and p.pos twice.
+									f32 w = (text_p.x - p.rect.min.x) * 2 + scroll_bar_width;
+									view_limit_x = (u32)Floor((p.dim.x - w) / char_width);
+								}
+								recalc = true;
+								break;								
+							}
+						}
+					}
+					
+					Assert(line_start <= str->lenght);
+
+					// If cursor last line.
+					if(state->write_cursor_position >= line_start)
+					{
+						characters_before_cursor = state->write_cursor_position - line_start;
+						characters_on_line_preceding_cursor = characters_on_last_line;
+						cursor_on_virtual_line = false;
+						cursor_line = line_count + 1;
+					}
+					
+					if(line_start < str->lenght)
+					{	
+						line_count += 1;
+					}
+					
+				}while(recalc);
+				
+				Assert(cursor_line > 0);
+				
+				// Navigation. 
+				{
+					if(context->actions[GUI_Menu_Actions::left].Is_Pressed() ||
+						context->actions[GUI_Menu_Actions::right].Is_Pressed() || 
+						context->actions[GUI_Menu_Actions::up].Is_Pressed() ||
+						context->actions[GUI_Menu_Actions::down].Is_Pressed())
+					{
+						state->input_start_time = 0;
+						state->next_input_time = 0;
+					}
+					
+					// Arrowkey/controller input 
+					while(context->actions[GUI_Menu_Actions::left].Is_Down() && GUI_Accelerated_Tick(
+						&keyboard_acceleration, time, &state->input_start_time, &state->next_input_time))
+					{
+						state->write_cursor_position -= 1;
+						
+						if(state->write_cursor_position > wcp)
+						{
+							if(context->actions[GUI_Menu_Actions::left].Is_Pressed())
+								state->write_cursor_position = str->lenght;	
+							
+							else
+								state->write_cursor_position = wcp;
+						}
+					}
+				
+					while(context->actions[GUI_Menu_Actions::right].Is_Down() && GUI_Accelerated_Tick(
+						&keyboard_acceleration, time, &state->input_start_time, &state->next_input_time))
+					{
+						
+						state->write_cursor_position += 1;
+						
+						if(state->write_cursor_position > str->lenght)
+						{
+							if(context->actions[GUI_Menu_Actions::right].Is_Pressed())
+								state->write_cursor_position = 0;
+							else
+								state->write_cursor_position = wcp;
+						}
+					}
+
+					while(context->actions[GUI_Menu_Actions::up].Is_Down() && GUI_Accelerated_Tick(
+						&keyboard_acceleration, time, &state->input_start_time, &state->next_input_time))
+					{
+						if(cursor_line > 1)
+						{
+							u32 move_amount = view_limit_x;
+							bool starts_at_new_line = str->buffer[state->write_cursor_position] == '\n';
+							
+							for(u32 i = characters_before_cursor; i < move_amount; ++i)
+							{
+								if(state->write_cursor_position - i <= 0)
+									break;
+								
+								if(str->buffer[state->write_cursor_position - i] == '\n')
+								{
+									if(starts_at_new_line)
+									{
+										move_amount = characters_before_cursor==0? 1 : i;
+									}
+									else if(characters_on_line_preceding_cursor - 1 >= characters_before_cursor)
+									{
+										move_amount = characters_on_line_preceding_cursor;
+									}
+									else
+									{
+										move_amount = characters_before_cursor + 1;
+									}
+									break;
+								}
+							}
+							
+							state->write_cursor_position -= move_amount;
+							if(state->write_cursor_position > wcp)
+							{
+								state->write_cursor_position = 0;
+							}							
+						}
+					}
+					
+					while(context->actions[GUI_Menu_Actions::down].Is_Down() && GUI_Accelerated_Tick(
+						&keyboard_acceleration, time, &state->input_start_time, &state->next_input_time))
+					{
+						
+						u32 move_amount = view_limit_x;
+						
+						bool starts_at_new_line = str->buffer[state->write_cursor_position] == '\n';
+						
+						for(u32 i = 1; i < move_amount; ++i)
+						{
+							if(state->write_cursor_position + i >= str->lenght)
+								break;
+							
+							if(str->buffer[state->write_cursor_position + i] == '\n')
+							{
+								// If on a virtual line, the line can not end in a new line, therefore
+								// if we find a new a new line snap to it.
+								if(starts_at_new_line || cursor_on_virtual_line)
+								{
+									move_amount = i;
+								}
+								else
+								{
+									// TODO: Keep track of next line lenght as well to simplify this.
+									// If the next line has enough less characters than this one,
+									// this will move the cursor on to the line under, but if it has less, 
+									// this will overshoot. Potentially by a lot.
+									
+									move_amount = characters_before_cursor + i + 1;
+									
+									// So then have to check that we're not skipping any new lines.
+									for(u32 y = i + 1; y < move_amount; ++y)
+									{
+										if(state->write_cursor_position + y >= str->lenght)
+											break; // TODO: Figure out what should happen here.
+										
+										if(str->buffer[state->write_cursor_position + y] == '\n')
+										{
+											move_amount = y;
+											break;
+										}
+									}
+								}
+								break;
+							}
+						}
+					
+						
+						state->write_cursor_position += move_amount;
+						if(state->write_cursor_position > str->lenght)
+						{
+							state->write_cursor_position = str->lenght;
+						}
+					}
+				}
+				
+				// View offset snapping.
+				{
+					if(line_count == 0)
+					{
+						state->view_offset = 0;
+					}
+					else if(state->view_offset >= line_count)
+					{
+						state->view_offset = line_count - 1;
+					}
+					
+					if(cursor_line <= state->view_offset)
+					{
+						state->view_offset = cursor_line - 1;
+					}
+					
+					if(cursor_line > state->view_offset + view_limit_y)
+					{
+						state->view_offset = cursor_line - view_limit_y;
+					}
+				}
+				
+				view_offset = state->view_offset;
 			}
 			
 			draw_cursor = true;
@@ -2529,7 +2849,6 @@ static void GUI_Do_ML_Input_Field(
 				state->write_cursor_position = 0;
 				state->flicker_start_time = context->platform->Get_Time_Stamp() + state->flicker_delay;
 			}
-			
 		}
 		
 		if(state->is_pressed_down)
@@ -2548,83 +2867,104 @@ static void GUI_Do_ML_Input_Field(
 			theme->outline_thickness, 
 			outline_color);
 		
+		if(line_count > view_limit_y)
+		{
+			Color scroll_bar_color = theme->down_color;
+			
+			Draw_Filled_Rect_With_Outline(
+				context->canvas,
+				scroll_bar_rect, 
+				scroll_bar_color,
+				theme->outline_thickness,
+				outline_color);
+			
+			f32 h = scroll_bar_internal_dim.y * (f32(view_limit_y) / f32(line_count));
+			f32 handle_height = Max(h, min_handle_height);
+
+			v2f handle_center = 
+				scroll_bar_center + v2f{0, scroll_bar_internal_dim.y / 2 - handle_height / 2};
+			
+			//f32 yoff = f32(view_offset) / view_limit_y * scroll_bar_internal_dim.y;
+			//handle_center.x += xoff;
+			Rect handle_rect = 
+				Create_Rect_Center(handle_center, v2f{scroll_bar_internal_dim.x, handle_height});
+			
+			Draw_Filled_Rect(context->canvas, handle_rect, theme->outline_color);				
+		}
+		
 		u32 line_start = 0;
+		u32 line_num = 0;
 		
 		char* str_begin = str->buffer;
 		char* str_end = str->buffer + str->lenght;
-		int i = 0;
 		for(char* c = str_begin; c < str_end; ++c)
 		{
-			u32 lenght = u32(c - str_begin) - line_start;
+			u32 exclusive_lenght = u32(c - str_begin) - line_start;
 			
-			if(*c == '\n' || lenght >= view_limit_x)
+			b32 is_new_line = *c == '\n';
+			
+			if(is_new_line || exclusive_lenght >= view_limit_x)
 			{
-				String_View view = {str->buffer + line_start, lenght};
-				Draw_Text(context->canvas, view, text_p, text_color, font, text_scale);
-				if(draw_cursor && write_cursor_position > line_start &&
-					write_cursor_position < line_start + lenght)
-				{
-					draw_cursor = false;
-					v2f cursor_p = text_p;
-					cursor_p.x += f32(write_cursor_position - line_start) * char_width;
-	
-					Color cursor_color = (str->lenght < character_limit || character_limit == 0)? 
-						theme->write_cursor_color : theme->write_cursor_limit_color;
+				if(line_num >= view_offset)
+				{			
+					String_View view = {str->buffer + line_start, exclusive_lenght};
+					Draw_Text(context->canvas, view, text_p, text_color, font, text_scale);
 					
-					Draw_Vertical_Line(
-						context->canvas, 
-						cursor_p, 
-						f32(font->char_height) * text_scale.y, 
-						cursor_color);
+					if(draw_cursor && write_cursor_position >= line_start &&
+						write_cursor_position < line_start + exclusive_lenght + is_new_line)
+					{
+						draw_cursor = false;
+						v2f cursor_p = text_p;
+						cursor_p.x += f32(write_cursor_position - line_start) * char_width;
+		
+						Color cursor_color = (str->lenght < character_limit || character_limit == 0)? 
+							theme->write_cursor_color : theme->write_cursor_limit_color;
+						
+						Draw_Vertical_Line(
+							context->canvas, 
+							cursor_p, 
+							f32(font->char_height) * text_scale.y, 
+							cursor_color);
+					}
+					
+					text_p.y -= char_height;
 				}
 				
+				line_start += exclusive_lenght;
+				if(is_new_line)
+					line_start += 1;
+				else
+					--c;
 				
-				text_p.y -= char_height;
-				line_start += lenght + 1;
+				line_num += 1;
+				if(line_num - view_offset == view_limit_y)
+					return;
+				
 			}
-			i++;
 		}
 		Assert(line_start <= str->lenght);
+		
 		
 		if(line_start < str->lenght)
 		{
 			u32 lenght = u32(str->lenght - line_start);
 			String_View view = {str->buffer + line_start, lenght};
 			Draw_Text(context->canvas, view, text_p, text_color, font, text_scale);
-			
-			if(draw_cursor)
-			{
-				v2f cursor_p = text_p;
-				cursor_p.x += f32(write_cursor_position - line_start) * char_width;
+		}
+		
+		if(draw_cursor)
+		{
+			v2f cursor_p = text_p;
+			cursor_p.x += f32(write_cursor_position - line_start) * char_width;
 
-				Color cursor_color = (str->lenght < character_limit || character_limit == 0)? 
-					theme->write_cursor_color : theme->write_cursor_limit_color;
-				
-				Draw_Vertical_Line(
-					context->canvas, 
-					cursor_p, 
-					f32(font->char_height) * text_scale.y, 
-					cursor_color);
-			}
+			Color cursor_color = (str->lenght < character_limit || character_limit == 0)? 
+				theme->write_cursor_color : theme->write_cursor_limit_color;
+			
+			Draw_Vertical_Line(
+				context->canvas, 
+				cursor_p, 
+				f32(font->char_height) * text_scale.y, 
+				cursor_color);
 		}
 	}
 }
-
-
-/*
-if(draw_cursor)
-{
-	v2f cursor_p = text_p;
-	
-	cursor_p.x += f32(write_cursor_position - view_offset) * char_width;
-	
-	Color cursor_color = (str->lenght < character_limit || character_limit == 0)? 
-		theme->write_cursor_color : theme->write_cursor_limit_color;
-	
-	Draw_Vertical_Line(
-		context->canvas, 
-		cursor_p, 
-		f32(font->char_height) * text_scale.y, 
-		cursor_color);
-}
-*/

@@ -7,6 +7,7 @@ struct Font
 	u32 char_height = 0;
 	u8* data_buffer = 0; 	// reqular ascii
 	u8* data_buffer_sc = 0; // äöÄÖ
+	u32 tab_lenght = 4;
 };
 
 
