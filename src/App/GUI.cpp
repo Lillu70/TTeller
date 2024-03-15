@@ -2704,24 +2704,32 @@ static void GUI_Do_ML_Input_Field(
 								if(state->write_cursor_position >= line_start &&
 									state->write_cursor_position < line_start + effct_len + is_last_char)
 								{
-									characters_before_cursor = state->write_cursor_position - line_start;
-									characters_on_line_preceding_cursor = characters_on_last_line;
+									if(is_last_char && is_new_line)
+									{
+										characters_before_cursor = state->write_cursor_position - (line_start + effct_len);
+										characters_on_line_preceding_cursor = state->write_cursor_position - line_start;
+									}
+									else
+									{
+										characters_before_cursor = state->write_cursor_position - line_start;
+										characters_on_line_preceding_cursor = characters_on_last_line;										
+									}
 									cursor_on_virtual_line = !is_new_line;
 									cursor_line = line_count;
-									if(is_last_char && is_new_line && state->write_cursor_position == str->lenght)
-										cursor_line += 1;
 								}
 								
-								if(c == str_end)
-								{
-									if(is_new_line)
-										line_count += 1;
+								{									
+									if(c == str_end)
+									{
+										if(is_new_line)
+											line_count += 1;
+									}
+									// If this is a virual line, go back one character as,
+									// we're not actually counting this one.
+									// Dont do on last char to avoid infinite loop.
+									else if(!is_new_line)
+										c -= 1;
 								}
-								// If this is a virual line, go back one character as,
-								// we're not actually counting this one.
-								// Dont do on last char to avoid infinite loop.
-								else if(!is_new_line)
-									c -= 1;
 								
 								line_start += effct_len;
 								
@@ -3035,9 +3043,16 @@ static void GUI_Do_ML_Input_Field(
 					{
 						draw_cursor = false;
 						v2f cursor_p = text_p;
-						u32 begin_offset = u32(str_begin - str->buffer);
-						cursor_p.x += f32(write_cursor_position - line_start - begin_offset) * char_width;
-		
+						if(is_new_line && is_last_char && write_cursor_position == str->lenght)
+						{
+							cursor_p.y -= char_height;
+						}
+						else
+						{
+							u32 begin_offset = u32(str_begin - str->buffer);
+							cursor_p.x += f32(write_cursor_position - line_start - begin_offset) * char_width;							
+						}
+						
 						Color cursor_color = (str->lenght < character_limit || character_limit == 0)? 
 							theme->write_cursor_color : theme->write_cursor_limit_color;
 						
@@ -3063,6 +3078,7 @@ static void GUI_Do_ML_Input_Field(
 			}
 		}
 
+		#if 0
 		// Drawing cursor on last line
 		// CONSIDER: a lambda?
 		if(draw_cursor)
@@ -3080,5 +3096,6 @@ static void GUI_Do_ML_Input_Field(
 				f32(font->char_height) * text_scale.y, 
 				cursor_color);
 		}
+		#endif
 	}
 }
