@@ -93,8 +93,9 @@ static void Init_String(String* str, Allocator_Shell* allocator, char* c_str)
 	str->alloc = allocator;
 	
 	String_Init_Alloc(str, lenght + 1);
+	if(str->lenght > 0)
+		Mem_Copy(str->buffer, c_str, lenght);
 	
-	Mem_Copy(str->buffer, c_str, lenght);
 	str->buffer[lenght] = 0;
 }
 

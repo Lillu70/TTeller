@@ -580,19 +580,7 @@ static void Do_Event_Editor_Text_Frame()
 		if(str.buffer == 0)
 		{
 			Init_String(&str, &s_allocator, 
-"a\n\
-aa\n\
-aaa\n\
-aaaa\n\
-aaaaa\n\
-aaaaaa\n\
-aaaaaaaa\n\
-aaaaaa\n\
-aaaaa\n\
-aaaa\n\
-aaa\n\
-aa\n\
-a");
+"");
 		}
 		
 		v2f dim = v2u::Cast<f32>(context->canvas->dim) - 50.f;

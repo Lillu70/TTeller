@@ -24,7 +24,7 @@ Declare_Timing_Tables();
 
 
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
-{
+{	
 	Win32_Init(instance, 620 * 2, 480 * 2, CW_USEDEFAULT, CW_USEDEFAULT, APP_TITLE, APP_MEMORY_SIZE);
 	
 	Platform_Calltable calltable = Win32_Get_Calltable();

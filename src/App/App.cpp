@@ -26,10 +26,6 @@ void Init_App(Platform_Calltable platform_calltable, void* app_memory, u32 app_m
 
 void Update_App(f64 delta_time, bool* update_surface)
 {
-	__m128 vA = _mm_set1_ps(1.0f);
-	__m128 vB = _mm_set1_ps(2.0f);
-	__m128 vS = _mm_add_ps(vA, vB);
-	
 	Begin_Timing_Block(internal_run_time);
 	
 	u32 app_flags = s_platform.Get_Flags();

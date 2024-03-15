@@ -21,6 +21,13 @@ union v2
 		v2<U> result = v2<U>{(U)v.x, (U)v.y};
 		return result;
 	}
+	
+	template<typename U>
+	inline v2<U> As()
+	{
+		v2<U> result = v2<U>{U(x), U(y)};
+		return result;
+	}
 };
 
 
@@ -57,7 +64,14 @@ union v3
 	template<typename U>
 	static inline v3<U> Cast(v3<T> v)
 	{
-		v3<U> result = v3<U>{(U)v.x, (U)v.y, (U).z};
+		v3<U> result = v3<U>{(U)v.x, (U)v.y, (U)v.z};
+		return result;
+	}
+	
+	template<typename U>
+	inline v2<U> As()
+	{
+		v2<U> result = v2<U>{U(x), U(y), U(z)};
 		return result;
 	}
 };
@@ -102,7 +116,14 @@ union v4
 	template<typename U>
 	static inline v4<U> Cast(v4<T> v)
 	{
-		v4<U> result = v4<U>{(U)v.x, (U)v.y, (U).z, (U).w};
+		v4<U> result = v4<U>{(U)v.x, (U)v.y, (U)v.z, (U)v.w};
+		return result;
+	}
+	
+	template<typename U>
+	inline v2<U> As()
+	{
+		v2<U> result = v2<U>{U(x), U(y), U(z), U(w)};
 		return result;
 	}
 };

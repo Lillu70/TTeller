@@ -185,16 +185,16 @@ static void Win32_Init(
 			RECT client_rect;
 			BOOL get_client_rect_result = GetClientRect(s_app.window, &client_rect);
 			
-			i32 window_width = window_rect.right - window_rect.left;
-			i32 window_height = window_rect.bottom - window_rect.top;
+			i32 _window_width = window_rect.right - window_rect.left;
+			i32 _window_height = window_rect.bottom - window_rect.top;
 			
-			i32 border_width = (window_width - client_rect.right);
-			i32 border_height = (window_height - client_rect.bottom);
+			i32 border_width = (_window_width - client_rect.right);
+			i32 border_height = (_window_height - client_rect.bottom);
 			
 			u32 scale = 1;
 			
-			i32 new_width = window_width * scale + border_width;
-			i32 new_height = window_height * scale + border_height;
+			i32 new_width = _window_width * scale + border_width;
+			i32 new_height = _window_height * scale + border_height;
 			
 			SetWindowPos(s_app.window, 0, window_rect.left, window_rect.top, new_width, new_height, 0);
 		}
@@ -225,7 +225,7 @@ static void Win32_Init(
 	
 	// Try to load XInput
 	{ 
-		HMODULE XInput_lib;
+		HMODULE XInput_lib = 0;
 		if ((XInput_lib = LoadLibraryA("xinput1_4.dll")) || (XInput_lib = LoadLibraryA("xinput1_3.dll")))
 		{
 			XInputGetState = (x_input_get_state*)GetProcAddress(XInput_lib, "XInputGetState");
@@ -387,8 +387,7 @@ static void Win32_Set_Flag(App_Flags flag, bool value)
 			
 			s_app.flags ^= (1 << (u32)App_Flags::cursor_is_visible);
 			
-			i32 c = ShowCursor(value);
-			int a = 0;
+			ShowCursor(value);
 		}break;
 		
 		case App_Flags::is_fullscreen:
