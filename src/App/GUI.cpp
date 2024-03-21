@@ -2554,7 +2554,7 @@ static void GUI_Do_ML_Input_Field(
 	v2f scroll_bar_internal_dim = scroll_bar_dim - outline_thickness * 2;
 	Rect scroll_bar_rect = Create_Rect_Center(scroll_bar_center, scroll_bar_dim);
 	
-	// TODO: Better way to capture state. Perhaps a struct?
+	// CONSIDER: Better way to capture state. Perhaps a struct?
 	if(is_selected)
 	{
 		GUI_SL_Input_Field_State* state = &context->selection_state.sl_input_field;
@@ -2725,237 +2725,236 @@ static void GUI_Do_ML_Input_Field(
 					}
 				}
 				
+				
 				b32 cursor_on_virtual_last_line = false;
 				bool cursor_on_virtual_line = false;
-				if(str->lenght > 0)
+				u32 new_cursor_write_pos;
+				
+				bool recalc;
+				do
 				{
-					u32 new_cursor_write_pos;
-					
-					bool recalc;
-					do
+					if(str->lenght == 0)
 					{
-						// These values can't be used directly,
-						// because this loop might have to restart, when the scroll bar is enabled,
-						// Therefore we take copies and write out the results after the loop.
-						new_cursor_write_pos = state->write_cursor_position;
-						i32 desired_row_jumps_cpy = desired_row_jumps;
+						cursor_line = 1;
+						line_count = 1;
+						new_cursor_write_pos = 0;
+						break;
+					}
+					
+					// These values can't be used directly,
+					// because this loop might have to restart, when the scroll bar is enabled,
+					// Therefore we take copies and write out the results after the loop.
+					new_cursor_write_pos = state->write_cursor_position;
+					i32 desired_row_jumps_cpy = desired_row_jumps;
+					
+					recalc = false;
+					cursor_on_virtual_line = false;
+					cursor_on_virtual_last_line = false;
+					cursor_line = 0;
+					line_count = 0;
+					visible_text_start = 0;
+					
+					u32 line_start = 0;
+					bool cursor_state_is_unknown = true;
+					char* str_begin = str->buffer;
+					char* str_end = str->buffer + str->lenght - 1;
+					
+					for(char* c = str_begin; c <= str_end; ++c)
+					{
+						b32 is_last_char = c == str_end;
+						b32 is_new_line = *c == '\n';
+						u32 exclusive_lenght = u32(c - str_begin) - line_start;
 						
-						recalc = false;
-						cursor_on_virtual_line = false;
-						cursor_on_virtual_last_line = false;
-						cursor_line = 0;
-						line_count = 0;
-						visible_text_start = 0;
-						
-						u32 line_start = 0;
-						bool cursor_state_is_unknown = true;
-						char* str_begin = str->buffer;
-						char* str_end = str->buffer + str->lenght - 1;
-						
-						for(char* c = str_begin; c <= str_end; ++c)
+						// CONSIDER: should be be exclusive_lenght >= view_limit_x ??? 
+						if(is_new_line || exclusive_lenght >= view_limit_x || c == str_end)
 						{
-							b32 is_last_char = c == str_end;
-							b32 is_new_line = *c == '\n';
-							u32 exclusive_lenght = u32(c - str_begin) - line_start;
+							u32 effct_len = exclusive_lenght + (is_new_line | is_last_char);
+							Assert(effct_len);
 							
-							// CONSIDER: should be be exclusive_lenght >= view_limit_x ??? 
-							if(is_new_line || exclusive_lenght >= view_limit_x || c == str_end)
+							if(line_count == state->view_offset)
+								visible_text_start = str_begin + line_start;
+							
+							// On mouse click move the cursor here.
+							if(click_in_text_region)
 							{
-								u32 effct_len = exclusive_lenght + (is_new_line | is_last_char);
-								Assert(effct_len);
-								
-								if(line_count == state->view_offset)
-									visible_text_start = str_begin + line_start;
-								
-								// On mouse click move the cursor here.
-								if(click_in_text_region)
+								if(mouse_cell.y == line_count)
 								{
-									if(mouse_cell.y == line_count)
-									{
-										u32 line_lenght = effct_len;
-										if(line_lenght > 0 && !(is_last_char && !is_new_line))
-											line_lenght -= 1;
-										
-										u32 offset = Min(mouse_cell.x, line_lenght);
-										new_cursor_write_pos = line_start + offset;										
-									}
-									else if(is_last_char && is_new_line && mouse_cell.y == line_count + 1)
-									{
-										new_cursor_write_pos = line_start + effct_len;
-									}
-								}
-								
-								
-								// --- above this line_count depends on not being incerement yet. ---
-								
-								line_count += 1;
-								
-								
-								// If this is a virual line, go back one character as,
-								// we're not actually counting this one.
-								// Dont do on last char to avoid infinite loop.
-								if(c != str_end && !is_new_line)
-									c -= 1;
-								
-								
-								// If cursor on this line.
-								// CONSIDER: Probs pull this out into a function? 
-								// - indent getting crazy and it's not really related to line counting.
-								if(cursor_state_is_unknown)
-								{
-									if(new_cursor_write_pos >= line_start &&
-										new_cursor_write_pos < line_start + effct_len + is_last_char)
-									{
-										cursor_state_is_unknown = false;
-										u32 local_line_count = line_count;
-										b32 local_is_last_char = is_last_char;
-										b32 local_is_new_line = is_new_line;
-										i32 row_jumps = 0;
-										
-										// TODO: Actually implement multi line jumps.
-										// TODO: Do testing on greater than 1 jump counts.
-										if(desired_row_jumps_cpy > 0)
-										{
-											if(local_is_last_char && local_is_new_line)
-											{
-												new_cursor_write_pos = str->lenght;
-												row_jumps = 0;
-											}
-											else
-											{
-												u32 local_line_start = line_start;
-												u32 next_line_start = line_start + effct_len;
-												u32 num_rows_counted = 0;
-												for(char* _c2 = c + 1; _c2 <= str_end; ++_c2)
-												{
-													local_is_last_char = _c2 == str_end;
-													local_is_new_line = *_c2 == '\n';
-													u32 local_exclusive_lenght = u32(_c2 - str_begin) - next_line_start;
-													if(local_is_new_line || local_exclusive_lenght >= view_limit_x || _c2 == str_end)
-													{
-														u32 local_effct_len = 
-															local_exclusive_lenght + (local_is_new_line | local_is_last_char);
-														
-														if(_c2 != str_end && !local_is_new_line)
-															_c2 -= 1;
-														
-														num_rows_counted += 1;
-														
-														u32 cursor_x_pos = new_cursor_write_pos - local_line_start;
-														local_line_start = next_line_start;
-														
-														u32 line_len = local_is_last_char && !local_is_new_line?
-															local_effct_len : local_exclusive_lenght;
-														
-														u32 collum_offset = Min(line_len, cursor_x_pos);
-														new_cursor_write_pos = next_line_start + collum_offset;
-														if(num_rows_counted == desired_row_jumps_cpy || _c2 == str_end)
-														{
-															row_jumps = num_rows_counted;
-															break;
-														}
-														
-														next_line_start += local_effct_len;
-													}
-												}											
-											}
-										}
-										else if(desired_row_jumps_cpy < 0)
-										{
-											// Special case where cursor is at the end of the string and the last character is a new line.
-											if(new_cursor_write_pos == str->lenght && local_is_new_line)
-											{
-												new_cursor_write_pos -= effct_len;
-												desired_row_jumps_cpy += 1;
-												row_jumps = 0;
-											}
-											
-											if(desired_row_jumps_cpy < 0)
-											{
-												u32 abs_desired_row_jumbs = Min(line_count - 1, u32(Abs(desired_row_jumps_cpy)));
-												Assert(abs_desired_row_jumbs <= u32(line_start_buffer_len));
-												u32 local_line_start = line_start;
-												
-												// If line_count is 1 (min possible at this point), this will underflow.
-												// abs_desired_row_jumbs, should then be 0 though so the loop will just not run.
-												u32 line_count_s2 = line_count - 2;
-												
-												for(u32 i = 0; i < abs_desired_row_jumbs; ++i)
-												{
-													u32 idx = (line_count_s2 - i) % line_start_buffer_len; 
-													u32 ls = line_start_buffer[idx];
-													u32 local_excl_line_len = 0;
-													
-													// -> now I need to know the line lenght!
-													for(char* _c2 = str_begin + ls; _c2 <= str_end; ++_c2)
-													{
-														local_is_new_line = *_c2 == '\n';
-														local_is_last_char = _c2 == str_end;
-													
-														local_excl_line_len = u32(_c2 - str_begin) - ls;
-														if(local_excl_line_len >= view_limit_x)
-														{
-															// Gone over on the next line so step back.
-															local_excl_line_len -= 1;
-															break;
-														}
-														
-														if(local_is_new_line || local_is_last_char)
-															break;
-													}
-													
-													u32 cursor_x_pos = new_cursor_write_pos - local_line_start;
-													u32 collum_offset = Min(local_excl_line_len, cursor_x_pos);
-													new_cursor_write_pos = ls + collum_offset;
-													
-													local_line_start = ls;
-												}
-											}
-										}
-										
-										cursor_on_virtual_last_line = b32(new_cursor_write_pos == str->lenght && local_is_new_line);
-										cursor_on_virtual_line = !local_is_new_line;
-										cursor_line = local_line_count + row_jumps;
-									}
+									u32 line_lenght = effct_len;
+									if(line_lenght > 0 && !(is_last_char && !is_new_line))
+										line_lenght -= 1;
 									
-									// Write into line start buffer!
-									line_start_buffer[(line_count - 1) % line_start_buffer_len] = line_start;
+									u32 offset = Min(mouse_cell.x, line_lenght);
+									new_cursor_write_pos = line_start + offset;										
 								}
-							
-								
-								if(c == str_end)
+								else if(is_last_char && is_new_line && mouse_cell.y == line_count + 1)
 								{
-									if(is_new_line)
-										line_count += 1;
-								}
-								
-								line_start += effct_len;								
-								
-								if(!enable_scroll_bar && line_count > view_limit_y)
-								{
-									enable_scroll_bar = true;
-									
-									// Calculate view limit.
-									{
-										// w: dif between text_p and p.pos twice.
-										f32 w = (text_p.x - p.rect.min.x) * 2 + scroll_bar_width;
-										view_limit_x = (u32)Floor((p.dim.x - w) / char_width);
-									}
-									recalc = true;
-									break;								
+									new_cursor_write_pos = line_start + effct_len;
 								}
 							}
-						}
+							
+							// --- above this line_count depends on not being incerement yet. ---
+							
+							line_count += 1;
+							
+							
+							// If this is a virual line, go back one character as,
+							// we're not actually counting this one.
+							// Dont do on last char to avoid infinite loop.
+							if(c != str_end && !is_new_line)
+								c -= 1;
+							
+							
+							// If cursor on this line.
+							// CONSIDER: Probs pull this out into a function? 
+							// - indent getting crazy and it's not really related to line counting.
+							if(cursor_state_is_unknown)
+							{
+								if(new_cursor_write_pos >= line_start &&
+									new_cursor_write_pos < line_start + effct_len + is_last_char)
+								{
+									cursor_state_is_unknown = false;
+									u32 local_line_count = line_count;
+									b32 local_is_last_char = is_last_char;
+									b32 local_is_new_line = is_new_line;
+									i32 row_jumps = 0;
+									
+									if(desired_row_jumps_cpy > 0)
+									{
+										if(local_is_last_char && local_is_new_line)
+										{
+											new_cursor_write_pos = str->lenght;
+											row_jumps = 0;
+										}
+										else
+										{
+											u32 local_line_start = line_start;
+											u32 next_line_start = line_start + effct_len;
+											u32 num_rows_counted = 0;
+											for(char* _c2 = c + 1; _c2 <= str_end; ++_c2)
+											{
+												local_is_last_char = _c2 == str_end;
+												local_is_new_line = *_c2 == '\n';
+												u32 local_exclusive_lenght = u32(_c2 - str_begin) - next_line_start;
+												if(local_is_new_line || local_exclusive_lenght >= view_limit_x || _c2 == str_end)
+												{
+													u32 local_effct_len = 
+														local_exclusive_lenght + (local_is_new_line | local_is_last_char);
+													
+													if(_c2 != str_end && !local_is_new_line)
+														_c2 -= 1;
+													
+													num_rows_counted += 1;
+													
+													u32 cursor_x_pos = new_cursor_write_pos - local_line_start;
+													local_line_start = next_line_start;
+													
+													u32 line_len = local_is_last_char && !local_is_new_line?
+														local_effct_len : local_exclusive_lenght;
+													
+													u32 collum_offset = Min(line_len, cursor_x_pos);
+													new_cursor_write_pos = next_line_start + collum_offset;
+													if(num_rows_counted == desired_row_jumps_cpy || _c2 == str_end)
+													{
+														row_jumps = num_rows_counted;
+														break;
+													}
+													
+													next_line_start += local_effct_len;
+												}
+											}											
+										}
+									}
+									else if(desired_row_jumps_cpy < 0)
+									{
+										// Special case where cursor is at the end of the string and the last character is a new line.
+										if(new_cursor_write_pos == str->lenght && local_is_new_line)
+										{
+											new_cursor_write_pos -= effct_len;
+											desired_row_jumps_cpy += 1;
+											row_jumps = 0;
+										}
+										
+										if(desired_row_jumps_cpy < 0)
+										{
+											u32 abs_desired_row_jumbs = Min(line_count - 1, u32(Abs(desired_row_jumps_cpy)));
+											Assert(abs_desired_row_jumbs <= u32(line_start_buffer_len));
+											u32 local_line_start = line_start;
+											
+											// If line_count is 1 (min possible at this point), this will underflow.
+											// abs_desired_row_jumbs, should then be 0 though so the loop will just not run.
+											u32 line_count_s2 = line_count - 2;
+											
+											for(u32 i = 0; i < abs_desired_row_jumbs; ++i)
+											{
+												u32 idx = (line_count_s2 - i) % line_start_buffer_len; 
+												u32 ls = line_start_buffer[idx];
+												u32 local_excl_line_len = 0;
+												
+												// -> now I need to know the line lenght!
+												for(char* _c2 = str_begin + ls; _c2 <= str_end; ++_c2)
+												{
+													local_is_new_line = *_c2 == '\n';
+													local_is_last_char = _c2 == str_end;
+												
+													local_excl_line_len = u32(_c2 - str_begin) - ls;
+													if(local_excl_line_len >= view_limit_x)
+													{
+														// Gone over on the next line so step back.
+														local_excl_line_len -= 1;
+														break;
+													}
+													
+													if(local_is_new_line || local_is_last_char)
+														break;
+												}
+												
+												u32 cursor_x_pos = new_cursor_write_pos - local_line_start;
+												u32 collum_offset = Min(local_excl_line_len, cursor_x_pos);
+												new_cursor_write_pos = ls + collum_offset;
+												
+												local_line_start = ls;
+											}
+										}
+									}
+									
+									cursor_on_virtual_last_line = b32(new_cursor_write_pos == str->lenght && local_is_new_line);
+									cursor_on_virtual_line = !local_is_new_line;
+									cursor_line = local_line_count + row_jumps;
+								}
+								
+								// Write into line start buffer!
+								line_start_buffer[(line_count - 1) % line_start_buffer_len] = line_start;
+							}
 						
-					}while(recalc);
+							
+							if(c == str_end)
+							{
+								if(is_new_line)
+									line_count += 1;
+							}
+							
+							line_start += effct_len;								
+							
+							if(!enable_scroll_bar && line_count > view_limit_y)
+							{
+								enable_scroll_bar = true;
+								
+								// Calculate view limit.
+								{
+									// w: dif between text_p and p.pos twice.
+									f32 w = (text_p.x - p.rect.min.x) * 2 + scroll_bar_width;
+									view_limit_x = (u32)Floor((p.dim.x - w) / char_width);
+								}
+								recalc = true;
+								break;								
+							}
+						}
+					}
 					
-					state->write_cursor_position = new_cursor_write_pos;
-				}
-				else
-				{
-					cursor_line = 1;
-					line_count = 1;
-				}
+				}while(recalc);
+				
+				state->write_cursor_position = new_cursor_write_pos;
+			
 				
 				Assert(line_count > 0);
 				Assert(cursor_line > 0);	
