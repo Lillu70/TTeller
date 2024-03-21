@@ -2474,8 +2474,8 @@ static bool GUI_Do_SL_Input_Field(
 
 // TODO: 
 // Navigation
-//	-KB [X]
-//	-Mouse
+//	-KB 
+//	-Mouse [X]
 // Area selection (kb and mouse)
 // Cursor color on character limit
 // Cursor flicker
@@ -2573,7 +2573,9 @@ static void GUI_Do_ML_Input_Field(
 				state->is_active = false;
 				state->view_offset = 0;
 				
-				u32 mask = GUI_Context_Flags::cursor_mask_validation | GUI_Context_Flags::disable_kc_navigation;
+				u32 mask = GUI_Context_Flags::cursor_mask_validation | 
+					GUI_Context_Flags::disable_kc_navigation;
+				
 				Inverse_Bit_Mask(&context->flags, mask);
 			}
 			else
@@ -2593,179 +2595,18 @@ static void GUI_Do_ML_Input_Field(
 				
 				u32 wcp = state->write_cursor_position;
 				
-				if(!navigation)
-				{
-					GUI_Input_Field_Insert_Characters(
-						context->platform, 
-						state, 
-						str, 
-						character_limit, 
-						state->write_cursor_position,
-						true,
-						character_check);					
-				}
-				
-				f64 time = context->platform->Get_Time_Stamp();
-				
+				i32 desired_row_jumps = 0;
 				bool click_in_text_region = false;
 				v2u mouse_cell;
-				if(mouse_is_down)
-				{
-					v2f mouse_rel_pos = text_p + v2f{0, char_height};	
-					v2f rel_mouse_pos = context->cursor_fpos - mouse_rel_pos;
-					rel_mouse_pos.y *= -1;
-					v2f cell_dim = v2f{char_width, char_height};
-					
-					// This depends on underflow.
-					v2f fcell = Hadamar_Division(rel_mouse_pos, cell_dim);
-					fcell.x = Round(fcell.x);
-					
-					mouse_cell = fcell.As<u32>();
-					if(mouse_cell.x <= view_limit_x && mouse_cell.y <= view_limit_y)
-					{
-						mouse_cell.y += state->view_offset;
-						click_in_text_region = true;
-					}
-				}
 				
+				u32 line_start_buffer[16] = {};
+				i32 line_start_buffer_len = Array_Lenght(line_start_buffer);
 				
-				// Count the number of virtual and real new lines.
-				// If the line count exceeds the view limit, then a scroll bar is enabled and
-				// because that effects the view_limit_x counting has to be restarted.
-				if(str->lenght > view_limit_x * view_limit_y)
-				{
-					enable_scroll_bar = true;
-					
-					// Calculate view limit.
-					{
-						// w: dif between text_p and p.pos twice.
-						f32 w = (text_p.x - p.rect.min.x) * 2 + scroll_bar_width;
-						view_limit_x = (u32)Floor((p.dim.x - w) / char_width);
-					}
-				}
-				
-				u32 characters_before_cursor;
-				u32 characters_on_line_preceding_cursor;
-				bool cursor_on_virtual_line;
-				if(str->lenght > 0)
-				{
-					bool recalc;
-					do
-					{
-						recalc = false;
-						
-						cursor_line = 0;
-						line_count = 0;
-						characters_before_cursor = 0;
-						characters_on_line_preceding_cursor = 0;
-						visible_text_start = 0;
-						
-						u32 characters_on_last_line = 0;
-						u32 line_start = 0;
-						char* str_begin = str->buffer;
-						char* str_end = str->buffer + str->lenght - 1;
-						for(char* c = str_begin; c <= str_end; ++c)
-						{
-							b32 is_last_char = c == str_end;
-							b32 is_new_line = *c == '\n';
-							u32 exclusive_lenght = u32(c - str_begin) - line_start;
-							
-							if(is_new_line || exclusive_lenght >= view_limit_x || c == str_end)
-							{
-								u32 effct_len = exclusive_lenght + (is_new_line | is_last_char);
-								Assert(effct_len);
-								
-								if(line_count == state->view_offset)
-									visible_text_start = str_begin + line_start;
-								
-								// On mouse click move the cursor here.
-								if(click_in_text_region)
-								{
-									if(mouse_cell.y == line_count)
-									{
-										u32 line_lenght = effct_len;
-										if(line_lenght > 0 && !(is_last_char && !is_new_line))
-											line_lenght -= 1;
-										
-										u32 offset = Min(mouse_cell.x, line_lenght);
-										state->write_cursor_position = line_start + offset;										
-									}
-									else if(is_last_char && is_new_line && mouse_cell.y == line_count + 1)
-									{
-										state->write_cursor_position = line_start + effct_len;
-									}
-								}
-								
-								// --- above this line_count depends on not being incerement yet. ---
-								
-								line_count += 1;
-								
-								// If cursor on this line.
-								if(state->write_cursor_position >= line_start &&
-									state->write_cursor_position < line_start + effct_len + is_last_char)
-								{
-									if(is_last_char && is_new_line)
-									{
-										characters_before_cursor = state->write_cursor_position - (line_start + effct_len);
-										characters_on_line_preceding_cursor = state->write_cursor_position - line_start;
-									}
-									else
-									{
-										characters_before_cursor = state->write_cursor_position - line_start;
-										characters_on_line_preceding_cursor = characters_on_last_line;										
-									}
-									cursor_on_virtual_line = !is_new_line;
-									cursor_line = line_count;
-								}
-								
-								{									
-									if(c == str_end)
-									{
-										if(is_new_line)
-											line_count += 1;
-									}
-									// If this is a virual line, go back one character as,
-									// we're not actually counting this one.
-									// Dont do on last char to avoid infinite loop.
-									else if(!is_new_line)
-										c -= 1;
-								}
-								
-								line_start += effct_len;
-								
-								characters_on_last_line = effct_len;
-								
-								if(!enable_scroll_bar && line_count == view_limit_y)
-								{
-									enable_scroll_bar = true;
-									
-									// Calculate view limit.
-									{
-										// w: dif between text_p and p.pos twice.
-										f32 w = (text_p.x - p.rect.min.x) * 2 + scroll_bar_width;
-										view_limit_x = (u32)Floor((p.dim.x - w) / char_width);
-									}
-									recalc = true;
-
-									break;								
-								}
-							}
-						}
-						
-					}while(recalc);
-				}
-				else
-				{
-					cursor_line = 1;
-					line_count = 1;
-				}
-				
-				Assert(line_count > 0);
-				Assert(cursor_line > 0);	
-				
-				// Navigation.
 				if(navigation)
 				{
+					bool shift_down = context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT) || 
+						context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT);
+					
 					if(context->actions[GUI_Menu_Actions::left].Is_Pressed() ||
 						context->actions[GUI_Menu_Actions::right].Is_Pressed() || 
 						context->actions[GUI_Menu_Actions::up].Is_Pressed() ||
@@ -2777,6 +2618,8 @@ static void GUI_Do_ML_Input_Field(
 					
 					f64* inp_start_t = &state->input_start_time;
 					f64* next_inp_t = &state->next_input_time;
+					
+					f64 time = context->platform->Get_Time_Stamp();
 					GUI_Input_Acceleration_Behavior* kca = &keyboard_acceleration;
 					
 					// Arrowkey/controller input 
@@ -2810,110 +2653,319 @@ static void GUI_Do_ML_Input_Field(
 
 					while(up_is_down && GUI_Accelerated_Tick(kca, time, inp_start_t, next_inp_t))
 					{
-						if(cursor_line > 1)
+						desired_row_jumps -= 1;
+						if(shift_down)
 						{
-							// TODO: Make this framerate independant again.
-							// NOTE: This only works once per frame, so the FPS "fall behind" correction will not work.
-							
-							
-							u32 move_amount = view_limit_x;
-							bool starts_at_new_line = str->buffer[state->write_cursor_position] == '\n';
-							
-							for(u32 i = characters_before_cursor; i < move_amount; ++i)
-							{
-								if(state->write_cursor_position - i >= str->lenght) // Can't check < than 0 on unsigned value.
-									break;
-								
-								if(str->buffer[state->write_cursor_position - i] == '\n')
-								{
-									if(starts_at_new_line)
-									{
-										move_amount = characters_before_cursor==0? 1 : i;
-									}
-									else if(characters_on_line_preceding_cursor - 1 >= characters_before_cursor)
-									{
-										move_amount = characters_on_line_preceding_cursor;
-									}
-									else
-									{
-										move_amount = characters_before_cursor + 1;
-									}
-									break;
-								}
-							}
-							
-							
-							u32 pcl = cursor_line;
-							cursor_line -= 1;
-							state->write_cursor_position -= move_amount;
-							if(state->write_cursor_position > wcp)
-							{
-								state->write_cursor_position = 0;
-								cursor_line = pcl;
-							}							
+							desired_row_jumps -= 2;
 						}
 					}
 					
+					
 					while(down_is_down && GUI_Accelerated_Tick(kca, time, inp_start_t, next_inp_t))
 					{
-						
-						u32 move_amount = view_limit_x;
-						
-						bool starts_at_new_line = str->buffer[state->write_cursor_position] == '\n';
-						
-						for(u32 i = 1; i < move_amount; ++i)
+						desired_row_jumps += 1;
+						if(shift_down)
 						{
-							if(state->write_cursor_position + i >= str->lenght)
-								break;
-							
-							if(str->buffer[state->write_cursor_position + i] == '\n')
-							{
-								// If on a virtual line, the line can not end in a new line, therefore
-								// if we find a new a new line snap to it.
-								if(starts_at_new_line || cursor_on_virtual_line)
-								{
-									move_amount = i;
-								}
-								else
-								{
-									// TODO: Keep track of next line lenght as well to simplify this.
-									// If the next line has enough less characters than this one,
-									// this will move the cursor on to the line under, but if it has less, 
-									// this will overshoot. Potentially by a lot.
-									
-									move_amount = characters_before_cursor + i + 1;
-									
-									// So then have to check that we're not skipping any new lines.
-									for(u32 y = i + 1; y < move_amount; ++y)
-									{
-										if(state->write_cursor_position + y >= str->lenght)
-											break; // TODO: Figure out what should happen here.
-										
-										if(str->buffer[state->write_cursor_position + y] == '\n')
-										{
-											move_amount = y;
-											break;
-										}
-									}
-								}
-								break;
-							}
+							desired_row_jumps += 2;
 						}
+					}						
+					
+					
+					if(mouse_is_down)
+					{
+						desired_row_jumps = 0;
+						v2f mouse_rel_pos = text_p + v2f{0, char_height};	
+						v2f rel_mouse_pos = context->cursor_fpos - mouse_rel_pos;
+						rel_mouse_pos.y *= -1;
+						v2f cell_dim = v2f{char_width, char_height};
 						
-						u32 pcl = cursor_line;
-						cursor_line += 1;
-						state->write_cursor_position += move_amount;
-						if(state->write_cursor_position > str->lenght)
+						// This depends on underflow.
+						v2f fcell = Hadamar_Division(rel_mouse_pos, cell_dim);
+						fcell.x = Round(fcell.x);
+						
+						mouse_cell = fcell.As<u32>();
+						if(mouse_cell.x <= view_limit_x && mouse_cell.y <= view_limit_y)
 						{
-							state->write_cursor_position = str->lenght;
-							cursor_line = pcl;
+							mouse_cell.y += state->view_offset;
+							click_in_text_region = true;
 						}
+					}
+					
+					// NOTE: Because of how jumping up rows, has to work, it requires use of memory.
+					// So the max up jumps "min number" has to be limited to size of the array.
+					if(desired_row_jumps < -line_start_buffer_len)
+						desired_row_jumps = -line_start_buffer_len;
+				
+				}
+				else
+				{
+					GUI_Input_Field_Insert_Characters(
+						context->platform, 
+						state, 
+						str, 
+						character_limit, 
+						state->write_cursor_position,
+						true,
+						character_check);					
+				}
+				
+				
+				// Count the number of virtual and real new lines.
+				// If the line count exceeds the view limit, then a scroll bar is enabled and
+				// because that effects the view_limit_x counting has to be restarted.
+				if(str->lenght > view_limit_x * view_limit_y)
+				{
+					enable_scroll_bar = true;
+					
+					// Calculate view limit.
+					{
+						// w: dif between text_p and p.pos twice.
+						f32 w = (text_p.x - p.rect.min.x) * 2 + scroll_bar_width;
+						view_limit_x = (u32)Floor((p.dim.x - w) / char_width);
 					}
 				}
 				
+				b32 cursor_on_virtual_last_line = false;
+				bool cursor_on_virtual_line = false;
+				if(str->lenght > 0)
+				{
+					u32 new_cursor_write_pos;
+					
+					bool recalc;
+					do
+					{
+						// These values can't be used directly,
+						// because this loop might have to restart, when the scroll bar is enabled,
+						// Therefore we take copies and write out the results after the loop.
+						new_cursor_write_pos = state->write_cursor_position;
+						i32 desired_row_jumps_cpy = desired_row_jumps;
+						
+						recalc = false;
+						cursor_on_virtual_line = false;
+						cursor_on_virtual_last_line = false;
+						cursor_line = 0;
+						line_count = 0;
+						visible_text_start = 0;
+						
+						u32 line_start = 0;
+						bool cursor_state_is_unknown = true;
+						char* str_begin = str->buffer;
+						char* str_end = str->buffer + str->lenght - 1;
+						
+						for(char* c = str_begin; c <= str_end; ++c)
+						{
+							b32 is_last_char = c == str_end;
+							b32 is_new_line = *c == '\n';
+							u32 exclusive_lenght = u32(c - str_begin) - line_start;
+							
+							// CONSIDER: should be be exclusive_lenght >= view_limit_x ??? 
+							if(is_new_line || exclusive_lenght >= view_limit_x || c == str_end)
+							{
+								u32 effct_len = exclusive_lenght + (is_new_line | is_last_char);
+								Assert(effct_len);
+								
+								if(line_count == state->view_offset)
+									visible_text_start = str_begin + line_start;
+								
+								// On mouse click move the cursor here.
+								if(click_in_text_region)
+								{
+									if(mouse_cell.y == line_count)
+									{
+										u32 line_lenght = effct_len;
+										if(line_lenght > 0 && !(is_last_char && !is_new_line))
+											line_lenght -= 1;
+										
+										u32 offset = Min(mouse_cell.x, line_lenght);
+										new_cursor_write_pos = line_start + offset;										
+									}
+									else if(is_last_char && is_new_line && mouse_cell.y == line_count + 1)
+									{
+										new_cursor_write_pos = line_start + effct_len;
+									}
+								}
+								
+								
+								// --- above this line_count depends on not being incerement yet. ---
+								
+								line_count += 1;
+								
+								
+								// If this is a virual line, go back one character as,
+								// we're not actually counting this one.
+								// Dont do on last char to avoid infinite loop.
+								if(c != str_end && !is_new_line)
+									c -= 1;
+								
+								
+								// If cursor on this line.
+								// CONSIDER: Probs pull this out into a function? 
+								// - indent getting crazy and it's not really related to line counting.
+								if(cursor_state_is_unknown)
+								{
+									if(new_cursor_write_pos >= line_start &&
+										new_cursor_write_pos < line_start + effct_len + is_last_char)
+									{
+										cursor_state_is_unknown = false;
+										u32 local_line_count = line_count;
+										b32 local_is_last_char = is_last_char;
+										b32 local_is_new_line = is_new_line;
+										i32 row_jumps = 0;
+										
+										// TODO: Actually implement multi line jumps.
+										// TODO: Do testing on greater than 1 jump counts.
+										if(desired_row_jumps_cpy > 0)
+										{
+											if(local_is_last_char && local_is_new_line)
+											{
+												new_cursor_write_pos = str->lenght;
+												row_jumps = 0;
+											}
+											else
+											{
+												u32 local_line_start = line_start;
+												u32 next_line_start = line_start + effct_len;
+												u32 num_rows_counted = 0;
+												for(char* _c2 = c + 1; _c2 <= str_end; ++_c2)
+												{
+													local_is_last_char = _c2 == str_end;
+													local_is_new_line = *_c2 == '\n';
+													u32 local_exclusive_lenght = u32(_c2 - str_begin) - next_line_start;
+													if(local_is_new_line || local_exclusive_lenght >= view_limit_x || _c2 == str_end)
+													{
+														u32 local_effct_len = 
+															local_exclusive_lenght + (local_is_new_line | local_is_last_char);
+														
+														if(_c2 != str_end && !local_is_new_line)
+															_c2 -= 1;
+														
+														num_rows_counted += 1;
+														
+														u32 cursor_x_pos = new_cursor_write_pos - local_line_start;
+														local_line_start = next_line_start;
+														
+														u32 line_len = local_is_last_char && !local_is_new_line?
+															local_effct_len : local_exclusive_lenght;
+														
+														u32 collum_offset = Min(line_len, cursor_x_pos);
+														new_cursor_write_pos = next_line_start + collum_offset;
+														if(num_rows_counted == desired_row_jumps_cpy || _c2 == str_end)
+														{
+															row_jumps = num_rows_counted;
+															break;
+														}
+														
+														next_line_start += local_effct_len;
+													}
+												}											
+											}
+										}
+										else if(desired_row_jumps_cpy < 0)
+										{
+											// Special case where cursor is at the end of the string and the last character is a new line.
+											if(new_cursor_write_pos == str->lenght && local_is_new_line)
+											{
+												new_cursor_write_pos -= effct_len;
+												desired_row_jumps_cpy += 1;
+												row_jumps = 0;
+											}
+											
+											if(desired_row_jumps_cpy < 0)
+											{
+												u32 abs_desired_row_jumbs = Min(line_count - 1, u32(Abs(desired_row_jumps_cpy)));
+												Assert(abs_desired_row_jumbs <= u32(line_start_buffer_len));
+												u32 local_line_start = line_start;
+												
+												// If line_count is 1 (min possible at this point), this will underflow.
+												// abs_desired_row_jumbs, should then be 0 though so the loop will just not run.
+												u32 line_count_s2 = line_count - 2;
+												
+												for(u32 i = 0; i < abs_desired_row_jumbs; ++i)
+												{
+													u32 idx = (line_count_s2 - i) % line_start_buffer_len; 
+													u32 ls = line_start_buffer[idx];
+													u32 local_excl_line_len = 0;
+													
+													// -> now I need to know the line lenght!
+													for(char* _c2 = str_begin + ls; _c2 <= str_end; ++_c2)
+													{
+														local_is_new_line = *_c2 == '\n';
+														local_is_last_char = _c2 == str_end;
+													
+														local_excl_line_len = u32(_c2 - str_begin) - ls;
+														if(local_excl_line_len >= view_limit_x)
+														{
+															// Gone over on the next line so step back.
+															local_excl_line_len -= 1;
+															break;
+														}
+														
+														if(local_is_new_line || local_is_last_char)
+															break;
+													}
+													
+													u32 cursor_x_pos = new_cursor_write_pos - local_line_start;
+													u32 collum_offset = Min(local_excl_line_len, cursor_x_pos);
+													new_cursor_write_pos = ls + collum_offset;
+													
+													local_line_start = ls;
+												}
+											}
+										}
+										
+										cursor_on_virtual_last_line = b32(new_cursor_write_pos == str->lenght && local_is_new_line);
+										cursor_on_virtual_line = !local_is_new_line;
+										cursor_line = local_line_count + row_jumps;
+									}
+									
+									// Write into line start buffer!
+									line_start_buffer[(line_count - 1) % line_start_buffer_len] = line_start;
+								}
+							
+								
+								if(c == str_end)
+								{
+									if(is_new_line)
+										line_count += 1;
+								}
+								
+								line_start += effct_len;								
+								
+								if(!enable_scroll_bar && line_count > view_limit_y)
+								{
+									enable_scroll_bar = true;
+									
+									// Calculate view limit.
+									{
+										// w: dif between text_p and p.pos twice.
+										f32 w = (text_p.x - p.rect.min.x) * 2 + scroll_bar_width;
+										view_limit_x = (u32)Floor((p.dim.x - w) / char_width);
+									}
+									recalc = true;
+									break;								
+								}
+							}
+						}
+						
+					}while(recalc);
+					
+					state->write_cursor_position = new_cursor_write_pos;
+				}
+				else
+				{
+					cursor_line = 1;
+					line_count = 1;
+				}
+				
+				Assert(line_count > 0);
+				Assert(cursor_line > 0);	
+				Assert(cursor_line <= line_count);
+				
 				// View offset snapping.
 				{
-					if(line_count == 0)
+					u32 adj_cl = cursor_line + cursor_on_virtual_last_line;
+					
+					if(line_count == 0 || !enable_scroll_bar)
 					{
 						state->view_offset = 0;
 						visible_text_start = 0;
@@ -2928,16 +2980,16 @@ static void GUI_Do_ML_Input_Field(
 						}
 					}
 					
-					if(cursor_line <= state->view_offset)
+					if(adj_cl <= state->view_offset)
 					{
 						visible_text_start = 0;
-						state->view_offset = cursor_line - 1;
+						state->view_offset = adj_cl - 1;
 					}
 					
-					if(cursor_line > state->view_offset + view_limit_y)
+					if(adj_cl > state->view_offset + view_limit_y)
 					{
 						visible_text_start = 0;
-						state->view_offset = cursor_line - view_limit_y;
+						state->view_offset = adj_cl - view_limit_y;
 					}
 				}
 				
@@ -3002,14 +3054,13 @@ static void GUI_Do_ML_Input_Field(
 		char* str_begin; 
 		char* str_end = str->buffer + str->lenght - ((str->lenght > 0)? 1 : 0);
 		u32 effctive_offset;
-		u32 effective_cursor_line = cursor_line;
 		
 		// If the draw starting point is known, skip up to it. Otherwise; start from the begining...
 		if(visible_text_start)
 		{
 			str_begin = visible_text_start;
 			effctive_offset = 0;
-			effective_cursor_line -= view_offset;
+			cursor_line -= view_offset;
 		}
 		else
 		{
@@ -3039,7 +3090,7 @@ static void GUI_Do_ML_Input_Field(
 					String_View view = {str_begin + line_start, exclusive_lenght + is_last_char};
 					Draw_Text(context->canvas, view, text_p, text_color, font, text_scale);
 					
-					if(draw_cursor && line_num == effective_cursor_line)
+					if(draw_cursor && line_num == cursor_line)
 					{
 						draw_cursor = false;
 						v2f cursor_p = text_p;
@@ -3077,25 +3128,5 @@ static void GUI_Do_ML_Input_Field(
 					break;
 			}
 		}
-
-		#if 0
-		// Drawing cursor on last line
-		// CONSIDER: a lambda?
-		if(draw_cursor)
-		{
-			v2f cursor_p = text_p;
-			u32 begin_offset = u32(str_begin - str->buffer);
-			cursor_p.x += f32(write_cursor_position - line_start - begin_offset) * char_width;
-
-			Color cursor_color = (str->lenght < character_limit || character_limit == 0)? 
-				theme->write_cursor_color : theme->write_cursor_limit_color;
-			
-			Draw_Vertical_Line(
-				context->canvas, 
-				cursor_p, 
-				f32(font->char_height) * text_scale.y, 
-				cursor_color);
-		}
-		#endif
 	}
 }

@@ -28,6 +28,17 @@ static inline void Swap(T* a, T* b)
 	*a = *b;
 	*b = temp;
 }
+
+
+template<typename T>
+static inline T Abs(T v)
+{
+	T result = v;
+	if(result < 0)
+		result *= -1;
+	
+	return result;
+}
 #endif
 
 static inline f32 Sin(f32 value)
