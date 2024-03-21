@@ -2765,7 +2765,6 @@ static void GUI_Do_ML_Input_Field(
 						b32 is_new_line = *c == '\n';
 						u32 exclusive_lenght = u32(c - str_begin) - line_start;
 						
-						// CONSIDER: should be be exclusive_lenght >= view_limit_x ??? 
 						if(is_new_line || exclusive_lenght >= view_limit_x || c == str_end)
 						{
 							u32 effct_len = exclusive_lenght + (is_new_line | is_last_char);
@@ -2800,13 +2799,15 @@ static void GUI_Do_ML_Input_Field(
 							// If this is a virual line, go back one character as,
 							// we're not actually counting this one.
 							// Dont do on last char to avoid infinite loop.
-							if(c != str_end && !is_new_line)
+							if((c != str_end || exclusive_lenght >= view_limit_x) && !is_new_line)
+							{
 								c -= 1;
+								is_last_char = false;
+								effct_len = exclusive_lenght;
+							}
 							
 							
 							// If cursor on this line.
-							// CONSIDER: Probs pull this out into a function? 
-							// - indent getting crazy and it's not really related to line counting.
 							if(cursor_state_is_unknown)
 							{
 								if(new_cursor_write_pos >= line_start &&
@@ -2913,6 +2914,7 @@ static void GUI_Do_ML_Input_Field(
 												new_cursor_write_pos = ls + collum_offset;
 												
 												local_line_start = ls;
+												row_jumps -= 1;
 											}
 										}
 									}
@@ -3054,6 +3056,8 @@ static void GUI_Do_ML_Input_Field(
 		char* str_end = str->buffer + str->lenght - ((str->lenght > 0)? 1 : 0);
 		u32 effctive_offset;
 		
+		Assert(cursor_line - view_offset <= view_limit_y);
+		
 		// If the draw starting point is known, skip up to it. Otherwise; start from the begining...
 		if(visible_text_start)
 		{
@@ -3078,18 +3082,25 @@ static void GUI_Do_ML_Input_Field(
 			b32 is_new_line = *c == '\n';
 			b32 is_last_char = c == str_end;
 			
+			
 			if(is_new_line || exclusive_lenght >= view_limit_x || is_last_char)
 			{
-				line_num += 1;
+				if((!is_last_char || exclusive_lenght >= view_limit_x) && !is_new_line)
+				{
+					c -= 1;
+					is_last_char = false;
+				}
 				
 				if(line_num >= effctive_offset)
 				{
 					lines_drawn += 1;
+					if(lines_drawn > view_limit_y)
+						break;
 					
 					String_View view = {str_begin + line_start, exclusive_lenght + is_last_char};
 					Draw_Text(context->canvas, view, text_p, text_color, font, text_scale);
 					
-					if(draw_cursor && line_num == cursor_line)
+					if(draw_cursor && line_num + 1 == cursor_line)
 					{
 						draw_cursor = false;
 						v2f cursor_p = text_p;
@@ -3100,6 +3111,8 @@ static void GUI_Do_ML_Input_Field(
 						else
 						{
 							u32 begin_offset = u32(str_begin - str->buffer);
+							
+							Assert(line_start + begin_offset <= write_cursor_position);
 							cursor_p.x += f32(write_cursor_position - line_start - begin_offset) * char_width;							
 						}
 						
@@ -3111,6 +3124,9 @@ static void GUI_Do_ML_Input_Field(
 							cursor_p, 
 							f32(font->char_height) * text_scale.y, 
 							cursor_color);
+							
+						Rect cursor_rect = Create_Rect_Min_Dim(cursor_p, v2f{char_width, char_height});
+						Draw_Filled_Rect(context->canvas, cursor_rect, MAGENTA);	
 					}
 					
 					text_p.y -= char_height;
@@ -3118,13 +3134,9 @@ static void GUI_Do_ML_Input_Field(
 				
 				line_start += exclusive_lenght;
 				if(is_new_line)
-					line_start += 1;
+					line_start += 1;	
 				
-				else if(!is_last_char)
-					--c;
-				
-				if(lines_drawn >= view_limit_y)
-					break;
+				line_num += 1;
 			}
 		}
 	}
