@@ -166,6 +166,7 @@ struct GUI_Dropdown_Button_State
 };
 
 
+// NOTE: Is actually used for ML as well atm.
 struct GUI_SL_Input_Field_State
 {
 	u32 view_offset = 0;
@@ -173,16 +174,21 @@ struct GUI_SL_Input_Field_State
 	u32 text_select_start_point = 0;
 	u32 mouse_press_down_point = 0;
 	u32 click_p = 0;
+	
+	v2f mouse_scroll_bar_drag_offset = v2f{0, 0};
+	
 	f64 flicker_start_time = 0;
 	f64 next_input_time = 0;
 	f64 input_start_time = 0;
 	f64 mouse_hold_time = 0;
 	
+	// CONSIDER: Flags?
+	bool scroll_bar_drag_mode = 0;
 	bool text_select_mode = 0;
-	bool handel_drag_mode = 0;
 	bool is_pressed_down = 0;
 	bool is_active = 0;
 	bool draw_cursor = 0;
+	bool cursor_is_active = 0; // NOTE: ML only?
 
 	static constexpr f64 mouse_hold_delay = 0.1;
 	static constexpr f64 flicker_delay = 3.0;

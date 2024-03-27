@@ -2004,6 +2004,7 @@ static u32 GUI_Do_Dropdown_Button(
 }
 
 
+// TODO: Scroll bar understanding is much improved, so redo that code: this should also fix the related bug.
 static bool GUI_Do_SL_Input_Field(
 	GUI_Context* context, 
 	v2f* pos, 
@@ -2283,11 +2284,11 @@ static bool GUI_Do_SL_Input_Field(
 						
 						if(mouse_pressed_down && Is_Point_Inside_Rect(context->cursor_fpos, bar_rect))
 						{
-							state->handel_drag_mode = true;
+							state->scroll_bar_drag_mode = true;
 							state->text_select_mode = false;
 						}
 						
-						if(state->handel_drag_mode)
+						if(state->scroll_bar_drag_mode)
 						{
 							if(mouse_is_down)
 							{
@@ -2314,7 +2315,7 @@ static bool GUI_Do_SL_Input_Field(
 								}
 							}
 							else
-								state->handel_drag_mode = false;
+								state->scroll_bar_drag_mode = false;
 						}
 					}
 				}		
@@ -2477,9 +2478,9 @@ static bool GUI_Do_SL_Input_Field(
 // Area selection (kb and mouse)
 // Cursor color on character limit
 // Cursor flicker
-// Bar controls
 // Lookahead
 // Sensible minimums.
+// BUG FIX: Using the mouse selecting a last line that has only one character selectes the wrong one. (minor). 
 
 static void GUI_Do_ML_Input_Field(
 	GUI_Context* context, 
@@ -2548,6 +2549,8 @@ static void GUI_Do_ML_Input_Field(
 	u32 view_offset = 0;
 	char* visible_text_start = 0;
 	
+	f32 handle_height = 0;
+	v2f handle_center = v2f{0, 0};
 	v2f scroll_bar_center = v2f{p.rect.max.x - scroll_bar_width / 2, p.pos.y};
 	v2f scroll_bar_dim = v2f{scroll_bar_width, p.dim.y};
 	v2f scroll_bar_internal_dim = scroll_bar_dim - outline_thickness * 2;
@@ -2601,103 +2604,117 @@ static void GUI_Do_ML_Input_Field(
 				u32 line_start_buffer[16] = {};
 				i32 line_start_buffer_len = Array_Lenght(line_start_buffer);
 				
+				// If the line count exceeds the view limit, then a scroll bar is enabled and
+				// because that effects the view_limit_x counting has to be restarted.
+				if(str->lenght > view_limit_x * view_limit_y)
+				{
+					enable_scroll_bar = true;
+					
+					// Calculate view limit.
+					{
+						// w: dif between text_p and p.pos twice.
+						f32 w = (text_p.x - p.rect.min.x) * 2 + scroll_bar_width;
+						view_limit_x = (u32)Floor((p.dim.x - w) / char_width);
+					}
+				}
+				
 				if(navigation)
 				{	
-					bool shift_down = context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT) || 
-						context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT);
-					
-					if(context->actions[GUI_Menu_Actions::left].Is_Pressed() ||
-						context->actions[GUI_Menu_Actions::right].Is_Pressed() || 
-						context->actions[GUI_Menu_Actions::up].Is_Pressed() ||
-						context->actions[GUI_Menu_Actions::down].Is_Pressed())
+					if(!state->scroll_bar_drag_mode)
 					{
-						state->input_start_time = 0;
-						state->next_input_time = 0;
-					}
-					
-					f64* inp_start_t = &state->input_start_time;
-					f64* next_inp_t = &state->next_input_time;
-					
-					f64 time = context->platform->Get_Time_Stamp();
-					GUI_Input_Acceleration_Behavior* kca = &keyboard_acceleration;
-					
-					// Arrowkey/controller input 
-					while(left_is_down && GUI_Accelerated_Tick(kca, time, inp_start_t, next_inp_t))
-					{
-						state->write_cursor_position -= 1;
+						bool shift_down = context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT) || 
+							context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT);
 						
-						if(state->write_cursor_position > wcp)
+						if(context->actions[GUI_Menu_Actions::left].Is_Pressed() ||
+							context->actions[GUI_Menu_Actions::right].Is_Pressed() || 
+							context->actions[GUI_Menu_Actions::up].Is_Pressed() ||
+							context->actions[GUI_Menu_Actions::down].Is_Pressed())
 						{
-							if(context->actions[GUI_Menu_Actions::left].Is_Pressed())
-								state->write_cursor_position = str->lenght;	
+							state->input_start_time = 0;
+							state->next_input_time = 0;
+						}
+						
+						f64* inp_start_t = &state->input_start_time;
+						f64* next_inp_t = &state->next_input_time;
+						
+						f64 time = context->platform->Get_Time_Stamp();
+						GUI_Input_Acceleration_Behavior* kca = &keyboard_acceleration;
+						
+						// Arrowkey/controller input 
+						while(left_is_down && GUI_Accelerated_Tick(kca, time, inp_start_t, next_inp_t))
+						{
+							state->write_cursor_position -= 1;
 							
-							else
-								state->write_cursor_position = wcp;
+							if(state->write_cursor_position > wcp)
+							{
+								if(context->actions[GUI_Menu_Actions::left].Is_Pressed())
+									state->write_cursor_position = str->lenght;	
+								
+								else
+									state->write_cursor_position = wcp;
+							}
 						}
-					}
-				
-					while(right_is_down && GUI_Accelerated_Tick(kca, time, inp_start_t, next_inp_t))
-					{	
-						state->write_cursor_position += 1;
-						
-						if(state->write_cursor_position > str->lenght)
-						{
-							if(context->actions[GUI_Menu_Actions::right].Is_Pressed())
-								state->write_cursor_position = 0;
-							else
-								state->write_cursor_position = wcp;
+					
+						while(right_is_down && GUI_Accelerated_Tick(kca, time, inp_start_t, next_inp_t))
+						{	
+							state->write_cursor_position += 1;
+							
+							if(state->write_cursor_position > str->lenght)
+							{
+								if(context->actions[GUI_Menu_Actions::right].Is_Pressed())
+									state->write_cursor_position = 0;
+								else
+									state->write_cursor_position = wcp;
+							}
 						}
-					}
 
-					while(up_is_down && GUI_Accelerated_Tick(kca, time, inp_start_t, next_inp_t))
-					{
-						desired_row_jumps -= 1;
-						if(shift_down)
+						while(up_is_down && GUI_Accelerated_Tick(kca, time, inp_start_t, next_inp_t))
 						{
-							desired_row_jumps -= 2;
+							desired_row_jumps -= 1;
+							if(shift_down)
+							{
+								desired_row_jumps -= 2;
+							}
 						}
+						
+						
+						while(down_is_down && GUI_Accelerated_Tick(kca, time, inp_start_t, next_inp_t))
+						{
+							desired_row_jumps += 1;
+							if(shift_down)
+							{
+								desired_row_jumps += 2;
+							}
+						}						
+						
+						
+						if(mouse_is_down && cursor_on_selection)
+						{
+							desired_row_jumps = 0;
+							
+							desired_row_jumps = 0;
+							v2f mouse_rel_pos = text_p + v2f{0, char_height};	
+							v2f rel_mouse_pos = context->cursor_fpos - mouse_rel_pos;
+							rel_mouse_pos.y *= -1;
+							v2f cell_dim = v2f{char_width, char_height};
+							
+							// This depends on underflow.
+							v2f fcell = Hadamar_Division(rel_mouse_pos, cell_dim);
+							fcell.x = Round(fcell.x);
+							
+							mouse_cell = fcell.As<u32>();
+							if(mouse_cell.x <= view_limit_x && mouse_cell.y <= view_limit_y)
+							{
+								mouse_cell.y += state->view_offset;
+								click_in_text_region = true;
+							}
+						}
+						
+						// NOTE: Because of how jumping up rows, has to work, it requires use of memory.
+						// So the max up jumps "min number" has to be limited to size of the array.
+						if(desired_row_jumps < -line_start_buffer_len)
+							desired_row_jumps = -line_start_buffer_len;	
 					}
-					
-					
-					while(down_is_down && GUI_Accelerated_Tick(kca, time, inp_start_t, next_inp_t))
-					{
-						desired_row_jumps += 1;
-						if(shift_down)
-						{
-							desired_row_jumps += 2;
-						}
-					}						
-					
-					
-					if(mouse_is_down && cursor_on_selection)
-					{
-						desired_row_jumps = 0;
-						
-						desired_row_jumps = 0;
-						v2f mouse_rel_pos = text_p + v2f{0, char_height};	
-						v2f rel_mouse_pos = context->cursor_fpos - mouse_rel_pos;
-						rel_mouse_pos.y *= -1;
-						v2f cell_dim = v2f{char_width, char_height};
-						
-						// This depends on underflow.
-						v2f fcell = Hadamar_Division(rel_mouse_pos, cell_dim);
-						fcell.x = Round(fcell.x);
-						
-						mouse_cell = fcell.As<u32>();
-						if(mouse_cell.x <= view_limit_x && mouse_cell.y <= view_limit_y)
-						{
-							mouse_cell.y += state->view_offset;
-							click_in_text_region = true;
-						}
-					}
-					
-					
-					
-					// NOTE: Because of how jumping up rows, has to work, it requires use of memory.
-					// So the max up jumps "min number" has to be limited to size of the array.
-					if(desired_row_jumps < -line_start_buffer_len)
-						desired_row_jumps = -line_start_buffer_len;
-					
 				}
 				else
 				{
@@ -2713,19 +2730,6 @@ static void GUI_Do_ML_Input_Field(
 				
 				
 				// Count the number of virtual and real new lines.
-				// If the line count exceeds the view limit, then a scroll bar is enabled and
-				// because that effects the view_limit_x counting has to be restarted.
-				if(str->lenght > view_limit_x * view_limit_y)
-				{
-					enable_scroll_bar = true;
-					
-					// Calculate view limit.
-					{
-						// w: dif between text_p and p.pos twice.
-						f32 w = (text_p.x - p.rect.min.x) * 2 + scroll_bar_width;
-						view_limit_x = (u32)Floor((p.dim.x - w) / char_width);
-					}
-				}
 				
 				b32 cursor_on_virtual_last_line = false;
 				u32 new_cursor_write_pos;
@@ -2754,7 +2758,7 @@ static void GUI_Do_ML_Input_Field(
 					visible_text_start = 0;
 					
 					u32 line_start = 0;
-					bool cursor_state_is_unknown = true;
+					bool cursor_state_is_unknown = state->cursor_is_active;
 					char* str_begin = str->buffer;
 					char* str_end = str->buffer + str->lenght - 1;
 					
@@ -2785,12 +2789,14 @@ static void GUI_Do_ML_Input_Field(
 									new_cursor_write_pos = line_start + offset;
 									cursor_line = line_count + 1;
 									cursor_state_is_unknown = false;
+									state->cursor_is_active = true;
 								}
 								else if(is_last_char && is_new_line && mouse_cell.y == line_count + 1)
 								{
 									new_cursor_write_pos = line_start + effct_len;
 									cursor_line = line_count + 1;
 									cursor_state_is_unknown = false;
+									state->cursor_is_active = true;
 									cursor_on_virtual_last_line = true;
 								}
 							}
@@ -2951,6 +2957,7 @@ static void GUI_Do_ML_Input_Field(
 									view_limit_x = (u32)Floor((p.dim.x - w) / char_width);
 								}
 								
+								// Re-calculate mouse_cell with the new view_limit_x.
 								if(mouse_is_down && cursor_on_selection)
 								{
 									click_in_text_region = false;
@@ -2980,24 +2987,10 @@ static void GUI_Do_ML_Input_Field(
 					
 				}while(recalc);
 				
-				// Scroll bar controlls ----
-				if(enable_scroll_bar)
-				{
-					bool cursor_on_scroll_bar = Is_Point_Inside_Rect(context->cursor_fpos, scroll_bar_rect);
-					
-					if(mouse_is_down && cursor_on_scroll_bar)
-					{	
-						v2f rel_mouse_pos_y = context->cursor_fpos - scroll_bar_rect.min;
-						
-						//Draw_Filled_Rect(context->canvas, Create_Rect_Min_Dim(rel_mouse_pos, v2f{100,30}), MAGENTA);
-					}
-				}
-				
-				// --
 				state->write_cursor_position = new_cursor_write_pos;
 				
 				Assert(line_count > 0);
-				Assert(cursor_line > 0);	
+				Assert(!state->cursor_is_active || cursor_line > 0);	
 				Assert(cursor_line <= line_count);
 				
 				// View offset snapping.
@@ -3019,29 +3012,106 @@ static void GUI_Do_ML_Input_Field(
 						}
 					}
 					
-					if(adj_cl <= state->view_offset)
+					if(state->cursor_is_active)
 					{
-						visible_text_start = 0;
-						state->view_offset = adj_cl - 1;
-					}
-					
-					if(adj_cl > state->view_offset + view_limit_y)
-					{
-						visible_text_start = 0;
-						state->view_offset = adj_cl - view_limit_y;
+						if(adj_cl <= state->view_offset)
+						{
+							visible_text_start = 0;
+							state->view_offset = adj_cl - 1;
+						}
+						
+						if(adj_cl > state->view_offset + view_limit_y)
+						{
+							visible_text_start = 0;
+							state->view_offset = adj_cl - view_limit_y;
+						}						
 					}
 				}
+				
+				// --- Scroll bar control ----
+				if(enable_scroll_bar)
+				{
+					// Calculate handle position/dimensions.
+					
+					f32 r = f32(view_limit_y) / f32(line_count);
+					f32 h = scroll_bar_internal_dim.y * r;
+					handle_height = Max(h, min_handle_height);
+					
+					handle_center = 
+						scroll_bar_center + v2f{0, scroll_bar_internal_dim.y / 2 - handle_height / 2};
+					
+					v2f hc_rec = handle_center;
+					
+					f32 option_space = scroll_bar_internal_dim.y - handle_height;
+					f32 option_count = f32(line_count - view_limit_y);
+					
+					f32 yoff = (option_space / option_count) * state->view_offset;
+					handle_center.y -= yoff;
+					
+					// --
+					Rect scroll_bar_internal_rect = Create_Rect_Center(scroll_bar_center, scroll_bar_internal_dim);
+					
+					if(mouse_pressed_down)
+					{
+						state->scroll_bar_drag_mode =
+							Is_Point_Inside_Rect(context->cursor_fpos, scroll_bar_internal_rect);
+						
+						if(state->scroll_bar_drag_mode)
+						{
+							Rect handle_rect = 
+								Create_Rect_Center(handle_center, v2f{scroll_bar_internal_dim.x, handle_height});
+							
+							if(Is_Point_Inside_Rect(context->cursor_fpos, handle_rect))
+								state->mouse_scroll_bar_drag_offset = handle_center - context->cursor_fpos;
+							else
+								state->mouse_scroll_bar_drag_offset = v2f{0, 0};
+						}
+					}
+					
+					if(state->scroll_bar_drag_mode)
+					{	
+						state->cursor_is_active = false;
+						cursor_line = view_offset;
+						
+				
+						f32 effective_bar_height = scroll_bar_internal_dim.y - handle_height;
+						
+						f32 rel_to_pos = scroll_bar_internal_rect.min.y + handle_height / 2;
+						
+						f32 rel_mouse_pos_y = 
+							(context->cursor_fpos.y + state->mouse_scroll_bar_drag_offset.y) - rel_to_pos;
+						
+						f32 r2 = Clamp_Zero_To_One(1.0f - (rel_mouse_pos_y / effective_bar_height));
+						
+						u32 option_space2 = line_count - view_limit_y;
+						
+						state->view_offset = (u32)Round(r2 * f32(option_space2));
+						
+						// Recalculate where the handle center is.
+						handle_center = hc_rec;
+						yoff = (option_space / option_count) * state->view_offset;
+						handle_center.y -= yoff;
+						
+						visible_text_start = 0;
+					}
+				}
+				
+				if(!enable_scroll_bar || !mouse_is_down)
+					state->scroll_bar_drag_mode = false;
+				
+				// --
 				
 				view_offset = state->view_offset;
 			}
 			
-			draw_cursor = true;
+			draw_cursor = state->cursor_is_active;
 			write_cursor_position = state->write_cursor_position;
 		}
 		else
 		{
 			if(GUI_On_Release_Action(context, cursor_on_selection, &state->is_pressed_down))
 			{
+				state->cursor_is_active = true;
 				state->is_active = true;
 				state->write_cursor_position = 0;
 				state->flicker_start_time = context->platform->Get_Time_Stamp() + state->flicker_delay;
@@ -3075,22 +3145,9 @@ static void GUI_Do_ML_Input_Field(
 				theme->outline_thickness,
 				outline_color);
 			
-			f32 r = f32(view_limit_y) / f32(line_count);
-			f32 h = scroll_bar_internal_dim.y * r;
-			f32 handle_height = Max(h, min_handle_height);
-			
-			v2f handle_center = 
-				scroll_bar_center + v2f{0, scroll_bar_internal_dim.y / 2 - handle_height / 2};
-		
-			f32 option_space = scroll_bar_internal_dim.y - handle_height;
-			f32 option_count = f32(line_count - view_limit_y);
-		
-			f32 yoff = (option_space / option_count) * view_offset;
-			
-			handle_center.y -= yoff;
 			Rect handle_rect = 
 				Create_Rect_Center(handle_center, v2f{scroll_bar_internal_dim.x, handle_height});
-			
+				
 			Draw_Filled_Rect(context->canvas, handle_rect, theme->outline_color);
 		}
 		
@@ -3099,7 +3156,7 @@ static void GUI_Do_ML_Input_Field(
 		char* str_end = str->buffer + str->lenght - ((str->lenght > 0)? 1 : 0);
 		u32 effctive_offset;
 		
-		Assert(cursor_line - view_offset <= view_limit_y);
+		Assert(!draw_cursor || cursor_line - view_offset <= view_limit_y);
 		
 		// If the draw starting point is known, skip up to it. Otherwise; start from the begining...
 		if(visible_text_start)

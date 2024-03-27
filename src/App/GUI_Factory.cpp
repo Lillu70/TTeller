@@ -25,6 +25,7 @@ struct Event_State
 	static constexpr u32 max_participent_count = 100;
 	Dynamic_Array<Participent>* participents;
 	String name;
+	String event_text;
 };
 
 
@@ -47,6 +48,7 @@ static inline Event_State* Push_New_Event(char* def_name = "Uusi tapahtuma")
 	Event_State* event = Push(&s_global_data.all_events, &s_allocator);
 	event->participents = Create_Dynamic_Array<Participent>(&s_allocator, 4);
 	Init_String(&event->name, &s_allocator, def_name);
+	Init_String(&event->event_text, &s_allocator, 128);
 	
 	return event;
 }
@@ -250,11 +252,13 @@ static void Do_All_Events_Frame()
 		{
 			Event_State* e = begin + i;
 			
+			// Destroy event
 			if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "X"))
 			{
 				Delete_All_Participants_From_Event(e);
 				s_allocator.free(e->participents);
 				e->name.free();
+				e->event_text.free();
 				Remove_Element_From_Packed_Array(begin, &s_global_data.all_events->count, sizeof(*e), i--);
 				continue;
 			}
@@ -575,20 +579,13 @@ static void Do_Event_Editor_Text_Frame()
 	}; // ----------------------------------------------------------------------------------------
 
 	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
-	{
-		static String str = {0};
-		if(str.buffer == 0)
-		{
-			Init_String(&str, &s_allocator, 
-"");
-		}
-		
+	{		
 		v2f dim = v2u::Cast<f32>(context->canvas->dim) - 50.f;
 		if(dim.x >= 0 && dim.y >= 0)
 		{
+			Event_State* event = Begin(s_global_data.all_events) + s_global_data.active_event_index;
 			
-			//dim = v2f{500, 300};
-			GUI_Do_ML_Input_Field(context, &GUI_AUTO_MIDDLE, &dim, &str, 0);			
+			GUI_Do_ML_Input_Field(context, &GUI_AUTO_MIDDLE, &dim, &event->event_text, 0);
 		}
 		
 	}; // ----------------------------------------------------------------------------------------
@@ -614,6 +611,7 @@ static void Run_Active_Menu()
 		case Menus::none:
 		{
 			#if 0
+			
 			Clear_Canvas(&s_canvas, WHITE);
 
 			GUI_Begin_Context(&s_gui, &s_platform, &s_canvas,  (Action*)&s_global_data.menu_actions, &s_theme);
@@ -628,8 +626,11 @@ static void Run_Active_Menu()
 			GUI_Do_Text(&s_gui, &p, "does 1x1 text still work?!", {}, scale);
 			
 			GUI_End_Context(&s_gui);
+			
 			#else
+			
 			s_global_data.active_menu = Menus::event_editor_text;
+			
 			#endif
 			
 		}break;
