@@ -2477,7 +2477,7 @@ static bool GUI_Do_SL_Input_Field(
 // Area selection (kb and mouse)
 // Cursor color on character limit
 // Cursor flicker
-// Bar controls/rendering
+// Bar controls
 // Lookahead
 // Sensible minimums.
 
@@ -2602,7 +2602,7 @@ static void GUI_Do_ML_Input_Field(
 				i32 line_start_buffer_len = Array_Lenght(line_start_buffer);
 				
 				if(navigation)
-				{
+				{	
 					bool shift_down = context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT) || 
 						context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT);
 					
@@ -2637,8 +2637,7 @@ static void GUI_Do_ML_Input_Field(
 					}
 				
 					while(right_is_down && GUI_Accelerated_Tick(kca, time, inp_start_t, next_inp_t))
-					{
-						
+					{	
 						state->write_cursor_position += 1;
 						
 						if(state->write_cursor_position > str->lenght)
@@ -2670,8 +2669,10 @@ static void GUI_Do_ML_Input_Field(
 					}						
 					
 					
-					if(mouse_is_down)
+					if(mouse_is_down && cursor_on_selection)
 					{
+						desired_row_jumps = 0;
+						
 						desired_row_jumps = 0;
 						v2f mouse_rel_pos = text_p + v2f{0, char_height};	
 						v2f rel_mouse_pos = context->cursor_fpos - mouse_rel_pos;
@@ -2690,11 +2691,13 @@ static void GUI_Do_ML_Input_Field(
 						}
 					}
 					
+					
+					
 					// NOTE: Because of how jumping up rows, has to work, it requires use of memory.
 					// So the max up jumps "min number" has to be limited to size of the array.
 					if(desired_row_jumps < -line_start_buffer_len)
 						desired_row_jumps = -line_start_buffer_len;
-				
+					
 				}
 				else
 				{
@@ -2724,9 +2727,7 @@ static void GUI_Do_ML_Input_Field(
 					}
 				}
 				
-				
 				b32 cursor_on_virtual_last_line = false;
-				bool cursor_on_virtual_line = false;
 				u32 new_cursor_write_pos;
 				
 				bool recalc;
@@ -2747,7 +2748,6 @@ static void GUI_Do_ML_Input_Field(
 					i32 desired_row_jumps_cpy = desired_row_jumps;
 					
 					recalc = false;
-					cursor_on_virtual_line = false;
 					cursor_on_virtual_last_line = false;
 					cursor_line = 0;
 					line_count = 0;
@@ -2777,16 +2777,21 @@ static void GUI_Do_ML_Input_Field(
 							{
 								if(mouse_cell.y == line_count)
 								{
-									u32 line_lenght = effct_len;
-									if(line_lenght > 0 && !(is_last_char && !is_new_line))
-										line_lenght -= 1;
+									u32 line_lenght = exclusive_lenght;
+									if(line_lenght > 0 && !is_new_line)
+										line_lenght += is_last_char;
 									
 									u32 offset = Min(mouse_cell.x, line_lenght);
-									new_cursor_write_pos = line_start + offset;										
+									new_cursor_write_pos = line_start + offset;
+									cursor_line = line_count + 1;
+									cursor_state_is_unknown = false;
 								}
 								else if(is_last_char && is_new_line && mouse_cell.y == line_count + 1)
 								{
 									new_cursor_write_pos = line_start + effct_len;
+									cursor_line = line_count + 1;
+									cursor_state_is_unknown = false;
+									cursor_on_virtual_last_line = true;
 								}
 							}
 							
@@ -2919,7 +2924,6 @@ static void GUI_Do_ML_Input_Field(
 									}
 									
 									cursor_on_virtual_last_line = b32(new_cursor_write_pos == str->lenght && local_is_new_line);
-									cursor_on_virtual_line = !local_is_new_line;
 									cursor_line = local_line_count + row_jumps;
 								}
 								
@@ -2946,6 +2950,28 @@ static void GUI_Do_ML_Input_Field(
 									f32 w = (text_p.x - p.rect.min.x) * 2 + scroll_bar_width;
 									view_limit_x = (u32)Floor((p.dim.x - w) / char_width);
 								}
+								
+								if(mouse_is_down && cursor_on_selection)
+								{
+									click_in_text_region = false;
+									
+									v2f mouse_rel_pos = text_p + v2f{0, char_height};	
+									v2f rel_mouse_pos = context->cursor_fpos - mouse_rel_pos;
+									rel_mouse_pos.y *= -1;
+									v2f cell_dim = v2f{char_width, char_height};
+									
+									// This depends on underflow.
+									v2f fcell = Hadamar_Division(rel_mouse_pos, cell_dim);
+									fcell.x = Round(fcell.x);
+									
+									mouse_cell = fcell.As<u32>();
+									if(mouse_cell.x <= view_limit_x && mouse_cell.y <= view_limit_y)
+									{
+										mouse_cell.y += state->view_offset;
+										click_in_text_region = true;
+									}
+								}
+								
 								recalc = true;
 								break;								
 							}
@@ -2954,8 +2980,21 @@ static void GUI_Do_ML_Input_Field(
 					
 				}while(recalc);
 				
+				// Scroll bar controlls ----
+				if(enable_scroll_bar)
+				{
+					bool cursor_on_scroll_bar = Is_Point_Inside_Rect(context->cursor_fpos, scroll_bar_rect);
+					
+					if(mouse_is_down && cursor_on_scroll_bar)
+					{	
+						v2f rel_mouse_pos_y = context->cursor_fpos - scroll_bar_rect.min;
+						
+						//Draw_Filled_Rect(context->canvas, Create_Rect_Min_Dim(rel_mouse_pos, v2f{100,30}), MAGENTA);
+					}
+				}
+				
+				// --
 				state->write_cursor_position = new_cursor_write_pos;
-			
 				
 				Assert(line_count > 0);
 				Assert(cursor_line > 0);	
@@ -3052,7 +3091,7 @@ static void GUI_Do_ML_Input_Field(
 			Rect handle_rect = 
 				Create_Rect_Center(handle_center, v2f{scroll_bar_internal_dim.x, handle_height});
 			
-			Draw_Filled_Rect(context->canvas, handle_rect, theme->outline_color);				
+			Draw_Filled_Rect(context->canvas, handle_rect, theme->outline_color);
 		}
 		
 		
