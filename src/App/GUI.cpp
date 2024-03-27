@@ -2473,14 +2473,13 @@ static bool GUI_Do_SL_Input_Field(
 
 
 // TODO: 
-// Navigation
-//	-KB 
-//	-Mouse [X]
+
 // Area selection (kb and mouse)
 // Cursor color on character limit
 // Cursor flicker
-// Bar controls
+// Bar controls/rendering
 // Lookahead
+// Sensible minimums.
 
 static void GUI_Do_ML_Input_Field(
 	GUI_Context* context, 
@@ -3037,13 +3036,18 @@ static void GUI_Do_ML_Input_Field(
 				theme->outline_thickness,
 				outline_color);
 			
-			f32 h = scroll_bar_internal_dim.y * (f32(view_limit_y) / f32(line_count));
+			f32 r = f32(view_limit_y) / f32(line_count);
+			f32 h = scroll_bar_internal_dim.y * r;
 			f32 handle_height = Max(h, min_handle_height);
-
+			
 			v2f handle_center = 
 				scroll_bar_center + v2f{0, scroll_bar_internal_dim.y / 2 - handle_height / 2};
+		
+			f32 option_space = scroll_bar_internal_dim.y - handle_height;
+			f32 option_count = f32(line_count - view_limit_y);
+		
+			f32 yoff = (option_space / option_count) * view_offset;
 			
-			f32 yoff = f32(view_offset) / f32(line_count) * scroll_bar_internal_dim.y;
 			handle_center.y -= yoff;
 			Rect handle_rect = 
 				Create_Rect_Center(handle_center, v2f{scroll_bar_internal_dim.x, handle_height});
@@ -3123,10 +3127,7 @@ static void GUI_Do_ML_Input_Field(
 							context->canvas, 
 							cursor_p, 
 							f32(font->char_height) * text_scale.y, 
-							cursor_color);
-							
-						Rect cursor_rect = Create_Rect_Min_Dim(cursor_p, v2f{char_width, char_height});
-						Draw_Filled_Rect(context->canvas, cursor_rect, MAGENTA);	
+							cursor_color);	
 					}
 					
 					text_p.y -= char_height;
