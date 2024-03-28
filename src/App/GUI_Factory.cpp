@@ -629,7 +629,7 @@ static void Run_Active_Menu()
 			
 			#else
 			
-			s_global_data.active_menu = Menus::event_editor_text;
+			s_global_data.active_menu = Menus::all_events;
 			
 			#endif
 			

@@ -2459,8 +2459,6 @@ static bool GUI_Do_SL_Input_Field(
 
 
 // TODO: 
-// Area selection (kb and mouse)
-
 // Cursor color on character limit
 // Lookahead
 // Sensible minimums.
