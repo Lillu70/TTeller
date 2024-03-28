@@ -1082,6 +1082,26 @@ static inline bool GUI_On_Release_Action(
 }
 
 
+bool GUI_Input_Field_Begin_Or_End_Text_Select_Mode(GUI_SL_Input_Field_State* state, bool shift_down, u32 wcp)
+{
+	bool pre_text_select = state->text_select_mode;
+	u32 pre_start_point = state->text_select_start_point;
+	if(shift_down)
+	{
+		if(!state->text_select_mode)
+		{
+			state->text_select_mode = true;
+			state->text_select_start_point = wcp;
+		}
+	}
+	else
+		state->text_select_mode = false;
+	
+	// NOTE: this is for not doing kc movement when "unselecting".
+	return pre_text_select && !state->text_select_mode && pre_start_point != state->write_cursor_position;
+}
+
+
 static bool GUI_Input_Field_Insert_Characters(
 	Platform_Calltable* platform, 
 	GUI_SL_Input_Field_State* state, 
@@ -2156,20 +2176,7 @@ static bool GUI_Do_SL_Input_Field(
 				while(context->actions[GUI_Menu_Actions::left].Is_Down() && GUI_Accelerated_Tick(
 					&keyboard_acceleration, time, &state->input_start_time, &state->next_input_time))
 				{
-					bool pre_text_select = state->text_select_mode;
-					
-					if(shift_down)
-					{
-						if(!state->text_select_mode)
-						{
-							state->text_select_start_point = state->write_cursor_position;
-							state->text_select_mode = true;
-						}
-					}
-					else
-						state->text_select_mode = false;
-					
-					if(pre_text_select && !state->text_select_mode)
+					if(GUI_Input_Field_Begin_Or_End_Text_Select_Mode(state, shift_down, state->write_cursor_position))
 						break;
 					
 					state->write_cursor_position -= 1;
@@ -2188,20 +2195,7 @@ static bool GUI_Do_SL_Input_Field(
 				while(context->actions[GUI_Menu_Actions::right].Is_Down() && GUI_Accelerated_Tick(
 					&keyboard_acceleration, time, &state->input_start_time, &state->next_input_time))
 				{
-					bool pre_text_select = state->text_select_mode;
-					
-					if(shift_down)
-					{
-						if(!state->text_select_mode)
-						{
-							state->text_select_start_point = state->write_cursor_position;
-							state->text_select_mode = true;
-						}
-					}
-					else
-						state->text_select_mode = false;
-					
-					if(pre_text_select && !state->text_select_mode)
+					if(GUI_Input_Field_Begin_Or_End_Text_Select_Mode(state, shift_down, state->write_cursor_position))
 						break;
 					
 					state->write_cursor_position += 1;
@@ -2223,23 +2217,14 @@ static bool GUI_Do_SL_Input_Field(
 					
 					if(mouse_pressed_down && mouse_y_on_text_area)
 					{
-						if(shift_down)
-						{
-							if(!state->text_select_mode)
-							{
-								state->text_select_start_point = state->write_cursor_position;
-								state->text_select_mode = true;
-							}
-						}
-						else
-							state->text_select_mode = false;
+						GUI_Input_Field_Begin_Or_End_Text_Select_Mode(state, shift_down, state->write_cursor_position);
 						
 						f32 rel_cursor_x = context->cursor_fpos.x - text_p.x;
 						if(rel_cursor_x < 0)
 							rel_cursor_x = 0;
 						
+						// TODO: This is check of < 0 on unsigned?
 						u32 click_p = Max(u32(0), Min((u32)Round(rel_cursor_x / char_width), view_limit));
-						
 						
 						state->write_cursor_position = Min(state->view_offset + click_p, str->lenght);
 						
@@ -2474,10 +2459,9 @@ static bool GUI_Do_SL_Input_Field(
 
 
 // TODO: 
-
 // Area selection (kb and mouse)
+
 // Cursor color on character limit
-// Cursor flicker
 // Lookahead
 // Sensible minimums.
 // BUG FIX: Using the mouse selecting a last line that has only one character selectes the wrong one. (minor). 
@@ -2543,6 +2527,9 @@ static void GUI_Do_ML_Input_Field(
 
 	bool enable_scroll_bar = false;
 	bool draw_cursor = false;
+	bool text_select_mode = false;
+	u32 text_select_start_point = 0;
+	
 	u32 write_cursor_position = 0;
 	u32 line_count = view_limit_y;
 	u32 cursor_line = 0;
@@ -2592,8 +2579,8 @@ static void GUI_Do_ML_Input_Field(
 				bool down_is_down = context->actions[GUI_Menu_Actions::down].Is_Down();
 				bool right_is_down = context->actions[GUI_Menu_Actions::right].Is_Down();
 				bool left_is_down = context->actions[GUI_Menu_Actions::left].Is_Down();
-				bool navigation =
-					mouse_is_down || up_is_down || down_is_down || left_is_down || right_is_down;
+				bool navigation 
+					= mouse_is_down || up_is_down || down_is_down || left_is_down || right_is_down;
 				
 				u32 wcp = state->write_cursor_position;
 				
@@ -2618,13 +2605,16 @@ static void GUI_Do_ML_Input_Field(
 					}
 				}
 				
+				f64 time = context->platform->Get_Time_Stamp();
+				state->draw_cursor = !(time > state->flicker_start_time) || (u64)time % 2;
+				
+				bool shift_down = context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT) || 
+					context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT);
+
 				if(navigation)
 				{	
 					if(!state->scroll_bar_drag_mode)
-					{
-						bool shift_down = context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT) || 
-							context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT);
-						
+					{		
 						if(context->actions[GUI_Menu_Actions::left].Is_Pressed() ||
 							context->actions[GUI_Menu_Actions::right].Is_Pressed() || 
 							context->actions[GUI_Menu_Actions::up].Is_Pressed() ||
@@ -2637,12 +2627,14 @@ static void GUI_Do_ML_Input_Field(
 						f64* inp_start_t = &state->input_start_time;
 						f64* next_inp_t = &state->next_input_time;
 						
-						f64 time = context->platform->Get_Time_Stamp();
 						GUI_Input_Acceleration_Behavior* kca = &keyboard_acceleration;
 						
 						// Arrowkey/controller input 
 						while(left_is_down && GUI_Accelerated_Tick(kca, time, inp_start_t, next_inp_t))
 						{
+							if(GUI_Input_Field_Begin_Or_End_Text_Select_Mode(state, shift_down, wcp))
+								break;
+							
 							state->write_cursor_position -= 1;
 							
 							if(state->write_cursor_position > wcp)
@@ -2656,7 +2648,10 @@ static void GUI_Do_ML_Input_Field(
 						}
 					
 						while(right_is_down && GUI_Accelerated_Tick(kca, time, inp_start_t, next_inp_t))
-						{	
+						{
+							if(GUI_Input_Field_Begin_Or_End_Text_Select_Mode(state, shift_down, wcp))
+								break;
+							
 							state->write_cursor_position += 1;
 							
 							if(state->write_cursor_position > str->lenght)
@@ -2670,22 +2665,20 @@ static void GUI_Do_ML_Input_Field(
 
 						while(up_is_down && GUI_Accelerated_Tick(kca, time, inp_start_t, next_inp_t))
 						{
+							if(GUI_Input_Field_Begin_Or_End_Text_Select_Mode(state, shift_down, wcp))
+								break;
+							
 							desired_row_jumps -= 1;
-							if(shift_down)
-							{
-								desired_row_jumps -= 2;
-							}
 						}
 						
 						
 						while(down_is_down && GUI_Accelerated_Tick(kca, time, inp_start_t, next_inp_t))
 						{
+							if(GUI_Input_Field_Begin_Or_End_Text_Select_Mode(state, shift_down, wcp))
+								break;
+							
 							desired_row_jumps += 1;
-							if(shift_down)
-							{
-								desired_row_jumps += 2;
-							}
-						}						
+						}
 						
 						
 						if(mouse_is_down && cursor_on_selection)
@@ -2716,7 +2709,7 @@ static void GUI_Do_ML_Input_Field(
 							desired_row_jumps = -line_start_buffer_len;	
 					}
 				}
-				else
+				else if(state->cursor_is_active)
 				{
 					GUI_Input_Field_Insert_Characters(
 						context->platform, 
@@ -2987,7 +2980,36 @@ static void GUI_Do_ML_Input_Field(
 					
 				}while(recalc);
 				
+				// Write cursor position set in stone!
 				state->write_cursor_position = new_cursor_write_pos;
+				if(wcp != state->write_cursor_position)
+					state->flicker_start_time = time + state->flicker_delay;
+				
+				// Mouse highlight
+				{
+					Rect text_rect = p.rect;
+					text_rect.max.x = text_p.x + f32(view_limit_x) * char_width;
+					
+					if(mouse_pressed_down && Is_Point_Inside_Rect(context->cursor_fpos, text_rect))
+					{
+						if(shift_down && state->text_select_mode)
+						{
+							u32 s = state->text_select_start_point;
+							
+							if((s > wcp && state->write_cursor_position > s) || 
+								(s < wcp && state->write_cursor_position < s))
+							{
+								state->text_select_start_point = wcp;
+							}
+						}
+						else
+						{
+							state->text_select_start_point = state->write_cursor_position;
+						}
+						
+						state->text_select_mode = true;
+					}
+				}
 				
 				Assert(line_count > 0);
 				Assert(!state->cursor_is_active || cursor_line > 0);	
@@ -3031,6 +3053,26 @@ static void GUI_Do_ML_Input_Field(
 				// --- Scroll bar control ----
 				if(enable_scroll_bar)
 				{
+					// Mouse wheel.
+					{
+						i32 wheel_delta = (i32)context->platform->Get_Scroll_Wheel_Delta();
+						
+						if(wheel_delta > 0 && state->view_offset > 0)
+						{
+							state->view_offset -= 1;
+							
+							state->cursor_is_active = false;
+							visible_text_start = 0;
+						}
+						else if(wheel_delta < 0 && state->view_offset < line_count - view_limit_y)
+						{
+							state->view_offset += 1;
+							
+							state->cursor_is_active = false;
+							visible_text_start = 0;
+						}
+					}
+					
 					// Calculate handle position/dimensions.
 					
 					f32 r = f32(view_limit_y) / f32(line_count);
@@ -3085,14 +3127,17 @@ static void GUI_Do_ML_Input_Field(
 						
 						u32 option_space2 = line_count - view_limit_y;
 						
+						view_offset = state->view_offset;
+						
 						state->view_offset = (u32)Round(r2 * f32(option_space2));
-						
-						// Recalculate where the handle center is.
-						handle_center = hc_rec;
-						yoff = (option_space / option_count) * state->view_offset;
-						handle_center.y -= yoff;
-						
-						visible_text_start = 0;
+						if(view_offset != state->view_offset)
+						{
+							// Recalculate where the handle center is.
+							handle_center = hc_rec;
+							yoff = (option_space / option_count) * state->view_offset;
+							handle_center.y -= yoff;
+							visible_text_start = 0;							
+						}
 					}
 				}
 				
@@ -3104,16 +3149,20 @@ static void GUI_Do_ML_Input_Field(
 				view_offset = state->view_offset;
 			}
 			
-			draw_cursor = state->cursor_is_active;
+			draw_cursor = state->cursor_is_active && state->draw_cursor;
 			write_cursor_position = state->write_cursor_position;
+			
+			text_select_mode = state->text_select_mode;
+			text_select_start_point = state->text_select_start_point;
 		}
 		else
 		{
 			if(GUI_On_Release_Action(context, cursor_on_selection, &state->is_pressed_down))
 			{
+				state->text_select_mode = false;
 				state->cursor_is_active = true;
 				state->is_active = true;
-				state->write_cursor_position = 0;
+				state->write_cursor_position = str->lenght;
 				state->flicker_start_time = context->platform->Get_Time_Stamp() + state->flicker_delay;
 			}
 		}
@@ -3158,15 +3207,19 @@ static void GUI_Do_ML_Input_Field(
 		
 		Assert(!draw_cursor || cursor_line - view_offset <= view_limit_y);
 		
+		
 		// If the draw starting point is known, skip up to it. Otherwise; start from the begining...
+		u32 char_skip_count;
 		if(visible_text_start)
 		{
 			str_begin = visible_text_start;
+			char_skip_count = u32(visible_text_start - str->buffer);
 			effctive_offset = 0;
 			cursor_line -= view_offset;
 		}
 		else
 		{
+			char_skip_count = 0;
 			str_begin = str->buffer;
 			effctive_offset = view_offset;
 		}
@@ -3174,6 +3227,14 @@ static void GUI_Do_ML_Input_Field(
 		u32 line_start = 0;
 		u32 line_num = 0;
 		u32 lines_drawn = 0;
+		
+		u32 hl_p0 = write_cursor_position;
+		u32 hl_p1 = text_select_start_point;
+		if(hl_p1 < hl_p0)
+			Swap(&hl_p0, &hl_p1);
+		
+		u32 hl_dif = hl_p1 - hl_p0;
+		
 		for(char* c = str_begin; c <= str_end; ++c)
 		{
 			u32 begin_offset = u32(c - str_begin);
@@ -3181,7 +3242,6 @@ static void GUI_Do_ML_Input_Field(
 			
 			b32 is_new_line = *c == '\n';
 			b32 is_last_char = c == str_end;
-			
 			
 			if(is_new_line || exclusive_lenght >= view_limit_x || is_last_char)
 			{
@@ -3196,6 +3256,62 @@ static void GUI_Do_ML_Input_Field(
 					lines_drawn += 1;
 					if(lines_drawn > view_limit_y)
 						break;
+					
+					// Draw highlight
+					if(text_select_mode && hl_dif)
+					{
+						u32 effct_line_start = line_start + char_skip_count;
+						
+						u32 effct_len = exclusive_lenght + is_last_char;
+						u32 line_end = effct_line_start + effct_len;
+						
+						// Highlight starts on this line.
+						if(hl_p0 >= effct_line_start && hl_p0 < line_end)
+						{
+							u32 start_offset = hl_p0 - effct_line_start;
+							u32 max_len = effct_len - start_offset;
+							
+							u32 hl_len = Min(hl_dif, max_len);
+							if(hl_len > 0)
+							{
+								v2f hl_pos = v2f{text_p.x + f32(start_offset) * char_width, text_p.y};
+								v2f hl_dim = v2f{char_width * f32(hl_len), char_height};
+								Rect hl_rect = Create_Rect_Min_Dim(hl_pos, hl_dim);
+								
+								Draw_Filled_Rect(context->canvas, hl_rect, theme->selected_color);								
+							}
+						}
+						
+						// Highlight is surrounded by this line.
+						else if(hl_p0 <= effct_line_start && hl_p1 >= line_end)
+						{
+							u32 hl_len = effct_len;
+							
+							// EDGE_CASE: only char on the line is a new line.
+							if(hl_len == 0 && is_new_line)
+								hl_len = 1;
+							
+							// EDGE_CASE: last char is a new line.
+							else if(is_last_char && is_new_line && hl_len > 1)
+								hl_len -= 1;
+							
+							v2f hl_dim = v2f{char_width * f32(hl_len), char_height};
+							Rect hl_rect = Create_Rect_Min_Dim(text_p, hl_dim);
+							
+							Draw_Filled_Rect(context->canvas, hl_rect, theme->selected_color);
+						}
+						
+						// Highlight start on previous line, but ends on this line.
+						else if(hl_p0 < effct_line_start && hl_p1 > effct_line_start && hl_p1 < line_end)
+						{
+							u32 hl_len = hl_p1 - effct_line_start;
+							v2f hl_dim = v2f{char_width * f32(hl_len), char_height};
+							
+							Rect hl_rect = Create_Rect_Min_Dim(text_p, hl_dim);
+							
+							Draw_Filled_Rect(context->canvas, hl_rect, theme->selected_color);
+						}
+					}
 					
 					String_View view = {str_begin + line_start, exclusive_lenght + is_last_char};
 					Draw_Text(context->canvas, view, text_p, text_color, font, text_scale);

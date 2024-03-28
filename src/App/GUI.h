@@ -174,7 +174,7 @@ struct GUI_SL_Input_Field_State
 	u32 text_select_start_point = 0;
 	u32 mouse_press_down_point = 0;
 	u32 click_p = 0;
-	
+
 	v2f mouse_scroll_bar_drag_offset = v2f{0, 0};
 	
 	f64 flicker_start_time = 0;
@@ -190,7 +190,7 @@ struct GUI_SL_Input_Field_State
 	bool draw_cursor = 0;
 	bool cursor_is_active = 0; // NOTE: ML only?
 
-	static constexpr f64 mouse_hold_delay = 0.1;
+	static constexpr f64 mouse_hold_delay = 3.0;
 	static constexpr f64 flicker_delay = 3.0;
 };
 
