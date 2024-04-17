@@ -14,12 +14,6 @@ static Color Make_Color(u8 red, u8 green, u8 blue, u8 alpha = 0xFF)
 }
 
 
-static inline u32 Put_Color(u8 r, u8 g, u8 b, u8 a = 0xff)
-{
-	return u32(a << 24) | u32(r << 16) | u32(g << 8) | u32(b << 0);
-}
-
-
 // Returns the lenght of the buffer. Does NOT include the null terminator.
 static u32 Null_Terminated_Buffer_Lenght(u8* buffer)
 {

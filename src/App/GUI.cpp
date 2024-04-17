@@ -1,6 +1,12 @@
 
 #pragma once
 
+static inline u32 GUI_Make_Ignore_Selection_Mask()
+{
+	u32 result = GUI_Context_Flags::soft_ignore_selection | GUI_Context_Flags::hard_ignore_selection;
+	return result;
+}
+
 static inline bool GUI_Is_Context_Ready(GUI_Context* context)
 {
 	bool result = context->flags & GUI_Context_Flags::context_ready;
@@ -507,7 +513,7 @@ static inline void GUI_Begin_Context(
 		{
 			Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::disable_kc_navigation);
 		}
-		else if(Bit_Not_Set(context->flags, GUI_Context_Flags::ignore_selection))
+		else if(Bit_Not_Set(context->flags, GUI_Make_Ignore_Selection_Mask()))
 		{
 			if(actions[GUI_Menu_Actions::up].Is_Pressed())
 			{
@@ -599,9 +605,10 @@ static inline void GUI_End_Context(GUI_Context* context)
 		context->cursor_mask_area = {};
 	}
 	
+	u32 ignore_selection_mask = GUI_Make_Ignore_Selection_Mask();
 	
 	// Selection wrapping.
-	if(Bit_Not_Set(context->flags, GUI_Context_Flags::ignore_selection) && 
+	if(Bit_Not_Set(context->flags, ignore_selection_mask) && 
 		Bit_Not_Set(context->flags, GUI_Context_Flags::disable_wrapping))
 	{
 		if(context->widget_count > 0 &&
@@ -825,7 +832,7 @@ static inline void GUI_End_Context(GUI_Context* context)
 					context->selected_index = context->widget_count - 1;
 				
 				
-				if(Bit_Not_Set(context->flags, GUI_Context_Flags::ignore_selection) && 
+				if(Bit_Not_Set(context->flags, ignore_selection_mask) && 
 					context->selected_index == context->widget_count - 1)
 				{
 					selected_element_is_window_slider = true;
@@ -892,7 +899,7 @@ static inline void GUI_End_Context(GUI_Context* context)
 				if(local_scroll_v != 0)
 					context->selected_index = context->widget_count - 1;
 				
-				if(Bit_Not_Set(context->flags, GUI_Context_Flags::ignore_selection) && 
+				if(Bit_Not_Set(context->flags, ignore_selection_mask) && 
 					context->selected_index == context->widget_count - 1)
 				{
 					selected_element_is_window_slider = true;
@@ -929,7 +936,7 @@ static inline void GUI_End_Context(GUI_Context* context)
 			context->anchor_base = anchor_base;
 		}
 		
-		if(Bit_Not_Set(context->flags, GUI_Context_Flags::ignore_selection) 
+		if(Bit_Not_Set(context->flags, ignore_selection_mask) 
 			&& !selected_element_is_window_slider)
 		{
 			f32 true_canvas_height = canvas_dim.y;
@@ -1015,7 +1022,7 @@ static inline bool GUI_Is_Element_Selected(GUI_Context* context, bool cursor_on_
 	bool result = false;
 	
 	// This is the selected element.
-	if(Bit_Not_Set(context->flags, GUI_Context_Flags::ignore_selection) &&
+	if(Bit_Not_Set(context->flags, GUI_Make_Ignore_Selection_Mask()) &&
 		context->selected_index == context->widget_count)
 	{
 		// Buuut, it seems to be a different widget?
@@ -1035,7 +1042,8 @@ static inline bool GUI_Is_Element_Selected(GUI_Context* context, bool cursor_on_
 		context->actions[GUI_Menu_Actions::mouse].Is_Down()) &&
 		Is_Point_Inside_Rect(context->cursor_fpos, context->canvas_rect) &&
 		!((context->flags & GUI_Context_Flags::cursor_mask_enabled) && 
-		Is_Point_Inside_Rect(context->cursor_fpos, context->cursor_mask_area))
+		Is_Point_Inside_Rect(context->cursor_fpos, context->cursor_mask_area)) &&
+		Bit_Not_Set(context->flags, GUI_Context_Flags::hard_ignore_selection)
 	)
 	{
 		GUI_Reset_Selection_State(context);
@@ -1046,7 +1054,7 @@ static inline bool GUI_Is_Element_Selected(GUI_Context* context, bool cursor_on_
 		context->selected_element_dim = context->layout.last_element_dim;		
 		result = true;
 
-		Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::ignore_selection);
+		Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::soft_ignore_selection);
 	}		
 
 	context->widget_count += 1; // Suprising side effect! But better to do it here than forget to do it ouside.
@@ -1272,11 +1280,12 @@ static bool GUI_Input_Field_Insert_Characters(
 			
 			case '\b': // BACKSPACE
 			{
-				if(state->text_select_mode) 
+				if(state->text_select_mode && state->write_cursor_position != state->text_select_start_point) 
 				{
 					Conditional_Erase_Selection(state, str);
 					continue;
 				}
+				state->text_select_mode = false;
 				
 				if(str->lenght > 0)
 				{
@@ -1378,7 +1387,7 @@ static void GUI_Do_Text(
 	
 	if(Rects_Overlap(p.rect, context->canvas_rect))
 	{
-		bool is_highlighted = Bit_Not_Set(context->flags, GUI_Context_Flags::ignore_selection) && 
+		bool is_highlighted = Bit_Not_Set(context->flags, GUI_Make_Ignore_Selection_Mask()) && 
 			highlight.highlight_count && context->selected_index >= highlight.idx && 
 			context->selected_index < highlight.idx + highlight.highlight_count;
 		

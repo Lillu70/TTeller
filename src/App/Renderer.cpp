@@ -1,5 +1,17 @@
 
-# pragma once
+#pragma once
+
+#define SSE
+
+
+static inline Color Pack_Color(v3f color)
+{
+	color.r = Min(255.f, Max(color.r, 0.f));
+	color.g = Min(255.f, Max(color.g, 0.f));
+	color.b = Min(255.f, Max(color.b, 0.f));
+	
+	return Make_Color(u8(color.r), u8(color.g), u8(color.b));
+}
 
 
 static inline v2f Get_Middle(Canvas* canvas)
@@ -132,9 +144,10 @@ static inline Color Get_Pixel_HZ(Canvas* canvas, v2i p)
 }
 
 
+// TODO: This doesn't work with sub canvases.
 static void Clear_Canvas(Canvas* canvas, Color color)
 {
-	//Start_Scope_Timer(render_clear);
+	Start_Scope_Timer(clear_canvas);
 	
 	Assert(canvas);
 	
@@ -581,7 +594,7 @@ static void Draw_Glyph(
 	f32 uf = Componentwise_Mult({inv_fraction.x, fraction.y});
 	f32 rf = Componentwise_Mult({fraction.x, inv_fraction.y});
 	
-	#if 1 // Going fast going wide.
+	#ifdef SSE // Going fast going wide.
 	
 	__m128i zeroes 		= _mm_set1_epi32(0);
 	__m128i ones 		= _mm_set1_epi32(1);
@@ -795,4 +808,77 @@ static void Draw_Vertical_Line(Canvas* canvas, v2f pos, f32 height, Color color)
 			Set_Pixel(canvas, v2i{i32(floor_p.x), y}, color);
 		}
 	}
+}
+
+
+static void Dim_Entire_Screen(Canvas* canvas, f32 s)
+{
+	Assert(s >= 0 && s < 1);
+	Begin_Timing_Block(scale_pixel);
+	
+	#ifdef SSE
+	u32 pixel_count = canvas->dim.x * canvas->dim.y;
+	
+	u32 mask_255 = 0xFF;
+	
+	__m128 wscale = _mm_set1_ps(s);
+	__m128i wide_mask_255 = _mm_set1_epi32(mask_255);
+	
+	for(u32* pxl = canvas->buffer; pxl < canvas->buffer + pixel_count; pxl += 4)
+	{
+		__m128i wpck_pxl = _mm_load_si128((__m128i*)pxl);
+
+		__m128i wc1 = _mm_and_si128(wpck_pxl, wide_mask_255);
+		__m128i wc2 = _mm_and_si128(_mm_srli_epi32(wpck_pxl, 8), wide_mask_255);
+		__m128i wc3 = _mm_and_si128(_mm_srli_epi32(wpck_pxl, 16), wide_mask_255);
+		__m128i wc4 = _mm_and_si128(_mm_srli_epi32(wpck_pxl, 24), wide_mask_255);
+		
+		__m128 wc1_ps = _mm_cvtepi32_ps(wc1);
+		__m128 wc2_ps = _mm_cvtepi32_ps(wc2);
+		__m128 wc3_ps = _mm_cvtepi32_ps(wc3);
+		__m128 wc4_ps = _mm_cvtepi32_ps(wc4);
+		
+		wc1_ps = _mm_mul_ps(wc1_ps, wscale);
+		wc2_ps = _mm_mul_ps(wc2_ps, wscale);
+		wc3_ps = _mm_mul_ps(wc3_ps, wscale);
+		wc4_ps = _mm_mul_ps(wc4_ps, wscale);
+		
+		wc1 = _mm_cvttps_epi32(wc1_ps);
+		wc2 = _mm_cvttps_epi32(wc2_ps);
+		wc3 = _mm_cvttps_epi32(wc3_ps);
+		wc4 = _mm_cvttps_epi32(wc4_ps);
+		
+		wc2 = _mm_slli_epi32(wc2, 8);
+		wc3 = _mm_slli_epi32(wc3, 16);
+		wc4 = _mm_slli_epi32(wc4, 24);
+		
+		__m128i wc12 = _mm_or_si128(wc1, wc2);
+		__m128i wc34 = _mm_or_si128(wc3, wc4);
+		
+		__m128i result = _mm_or_si128(wc12, wc34);
+		_mm_storeu_si128((__m128i*)pxl, result);
+	}
+
+	#else
+	for(u32 y = 0; y < canvas->dim.y; ++y)
+	{
+		for(u32 x = 0; x < canvas->dim.x; ++x)
+		{
+			v2i p = v2i{i32(x), i32(y)};
+			Color frame_buffer_color = Get_Pixel_HZ(canvas, p);
+			
+			v3f unpacked_color = Unpack_Color(frame_buffer_color);
+			
+			unpacked_color *= s;
+			
+			frame_buffer_color = Pack_Color(unpacked_color);
+			
+			Set_Pixel_HZ(canvas, p, frame_buffer_color);
+			
+		}
+	}
+	
+	#endif
+	
+	End_Timing_Block(scale_pixel);
 }

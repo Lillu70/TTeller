@@ -106,6 +106,8 @@ static LRESULT Win32_Message_Handler(HWND win_handle, UINT message, WPARAM wpara
 
 static u32* Win32_Resize_Pixel_Buffer(i32 new_width, i32 new_height)
 {
+	static constexpr u32 extra_pp = 3; // For SSE wide operations.
+	
 	Assert(new_width >= 0);
 	Assert(new_height >= 0);
 	
@@ -119,7 +121,7 @@ static u32* Win32_Resize_Pixel_Buffer(i32 new_width, i32 new_height)
 	s_bitmap.info.bmiHeader.biHeight = new_height;
 	
 	u64 pixel_count = (u64)new_width * new_height;
-	u64 bitmap_memory_size = pixel_count * s_bitmap.bytes_per_pixel;
+	u64 bitmap_memory_size = (pixel_count + extra_pp) * s_bitmap.bytes_per_pixel;
 	
 	s_bitmap.memory = (u32*)VirtualAlloc(0, bitmap_memory_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	

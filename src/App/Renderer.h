@@ -22,6 +22,7 @@ static inline v2f Get_Middle(Canvas* canvas);
 
 static inline v3f Unpack_Color(Color color);
 static inline v4f Unpack_Color_With_Alpha(Color color);
+static inline Color Pack_Color(v3f color);
 
 
 static inline bool Init_Canvas(Canvas* canvas, u32* buffer, v2u dim);
@@ -46,6 +47,9 @@ static inline Color Get_Pixel_HZ(Canvas* canvas, v2i p);
 
 
 static void Clear_Canvas(Canvas* canvas, Color color);
+
+
+static void Dim_Entire_Screen(Canvas* canvas, f32 s);
 
 
 static void Draw_Vertical_Line(Canvas* canvas, v2f pos, f32 height, Color color);

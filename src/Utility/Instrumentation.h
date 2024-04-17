@@ -25,11 +25,9 @@ enum class __Time_Table_Names : u64
 {
 	run_time,
 	internal_run_time,
-	render_clear,
-	render_filled_rect,
-	render_filled_rect_with_outline,
 	render_glyph,
-	blit_surface,
+	clear_canvas,
+	scale_pixel,
 	COUNT
 };
 

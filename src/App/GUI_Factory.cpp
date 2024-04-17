@@ -9,6 +9,7 @@ static Color s_banner_background_color = Make_Color(40, 40, 40);
 static GUI_Theme s_theme = {};
 static GUI_Context s_gui;
 static GUI_Context s_gui_banner;
+static GUI_Context s_gui_pop_up;
 
 
 enum class Menus : u32
@@ -33,7 +34,7 @@ struct Global_Data
 {
 	Action menu_actions[GUI_Menu_Actions::COUNT] = {};
 	
-	Menus active_menu;
+	Menus active_menu = Menus::none;
 	
 	Dynamic_Array<Event_State>* all_events = 0;
 	u32 active_event_index = 0;
@@ -76,7 +77,6 @@ static inline void Init_GUI()
 
 	GUI_DEFAULT_TEXT_SCALE = v2f{2, 2};
 	
-	s_global_data.active_menu = Menus::none;
 	s_global_data.all_events = Create_Dynamic_Array<Event_State>(&s_allocator, 12);
 	
 	// Make Test event:
@@ -184,8 +184,8 @@ static void Do_GUI_Frame_With_Banner(
 
 	GUI_Context* context = &s_gui_banner;
 	
-	if(Bit_Not_Set(s_gui.flags, GUI_Context_Flags::ignore_selection))
-		s_gui_banner.flags |= GUI_Context_Flags::ignore_selection;
+	if(Bit_Not_Set(s_gui.flags, GUI_Context_Flags::soft_ignore_selection))
+		s_gui_banner.flags |= GUI_Context_Flags::soft_ignore_selection;
 	
 	GUI_Begin_Context(context, &s_platform, &banner_canvas, actions, &s_theme, banner_canvas_pos);
 	{
@@ -203,8 +203,8 @@ static void Do_GUI_Frame_With_Banner(
 	
 	context = &s_gui;
 	
-	if(Bit_Not_Set(s_gui_banner.flags, GUI_Context_Flags::ignore_selection))
-		s_gui.flags |= GUI_Context_Flags::ignore_selection;
+	if(Bit_Not_Set(s_gui_banner.flags, GUI_Context_Flags::soft_ignore_selection))
+		s_gui.flags |= GUI_Context_Flags::soft_ignore_selection;
 	
 	GUI_Begin_Context(context, &s_platform, &menu_canvas, actions, &s_theme);
 	{
@@ -547,9 +547,60 @@ static void Do_Event_Editor_Text_Frame()
 		f32 title_height = context->layout.last_element_dim.y;
 		v2f tile_bounds_max = GUI_Get_Bounds_In_Pixel_Space(context).max;
 
-		
 		context->layout.build_direction = GUI_Build_Direction::right_center;
 		
+		f32 padding = context->layout.theme->padding;
+		
+		v2f spacing = {30, 0};
+		GUI_Do_Spacing(context, &spacing);
+		
+		{
+			static constexpr char* button_text = "<";
+			
+			f32 button_width = GUI_Tight_Fit_Text(
+				button_text, 
+				GUI_DEFAULT_TEXT_SCALE, 
+				&context->layout.theme->font).x + padding;
+				
+			v2f dim =  {button_width, context->layout.last_element_dim.y};
+			
+			if(GUI_Do_Button(context, AUTO, &dim, button_text))
+			{
+			}			
+		}
+		
+		{
+			static constexpr char* button_text = "Vaatimukset";
+			
+			f32 button_width = GUI_Tight_Fit_Text(
+				button_text, 
+				GUI_DEFAULT_TEXT_SCALE, 
+				&context->layout.theme->font).x + padding;
+				
+			v2f dim =  {button_width, context->layout.last_element_dim.y};
+			
+			if(GUI_Do_Button(context, AUTO, &dim, button_text))
+			{
+			}			
+		}
+		
+		
+		{
+			static constexpr char* button_text = "Seuraamukset";
+			
+			f32 button_width = GUI_Tight_Fit_Text(
+				button_text, 
+				GUI_DEFAULT_TEXT_SCALE, 
+				&context->layout.theme->font).x + padding;
+				
+			v2f dim =  {button_width, context->layout.last_element_dim.y};
+			
+			if(GUI_Do_Button(context, AUTO, &dim, button_text))
+			{
+			}			
+		}
+		
+		#if 0
 		f32 padding = context->layout.theme->padding;
 		
 		static constexpr char* back_button_text = "<";
@@ -575,7 +626,8 @@ static void Do_Event_Editor_Text_Frame()
 		
 		if(GUI_Do_Button(context, &back_button_pos, &back_button_dim, back_button_text))
 			s_global_data.active_menu = Menus::event_editor_participents;
-
+		
+		#endif
 	}; // ----------------------------------------------------------------------------------------
 
 	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
@@ -594,9 +646,63 @@ static void Do_Event_Editor_Text_Frame()
 }
 
 
-static void Run_Active_Menu()
+static void Do_On_Exit_Pop_Up()
 {
-	Update_Actions(&s_platform, s_global_data.menu_actions, GUI_Menu_Actions::COUNT);
+	Dim_Entire_Screen(&s_canvas, 0.333f);
+	
+	GUI_Begin_Context(&s_gui_pop_up, &s_platform, &s_canvas, s_global_data.menu_actions, &s_theme);
+	
+	v2f scale = GUI_DEFAULT_TEXT_SCALE;	
+	static constexpr char* text = "Oletko varma ett\xE4 haluat sulkea ohjelman?";
+	GUI_Do_Text(&s_gui_pop_up, &GUI_AUTO_MIDDLE, text, {}, scale * 1.5f, true);		
+	
+	s_gui_pop_up.layout.build_direction = GUI_Build_Direction::down_center;
+	
+	static constexpr char* t1 = "Peruuta ja jatka";
+	static constexpr char* t2 = "Tallenna ja sulje";
+	static constexpr char* t3 = "Sulje tallentamatta";
+	
+	v2f button_dim = GUI_Tight_Fit_Text(t3, scale, &s_theme.font) + s_theme.padding;
+	
+	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t1, scale))
+	{
+		s_platform.Set_Flag(App_Flags::wants_to_exit, false);
+	}
+	
+	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t2, scale))
+	{
+		s_platform.Set_Flag(App_Flags::is_running, false);
+	}
+	
+	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t3, scale))
+	{
+		s_platform.Set_Flag(App_Flags::is_running, false);
+	}
+	
+	GUI_End_Context(&s_gui_pop_up);
+};
+
+
+static void Run_Active_Menu(bool quit_app_pop_up)
+{
+	Action* actions = s_global_data.menu_actions;
+	
+	Update_Actions(&s_platform, actions, GUI_Menu_Actions::COUNT);
+	
+	if(quit_app_pop_up)
+	{
+		s_gui.flags 		|= GUI_Context_Flags::hard_ignore_selection;
+		s_gui_banner.flags 	|= GUI_Context_Flags::hard_ignore_selection;
+		
+		for(Action* action = actions; action < actions + GUI_Menu_Actions::COUNT; ++action)
+			action->disabled = true;
+	}
+	else
+	{
+		Inverse_Bit_Mask(&s_gui.flags, GUI_Context_Flags::hard_ignore_selection);
+		Inverse_Bit_Mask(&s_gui_banner.flags, GUI_Context_Flags::hard_ignore_selection);
+	}
+	
 	
 	Menus current_menu = s_global_data.active_menu;
 	
@@ -629,7 +735,7 @@ static void Run_Active_Menu()
 			
 			#else
 			
-			s_global_data.active_menu = Menus::all_events;
+			s_global_data.active_menu = Menus::event_editor_text;
 			
 			#endif
 			
@@ -660,9 +766,18 @@ static void Run_Active_Menu()
 		GUI_Reset_Context(&s_gui);
 		GUI_Reset_Context(&s_gui_banner);
 		
-		u32 f = GUI_Context_Flags::ignore_selection | GUI_Context_Flags::enable_dynamic_sliders; 
+		u32 f = GUI_Context_Flags::soft_ignore_selection | GUI_Context_Flags::enable_dynamic_sliders; 
 	
 		s_gui.flags |= f;
 		s_gui_banner.flags |= GUI_Context_Flags::enable_dynamic_sliders;
+	}
+	
+	
+	if(quit_app_pop_up)
+	{
+		for(Action* action = actions; action < actions + GUI_Menu_Actions::COUNT; ++action)
+			action->disabled = false;
+		
+		Do_On_Exit_Pop_Up();
 	}
 }

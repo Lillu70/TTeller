@@ -222,7 +222,7 @@ namespace GUI_Context_Flags
 {
 	enum : u32
 	{
-		ignore_selection 			= 1 << 0,
+		soft_ignore_selection 		= 1 << 0, // Makes it so that nothing is selected, but mouse selection is still possible to exit this state.
 		enable_dynamic_sliders 		= 1 << 1,
 		cursor_mask_validation 		= 1 << 2,
 		cursor_mask_enabled 		= 1 << 3,
@@ -232,7 +232,7 @@ namespace GUI_Context_Flags
 		context_ready 				= 1 << 7,
 		maxout_vertical_slider 		= 1 << 8,
 		maxout_horizontal_slider	= 1 << 9,
-	
+		hard_ignore_selection		= 1 << 10, // Makes it so that nothing is selected and to leave this state this flag has to manually set to 0.
 	}; // max shift is 31
 }
 
