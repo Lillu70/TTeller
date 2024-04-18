@@ -51,7 +51,7 @@ void Update_App(f64 delta_time, bool* update_surface)
 	
 	bool wants_to_exit = Is_Flag_Set(app_flags, (u32)App_Flags::wants_to_exit);
 	
-	#if 1
+	#if 0
 	
 	if(wants_to_exit)
 		s_platform.Set_Flag(App_Flags::is_running, false);

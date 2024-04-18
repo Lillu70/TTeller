@@ -3,13 +3,15 @@
 
 struct Win32_App
 {
-	i32 window_width = 0, window_height = 0;
+	i32 window_width = 0;
+	i32 window_height = 0;
 	i32 flags = 0;
 	f32 scroll_delta = 0;
 	
 	HDC dc = 0;
 	HINSTANCE instance = 0;
 	HWND window = 0;
+	DWORD main_thread_id;
 	
 	WINDOWPLACEMENT window_placement = { sizeof(window_placement) };
 	
@@ -28,6 +30,7 @@ struct Win32_App
 	Controller_State controller_state[max_controllers];
 	
 	bool force_update_surface = false;
+	volatile bool init_done = false;
 };
 
 

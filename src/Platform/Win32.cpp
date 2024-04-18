@@ -16,91 +16,40 @@ static x_input_set_state* XInputSetState_;
 #define XInputSetState XInputSetState_
 
 
-static LRESULT Win32_Message_Handler(HWND win_handle, UINT message, WPARAM wparam, LPARAM lParam)
+struct Window_Create_Info
 {
-	LRESULT result = 0;
+	u32 window_width = 620 * 2; 
+	u32 window_height = 480 * 2;
+	u32 window_pos_x = CW_USEDEFAULT; 
+	u32 window_pos_y = CW_USEDEFAULT; 
+	const wchar_t* window_title = L"Nalkapeli";
+};
 
-	switch (message)
-	{
-		case WM_CHAR:
-		{
-			char c = (char)wparam;
-			
-			u32 lenght = Array_Lenght(s_app.typing_information.buffer);
-			if(s_app.typing_information.count < lenght)
-			{
-				s_app.typing_information.buffer[s_app.typing_information.count] = c;
-				s_app.typing_information.count += 1;
-			}
-			
-		}break;
-		
-		case WM_MOUSEWHEEL:
-		{
-			s_app.scroll_delta = f32(GET_WHEEL_DELTA_WPARAM(wparam)) / WHEEL_DELTA;
-		}break;
-		
-		case WM_SIZING:
-		case WM_SIZE:
-		{
-			RECT client_rect;
-			GetClientRect(win_handle, &client_rect);
-			
-			s_app.window_width = client_rect.right - client_rect.left;
-			s_app.window_height = client_rect.bottom - client_rect.top;
-			
-			s_app.flags |= (1 << (u32)App_Flags::window_has_resized);
-			
-			s_app.force_update_surface = true;
-		}break;
-		
-		
-		case WM_DESTROY:
-		{
-			s_app.flags |= (1 << (u32)App_Flags::wants_to_exit);
-		}break;
-		
-		
+
+static LRESULT Win32_Display_Window_Proc(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
+{
+    LRESULT Result = 0;
+
+    switch (Message)
+    {
+		// NOTE: For any message to get passed into the main thread they have to be included here!
 		case WM_CLOSE:
-		{
-			s_app.flags |= (1 << (u32)App_Flags::wants_to_exit);
-		}break;
-		
-		
+        case WM_DESTROY:
+		case WM_SIZE:
+        case WM_CHAR:
+		case WM_MOUSEWHEEL:
 		case WM_ACTIVATEAPP:
-		{
-			BOOL active = (BOOL)wparam;
-			
-			u8 n = (u8)App_Flags::is_focused;
-			s_app.flags = (s_app.flags & ~(1 << n)) | (active << n);
-			s_app.force_update_surface = true;
-		}break;
-		
-		
-		case WM_SYSKEYDOWN:
-		{
-			s_app.force_update_surface = true;
-			DefWindowProcA(win_handle, message, wparam, lParam);
-		}break;
-		
-		
-		
-		case WM_SETCURSOR:
-		{
-			/*
-			if(LOWORD(lParam) == HTCLIENT)
-				SetCursor(NULL);
-			*/
-			result = DefWindowProcA(win_handle, message, wparam, lParam);
-		}break;
-		
-		default:
-		{
-			result = DefWindowProcA(win_handle, message, wparam, lParam);
-		}break;
-	}
+        {
+            PostThreadMessageW(s_app.main_thread_id, Message, WParam, LParam);
+        } break;
 
-	return  result;
+        default:
+        {
+            Result = DefWindowProcW(Window, Message, WParam, LParam);
+        } break;
+    }
+
+    return Result;
 }
 
 
@@ -123,96 +72,93 @@ static u32* Win32_Resize_Pixel_Buffer(i32 new_width, i32 new_height)
 	u64 pixel_count = (u64)new_width * new_height;
 	u64 bitmap_memory_size = (pixel_count + extra_pp) * s_bitmap.bytes_per_pixel;
 	
-	s_bitmap.memory = (u32*)VirtualAlloc(0, bitmap_memory_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	s_bitmap.memory = 
+		(u32*)VirtualAlloc(0, bitmap_memory_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	
 	return s_bitmap.memory;
 }
 
 
-static void Win32_Init(
-	HINSTANCE instance, 
-	u32 window_width, 
-	u32 window_height, 
-	u32 window_pos_x, 
-	u32 window_pos_y, 
-	const char* window_title,
-	u32 app_memory_size)
+DWORD Win32_Create_Message_Thread(LPVOID param)
 {
-	// Create window
-	{
-		s_app.instance = instance;
-		WNDCLASSA win_class{};
-		//window_class.hIcon = ;
-		win_class.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
-		win_class.lpfnWndProc = Win32_Message_Handler;
-		win_class.hInstance = instance;
-		win_class.lpszClassName = "TW_CLASS";
-		win_class.hCursor = LoadCursorA(0, (LPCSTR)IDC_CROSS);
-		
-		if (!RegisterClassA(&win_class))
-		Terminate;
-		
-		
-		//Windows behavior here is whacky.
-		//https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-createwindowexa
-		
-		if (window_pos_x != CW_USEDEFAULT && window_pos_y == CW_USEDEFAULT) window_pos_y = 0;
-		if (window_pos_y != CW_USEDEFAULT && window_pos_x == CW_USEDEFAULT) window_pos_x = 0;
-		
-		if (window_height != CW_USEDEFAULT && window_width == CW_USEDEFAULT) window_width = window_height;
-		if (window_width  != CW_USEDEFAULT && window_height == CW_USEDEFAULT) window_height = window_width;
-		
-		DWORD win_style_flags = WS_OVERLAPPEDWINDOW | WS_VISIBLE;
-		
-		s_app.window = CreateWindowExA
-		(
-			0,
-			win_class.lpszClassName,
-			window_title, 
-			win_style_flags,
-			window_pos_x, 
-			window_pos_y,
-			window_width, 
-			window_height,
-			0, 
-			0, 
-			instance, 
-			0
-		);
-		
-		{            
-			RECT window_rect;
-			BOOL get_window_rect_result = GetWindowRect(s_app.window, &window_rect);
-			
-			RECT client_rect;
-			BOOL get_client_rect_result = GetClientRect(s_app.window, &client_rect);
-			
-			i32 _window_width = window_rect.right - window_rect.left;
-			i32 _window_height = window_rect.bottom - window_rect.top;
-			
-			i32 border_width = (_window_width - client_rect.right);
-			i32 border_height = (_window_height - client_rect.bottom);
-			
-			u32 scale = 1;
-			
-			i32 new_width = _window_width * scale + border_width;
-			i32 new_height = _window_height * scale + border_height;
-			
-			SetWindowPos(s_app.window, 0, window_rect.left, window_rect.top, new_width, new_height, 0);
-		}
-		
-		
-		if(!s_app.window)
-			Terminate;
-		
-		s_app.dc = GetDC(s_app.window);
-		
-		
-		s_app.flags |= 1 << (u32)App_Flags::is_running;
-		s_app.flags |= 1 << (u32)App_Flags::is_focused;
-		s_app.flags |= 1 << (u32)App_Flags::cursor_is_visible;
+	Window_Create_Info* wci = (Window_Create_Info*)param;
 	
+	//Windows behavior here is whacky.
+	//https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-createwindowexa
+	
+	if(wci->window_pos_x != CW_USEDEFAULT && wci->window_pos_y == CW_USEDEFAULT)
+		wci->window_pos_y = 0;
+	
+	if(wci->window_pos_y != CW_USEDEFAULT && wci->window_pos_x == CW_USEDEFAULT)
+		wci->window_pos_x = 0;
+	
+	if(wci->window_height != CW_USEDEFAULT && wci->window_width == CW_USEDEFAULT)
+		wci->window_width  = wci->window_height;
+	
+	if(wci->window_width != CW_USEDEFAULT && wci->window_height == CW_USEDEFAULT)
+		wci->window_height = wci->window_width;
+	
+	s_app.window_width = wci->window_width;
+	s_app.window_height = wci->window_height;
+	
+	WNDCLASSEXW WindowClass = {};
+    WindowClass.cbSize = sizeof(WindowClass);
+    WindowClass.lpfnWndProc = &Win32_Display_Window_Proc;
+    WindowClass.hInstance = GetModuleHandleW(0);
+    WindowClass.hIcon = LoadIconA(0, IDI_APPLICATION);
+    WindowClass.hCursor = LoadCursorA(0, IDC_CROSS);
+    WindowClass.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+    WindowClass.lpszClassName = L"Dangerous Class";
+    RegisterClassExW(&WindowClass);
+	
+	s_app.window = CreateWindowExW(
+		0,
+		WindowClass.lpszClassName,
+		wci->window_title,
+		WS_OVERLAPPEDWINDOW|WS_VISIBLE,
+		wci->window_pos_x,
+		wci->window_pos_y,
+		s_app.window_width,
+		s_app.window_height,
+		0,
+		0,
+		WindowClass.hInstance,
+		0);
+	
+	{            
+		RECT window_rect;
+		BOOL get_window_rect_result = GetWindowRect(s_app.window, &window_rect);
+		
+		RECT client_rect;
+		BOOL get_client_rect_result = GetClientRect(s_app.window, &client_rect);
+		
+		i32 _window_width = window_rect.right - window_rect.left;
+		i32 _window_height = window_rect.bottom - window_rect.top;
+		
+		i32 border_width = (_window_width - client_rect.right);
+		i32 border_height = (_window_height - client_rect.bottom);
+		
+		u32 scale = 1;
+		
+		i32 new_width = _window_width * scale + border_width;
+		i32 new_height = _window_height * scale + border_height;
+		
+		SetWindowPos(
+			s_app.window, 
+			0, 
+			window_rect.left, 
+			window_rect.top, 
+			new_width, 
+			new_height, 
+			0);
 	}
+	
+	s_app.dc = GetDC(s_app.window);
+	s_app.flags |= 1 << (u32)App_Flags::is_running;
+	s_app.flags |= 1 << (u32)App_Flags::is_focused;
+	s_app.flags |= 1 << (u32)App_Flags::cursor_is_visible;
+	s_app.flags |= 1 << (u32)App_Flags::window_has_resized;
+
 	
 	// Fill in bitmap info.
 	{
@@ -221,19 +167,42 @@ static void Win32_Init(
 		s_bitmap.info.bmiHeader.biBitCount = sizeof(i32) * 8;
 		s_bitmap.info.bmiHeader.biCompression = BI_RGB;
 		
-		Win32_Resize_Pixel_Buffer(window_width, window_height);
+		Win32_Resize_Pixel_Buffer(s_app.window_width, s_app.window_height);
 	}
 	
+	s_app.init_done = true;
+
+    // NOTE(casey): This thread can just idle for the rest of the run, forwarding
+    // messages to the main thread that it thinks the main thread wants.
+    for(;;)
+    {
+        MSG Message;
+
+        GetMessageW(&Message, 0, 0, 0); //blocks untill there is a message to get.
+        TranslateMessage(&Message);
+		DispatchMessageW(&Message);
+    }
 	
-	// Try to load XInput
-	{ 
-		HMODULE XInput_lib = 0;
-		if ((XInput_lib = LoadLibraryA("xinput1_4.dll")) || (XInput_lib = LoadLibraryA("xinput1_3.dll")))
-		{
-			XInputGetState = (x_input_get_state*)GetProcAddress(XInput_lib, "XInputGetState");
-			XInputSetState = (x_input_set_state*)GetProcAddress(XInput_lib, "XInputSetState");
-		}
-	}
+	return 0;
+}
+
+
+static void Win32_Init(
+	u32 window_width, 
+	u32 window_height, 
+	u32 window_pos_x, 
+	u32 window_pos_y, 
+	const wchar_t* window_title,
+	u32 app_memory_size)
+{
+	Window_Create_Info wci = 
+	{
+		window_width, 
+		window_height, 
+		window_pos_x, 
+		window_pos_y, 
+		window_title
+	};
 	
 	//Init time counters
 	{
@@ -244,6 +213,13 @@ static void Win32_Init(
 	}
 	
 	s_app.game_state_memory = VirtualAlloc(0, app_memory_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	
+	s_app.main_thread_id = GetCurrentThreadId();
+	
+	DWORD message_thread_id;
+	CloseHandle(CreateThread(0, 0, Win32_Create_Message_Thread, &wci, 0, &message_thread_id));
+	
+	while(!s_app.init_done);
 }
 
 
@@ -252,15 +228,65 @@ static void Win32_Flush_Events()
 	s_app.typing_information = {};
 	s_app.scroll_delta = 0;
 	
-	// The message dispatch loop.
-	{	
+	// This message loop resives messages we choose to send it. Using ThreadMessage and PostMessage.
+	{
 		MSG message;
-		while (BOOL message_result = PeekMessage(&message, 0, 0, 0, PM_REMOVE) != 0)
+		while(PeekMessage(&message, 0, 0, 0, PM_REMOVE))
 		{
-			if (message_result == -1) Terminate;
-				TranslateMessage(&message);
-				DispatchMessageA(&message);
-		}
+			switch(message.message)
+			{
+				case WM_SIZE:
+				{
+					RECT client_rect;
+					GetClientRect(s_app.window, &client_rect);
+					
+					s_app.window_width = client_rect.right - client_rect.left;
+					s_app.window_height = client_rect.bottom - client_rect.top;
+					
+					s_app.flags |= (1 << (u32)App_Flags::window_has_resized);
+					
+					s_app.force_update_surface = true;
+				}break;
+				
+				
+				case WM_DESTROY:
+				case WM_CLOSE:
+				{
+					s_app.flags |= (1 << (u32)App_Flags::wants_to_exit);
+				}break;
+				
+				
+				case WM_CHAR:
+				{
+					char c = (char)message.wParam;
+					
+					u32 lenght = Array_Lenght(s_app.typing_information.buffer);
+					if(s_app.typing_information.count < lenght)
+					{
+						s_app.typing_information.buffer[s_app.typing_information.count] = c;
+						s_app.typing_information.count += 1;
+					}
+					
+				}break;
+				
+				
+				case WM_MOUSEWHEEL:
+				{
+					f32 wheel_delta = f32(GET_WHEEL_DELTA_WPARAM(message.wParam));
+					s_app.scroll_delta = wheel_delta / f32(WHEEL_DELTA);
+				}break;
+				
+				
+				case WM_ACTIVATEAPP:
+				{
+					BOOL active = (BOOL)message.wParam;
+					
+					u8 n = (u8)App_Flags::is_focused;
+					s_app.flags = (s_app.flags & ~(1 << n)) | (active << n);
+					s_app.force_update_surface = true;
+				}break;
+			}
+		}		
 	}
 	
 	// Update controller state.

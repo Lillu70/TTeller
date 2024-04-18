@@ -581,6 +581,7 @@ static void Do_Event_Editor_Text_Frame()
 			
 			if(GUI_Do_Button(context, AUTO, &dim, button_text))
 			{
+				s_global_data.active_menu = Menus::event_editor_participents;
 			}			
 		}
 		
