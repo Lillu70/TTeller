@@ -1,11 +1,13 @@
 
 #pragma once
 
+
 static inline u32 GUI_Make_Ignore_Selection_Mask()
 {
 	u32 result = GUI_Context_Flags::soft_ignore_selection | GUI_Context_Flags::hard_ignore_selection;
 	return result;
 }
+
 
 static inline bool GUI_Is_Context_Ready(GUI_Context* context)
 {
@@ -433,12 +435,14 @@ static inline GUI_Placement GUI_Get_Placement(GUI_Context* context, v2f* dim, v2
 		}
 	}
 	
-	layout->last_element_pos = result.pos;
-	layout->last_element_dim = result.dim;
-	
-	result.rect = Create_Rect_Center(result.pos, result.dim);
-
-	GUI_Update_Bounds(context, result.rect);
+	result.rect = Create_Rect_Center_HZ(result.pos, result.dim);
+	if(Is_Rect_Valid(result.rect))
+	{
+		layout->last_element_pos = result.pos;
+		layout->last_element_dim = result.dim;
+		
+		GUI_Update_Bounds(context, result.rect);		
+	}
 
 	return result;
 }
@@ -608,8 +612,7 @@ static inline void GUI_End_Context(GUI_Context* context)
 	u32 ignore_selection_mask = GUI_Make_Ignore_Selection_Mask();
 	
 	// Selection wrapping.
-	if(Bit_Not_Set(context->flags, ignore_selection_mask) && 
-		Bit_Not_Set(context->flags, GUI_Context_Flags::disable_wrapping))
+	if(Bit_Not_Set(context->flags, ignore_selection_mask | GUI_Context_Flags::disable_wrapping))
 	{
 		if(context->widget_count > 0 &&
 			context->selected_index > context->widget_count - 1 &&
@@ -785,7 +788,8 @@ static inline void GUI_End_Context(GUI_Context* context)
 			}
 			
 			f32 mouse_scroll;
-			if(Bit_Not_Set(context->flags, GUI_Context_Flags::disable_mouse_scroll) &&
+			u32 mouse_scroll_mask = GUI_Context_Flags::disable_mouse_scroll | ignore_selection_mask;
+			if(Bit_Not_Set(context->flags, mouse_scroll_mask) &&
 				Is_Point_Inside_Rect(context->cursor_fpos, context->canvas_rect) &&
 				Is_Flag_Set(context->platform->Get_Flags(), (u32)App_Flags::is_focused))
 			{
@@ -937,7 +941,7 @@ static inline void GUI_End_Context(GUI_Context* context)
 		}
 		
 		if(Bit_Not_Set(context->flags, ignore_selection_mask) 
-			&& !selected_element_is_window_slider)
+			&& !selected_element_is_window_slider && context->selected_id)
 		{
 			f32 true_canvas_height = canvas_dim.y;
 		
@@ -1380,7 +1384,9 @@ static void GUI_Do_Text(
 	v2f dim = GUI_Tight_Fit_Text(text, text_scale, &theme->font);
 	
 	GUI_Placement p = GUI_Get_Placement(context, &dim, pos);
-
+	if(!Is_Rect_Valid(p.rect))
+		return;
+	
 	v2f text_p = GUI_Calc_Centered_Text_Position(text, text_scale, p.pos, &theme->font);
 	
 	// --------------------------------------------------------------------------
@@ -1421,7 +1427,8 @@ static bool GUI_Do_Button(
 	}
 	
 	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
-	
+	if(!Is_Rect_Valid(p.rect))
+		return false;
 	
 	u32 id = GUI_Generate_ID(p.rect, __LINE__);
 	
@@ -1490,6 +1497,8 @@ static bool GUI_Do_Fill_Slider(
 	// --------------------------------------------------------------------------
 	
 	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
+	if(!Is_Rect_Valid(p.rect))
+		return false;
 	
 	u32 id = GUI_Generate_ID(p.rect, __LINE__);
 	
@@ -1611,6 +1620,8 @@ static bool GUI_Do_Handle_Slider(
 	// --------------------------------------------------------------------------
 	
 	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
+	if(!Is_Rect_Valid(p.rect))
+		return false;
 	
 	u32 id = GUI_Generate_ID(p.rect, __LINE__);
 	
@@ -1639,6 +1650,8 @@ static bool GUI_Do_Handle_Slider(
 	f32 handle_lenght = Max(bar_internal_lenght / possibility_space, min_handle_width);
 	f32 half_handle_lenght = handle_lenght / 2;
 	f32 slidable_lenght = bar_internal_lenght - handle_lenght;
+	if(slidable_lenght <= 0)
+		return false;
 	
 	f32 divizor = possibility_space - 1;
 	
@@ -1711,7 +1724,6 @@ static bool GUI_Do_Handle_Slider(
 			
 			rel_cursor = (f32(cardinal_dir) * bar_internal_lenght) + (rel_cursor * y_flip);
 			
-			
 			f32 percent = rel_cursor / slidable_lenght;
 			
 			f32 v = (percent * range);
@@ -1783,6 +1795,8 @@ static bool GUI_Do_Checkbox(GUI_Context* context, v2f* pos, v2f* dim, bool* valu
 	// --------------------------------------------------------------------------
 	
 	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
+	if(!Is_Rect_Valid(p.rect))
+		return false;
 	
 	u32 id = GUI_Generate_ID(p.rect, __LINE__);
 	
@@ -1874,6 +1888,9 @@ static u32 GUI_Do_Dropdown_Button(
 	
 	
 	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
+	if(!Is_Rect_Valid(p.rect))
+		return false;
+	
 	
 	Rect id_rect = {p.rect.min - context->anchor_base, p.rect.max - context->anchor_base};
 	
@@ -2072,10 +2089,11 @@ static bool GUI_Do_SL_Input_Field(
 	// --------------------------------------------------------------------------
 	
 	GUI_Placement p = GUI_Get_Placement(context, &dim, pos);
+	if(!Is_Rect_Valid(p.rect))
+		return false;
 	
 	u32 id = GUI_Generate_ID(p.rect, __LINE__);
 	
-
 	bool cursor_on_selection = Is_Point_Inside_Rect(context->cursor_fpos, p.rect);
 	bool is_selected = GUI_Is_Element_Selected(context, cursor_on_selection, id);
 	
@@ -2494,6 +2512,8 @@ static void GUI_Do_ML_Input_Field(
 	GUI_Theme* theme = context->layout.theme;
 
 	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
+	if(!Is_Rect_Valid(p.rect))
+		return;
 	
 	u32 id = GUI_Generate_ID(p.rect, __LINE__);
 	
@@ -2529,7 +2549,13 @@ static void GUI_Do_ML_Input_Field(
 	{
 		// w: dif between text_p and p.pos twice.
 		f32 h = (p.rect.max.y - (text_p.y + char_height)) * 2;
-		view_limit_y = (u32)Floor((p.dim.y - h) / char_height);		
+		f32 text_area_height = p.dim.y - h;
+		
+		// Just exit of the text box is too small to draw any text in.
+		if(text_area_height <= char_height)
+			return;
+		
+		view_limit_y = (u32)Floor(text_area_height / char_height);		
 	}
 
 	bool enable_scroll_bar = false;
@@ -2598,26 +2624,12 @@ static void GUI_Do_ML_Input_Field(
 				u32 line_start_buffer[16] = {};
 				i32 line_start_buffer_len = Array_Lenght(line_start_buffer);
 				
-				// If the line count exceeds the view limit, then a scroll bar is enabled and
-				// because that effects the view_limit_x counting has to be restarted.
-				if(str->lenght > view_limit_x * view_limit_y)
-				{
-					enable_scroll_bar = true;
-					
-					// Calculate view limit.
-					{
-						// w: dif between text_p and p.pos twice.
-						f32 w = (text_p.x - p.rect.min.x) * 2 + scroll_bar_width;
-						view_limit_x = (u32)Floor((p.dim.x - w) / char_width);
-					}
-				}
-				
 				f64 time = context->platform->Get_Time_Stamp();
 				state->draw_cursor = !(time > state->flicker_start_time) || (u64)time % 2;
 				
 				bool shift_down = context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT) || 
 					context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT);
-
+				
 				if(navigation)
 				{	
 					if(!state->scroll_bar_drag_mode)
@@ -2691,8 +2703,7 @@ static void GUI_Do_ML_Input_Field(
 						if(mouse_is_down && cursor_on_selection)
 						{
 							desired_row_jumps = 0;
-							
-							desired_row_jumps = 0;
+					
 							v2f mouse_rel_pos = text_p + v2f{0, char_height};	
 							v2f rel_mouse_pos = context->cursor_fpos - mouse_rel_pos;
 							rel_mouse_pos.y *= -1;
@@ -2703,10 +2714,10 @@ static void GUI_Do_ML_Input_Field(
 							fcell.x = Round(fcell.x);
 							
 							mouse_cell = fcell.As<u32>();
-							if(mouse_cell.x <= view_limit_x && mouse_cell.y <= view_limit_y)
+							if(mouse_cell.y <= view_limit_y)
 							{
 								mouse_cell.y += state->view_offset;
-								click_in_text_region = true;
+								click_in_text_region = true;								
 							}
 						}
 						
@@ -2728,12 +2739,25 @@ static void GUI_Do_ML_Input_Field(
 						character_check);					
 				}
 				
+				// If the line count exceeds the view limit, then a scroll bar is enabled and
+				// because that effects the view_limit_x counting has to be restarted.
+				if(str->lenght > view_limit_x * view_limit_y)
+				{
+					enable_scroll_bar = true;
+					
+					// Calculate view limit.
+					{
+						// w: dif between text_p and p.pos twice.
+						f32 w = (text_p.x - p.rect.min.x) * 2 + scroll_bar_width;
+						view_limit_x = (u32)Floor((p.dim.x - w) / char_width);
+					}
+				}
 				
 				// Count the number of virtual and real new lines.
 				
 				b32 cursor_on_virtual_last_line = false;
 				u32 new_cursor_write_pos;
-				
+				bool cursor_moved_with_mouse;
 				bool recalc;
 				do
 				{
@@ -2742,6 +2766,7 @@ static void GUI_Do_ML_Input_Field(
 						cursor_line = 1;
 						line_count = 1;
 						new_cursor_write_pos = 0;
+						state->view_offset = 0;
 						break;
 					}
 					
@@ -2753,6 +2778,7 @@ static void GUI_Do_ML_Input_Field(
 					
 					recalc = false;
 					cursor_on_virtual_last_line = false;
+					cursor_moved_with_mouse = false;
 					cursor_line = 0;
 					line_count = 0;
 					visible_text_start = 0;
@@ -2767,8 +2793,9 @@ static void GUI_Do_ML_Input_Field(
 						b32 is_last_char = c == str_end;
 						b32 is_new_line = *c == '\n';
 						u32 exclusive_lenght = u32(c - str_begin) - line_start;
+						b32 is_virtual_line = exclusive_lenght >= view_limit_x;
 						
-						if(is_new_line || exclusive_lenght >= view_limit_x || c == str_end)
+						if(is_new_line || is_virtual_line || c == str_end)
 						{
 							u32 effct_len = exclusive_lenght + (is_new_line | is_last_char);
 							Assert(effct_len);
@@ -2779,17 +2806,20 @@ static void GUI_Do_ML_Input_Field(
 							// On mouse click move the cursor here.
 							if(click_in_text_region)
 							{
+								u32 cell_x = Min(mouse_cell.x, view_limit_x);
+								
 								if(mouse_cell.y == line_count)
 								{
 									u32 line_lenght = exclusive_lenght;
 									if(line_lenght > 0 && !is_new_line)
 										line_lenght += is_last_char;
 									
-									u32 offset = Min(mouse_cell.x, line_lenght);
+									u32 offset = Min(cell_x, line_lenght - is_virtual_line);
 									new_cursor_write_pos = line_start + offset;
 									cursor_line = line_count + 1;
 									cursor_state_is_unknown = false;
 									state->cursor_is_active = true;
+									cursor_moved_with_mouse = true;
 								}
 								else if(is_last_char && is_new_line && mouse_cell.y == line_count + 1)
 								{
@@ -2798,6 +2828,7 @@ static void GUI_Do_ML_Input_Field(
 									cursor_state_is_unknown = false;
 									state->cursor_is_active = true;
 									cursor_on_virtual_last_line = true;
+									cursor_moved_with_mouse = true;
 								}
 							}
 							
@@ -2809,7 +2840,7 @@ static void GUI_Do_ML_Input_Field(
 							// If this is a virual line, go back one character as,
 							// we're not actually counting this one.
 							// Dont do on last char to avoid infinite loop.
-							if((c != str_end || exclusive_lenght >= view_limit_x) && !is_new_line)
+							if((c != str_end || is_virtual_line) && !is_new_line)
 							{
 								c -= 1;
 								is_last_char = false;
@@ -2957,28 +2988,6 @@ static void GUI_Do_ML_Input_Field(
 									view_limit_x = (u32)Floor((p.dim.x - w) / char_width);
 								}
 								
-								// Re-calculate mouse_cell with the new view_limit_x.
-								if(mouse_is_down && cursor_on_selection)
-								{
-									click_in_text_region = false;
-									
-									v2f mouse_rel_pos = text_p + v2f{0, char_height};	
-									v2f rel_mouse_pos = context->cursor_fpos - mouse_rel_pos;
-									rel_mouse_pos.y *= -1;
-									v2f cell_dim = v2f{char_width, char_height};
-									
-									// This depends on underflow.
-									v2f fcell = Hadamar_Division(rel_mouse_pos, cell_dim);
-									fcell.x = Round(fcell.x);
-									
-									mouse_cell = fcell.As<u32>();
-									if(mouse_cell.x <= view_limit_x && mouse_cell.y <= view_limit_y)
-									{
-										mouse_cell.y += state->view_offset;
-										click_in_text_region = true;
-									}
-								}
-								
 								recalc = true;
 								break;								
 							}
@@ -2994,10 +3003,8 @@ static void GUI_Do_ML_Input_Field(
 				
 				// Mouse highlight
 				{
-					Rect text_rect = p.rect;
-					text_rect.max.x = text_p.x + f32(view_limit_x) * char_width;
-					
-					if(mouse_pressed_down && Is_Point_Inside_Rect(context->cursor_fpos, text_rect))
+		
+					if(mouse_pressed_down && cursor_moved_with_mouse)
 					{
 						if(shift_down && state->text_select_mode)
 						{

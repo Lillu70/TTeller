@@ -18,7 +18,7 @@
 #include "App\Main_App.h"
 
 static constexpr u32 APP_MEMORY_SIZE = MiB;
-static const wchar_t* APP_TITLE = L"Nalkapeli";
+static const wchar_t* APP_TITLE = L"N\xE4lk\xE4peli";
 
 Declare_Timing_Tables();
 
@@ -33,12 +33,11 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	
 	while(Is_Flag_Set(s_app.flags, (u32)App_Flags::is_running))
     {
-		
 		Begin_Timing_Block(run_time);
 		
 		Win32_Flush_Events();
 		
-		bool update_surface = true;
+		bool update_surface = false;
 		
 		Update_App(frame_time, &update_surface);
 		

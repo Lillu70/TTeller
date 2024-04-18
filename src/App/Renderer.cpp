@@ -856,7 +856,7 @@ static void Dim_Entire_Screen(Canvas* canvas, f32 s)
 		__m128i wc34 = _mm_or_si128(wc3, wc4);
 		
 		__m128i result = _mm_or_si128(wc12, wc34);
-		_mm_storeu_si128((__m128i*)pxl, result);
+		_mm_store_si128((__m128i*)pxl, result);
 	}
 
 	#else

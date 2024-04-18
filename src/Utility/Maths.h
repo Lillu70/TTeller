@@ -253,6 +253,27 @@ static inline Rect Create_Rect_Min_Dim(v2f min, v2f dim)
 }
 
 
+static inline Rect Create_Rect_Center_HZ(v2f pos, v2f dim)
+{
+	dim *= 0.5f;
+	Rect result = {pos - dim, pos + dim};
+	return result;
+}
+
+
+static inline Rect Create_Rect_Min_Max_HZ(v2f min, v2f max)
+{
+	Rect result = { min, max };
+	return result;
+}
+
+
+static inline Rect Create_Rect_Min_Dim_HZ(v2f min, v2f dim)
+{
+	Rect result = { min, min + dim };
+	return result;
+}
+
 
 static inline bool Is_Point_Inside_Rect(v2f p, Rect rect)
 {

@@ -12,11 +12,13 @@ static GUI_Context s_gui_banner;
 static GUI_Context s_gui_pop_up;
 
 
+// TODO: FUCKING RENAME THESE!
 enum class Menus : u32
 {
 	none = 0,
-	event_editor_participents,
+	event_editor_requirements,
 	event_editor_text,
+	event_editor_consequences,
 	all_events,
 };
 
@@ -73,6 +75,8 @@ static void Delete_All_Participants_From_Event(Event_State* event)
 
 static inline void Init_GUI()
 {
+	s_gui_pop_up.flags |= GUI_Context_Flags::enable_dynamic_sliders;
+	
 	GUI_Set_Default_Menu_Actions(&s_global_data.menu_actions[0]);
 
 	GUI_DEFAULT_TEXT_SCALE = v2f{2, 2};
@@ -161,7 +165,7 @@ Do_GUI_Frame_With_Banner(banner_func, menu_func);
 static void Do_GUI_Frame_With_Banner(
 	void(*banner_func)(GUI_Context*), 
 	void(*menu_func)(GUI_Context*), 
-	u32 banner_height = 255)
+	u32 banner_height = 225)
 {
 	Assert(banner_height);
 	Assert(banner_func);
@@ -194,8 +198,14 @@ static void Do_GUI_Frame_With_Banner(
 	GUI_End_Context(context);
 	
 	v2u menu_dim = v2u{s_canvas.dim.x, s_canvas.dim.y - banner_dim.y};
-	if(menu_dim.y == 0)	
+	
+	if(menu_dim.y <= 0)
+	{
+		// Make sure banner is usable.
+		Inverse_Bit_Mask(&s_gui_banner.flags, GUI_Context_Flags::soft_ignore_selection);
+		s_gui.flags |= GUI_Context_Flags::soft_ignore_selection;
 		return;
+	}
 	
 	Canvas menu_canvas;
 	Init_Canvas(&menu_canvas, s_canvas.buffer, menu_dim);
@@ -226,7 +236,7 @@ static void Do_All_Events_Frame()
 		{
 			if(jump_into_new_event)
 			{
-				s_global_data.active_menu = Menus::event_editor_participents;
+				s_global_data.active_menu = Menus::event_editor_requirements;
 				s_global_data.active_event_index = s_global_data.all_events->count;			
 			}
 			
@@ -269,7 +279,7 @@ static void Do_All_Events_Frame()
 			
 			if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, e->name.buffer))
 			{
-				s_global_data.active_menu = Menus::event_editor_participents;
+				s_global_data.active_menu = Menus::event_editor_requirements;
 				s_global_data.active_event_index = i;
 			}
 			
@@ -318,32 +328,47 @@ static void Do_Event_Editor_Requirements_Frame()
 		
 		f32 padding = context->layout.theme->padding;
 		
-		static constexpr char* back_button_text = "<";
-		v2f back_button_dim = GUI_Tight_Fit_Text(
-			back_button_text, 
-			GUI_DEFAULT_TEXT_SCALE, 
-			&context->layout.theme->font);
+		static constexpr char* go_to_all_events_text = "<";
+		static constexpr char* go_to_event_text_text = "Tapahtuma Teksti";
+		static constexpr char* go_to_consequences_text = "Seuraamukset";
 		
-		back_button_dim.x += padding;
-		back_button_dim.y = title_height;
-		f32 menu_buttons_width = back_button_dim.x * 2 + padding * 2 + context->dynamic_slider_girth;
+		v2f scale = GUI_DEFAULT_TEXT_SCALE;
+		Font* font = &context->layout.theme->font;
+		
+		f32 h = title_height + padding;
+		f32 w1 = GUI_Tight_Fit_Text(go_to_all_events_text,   scale, font).x + padding;
+		f32 w2 = GUI_Tight_Fit_Text(go_to_event_text_text, scale, font).x + padding;
+		f32 w3 = GUI_Tight_Fit_Text(go_to_consequences_text, scale, font).x + padding;
+		
+		f32 ctrl_buttons_width = w1 + w2 + w3 + context->dynamic_slider_girth + padding * 2;
 		f32 back_button_x;
 		
-		if(tile_bounds_max.x + padding > f32(context->canvas->dim.x) - menu_buttons_width)
+		if(tile_bounds_max.x + padding > f32(context->canvas->dim.x) - ctrl_buttons_width)
 			back_button_x = tile_bounds_max.x + padding;
-		
 		else
-			back_button_x = f32(context->canvas->dim.x) - menu_buttons_width;
-		
+			back_button_x = f32(context->canvas->dim.x) - ctrl_buttons_width;
 		
 		f32 back_button_y = f32(context->canvas->dim.y) - padding;
 		v2f back_button_pos = v2f{back_button_x, back_button_y};
 		
-		if(GUI_Do_Button(context, &back_button_pos, &back_button_dim, back_button_text))
+		v2f dim = v2f{w1, h};
+		if(GUI_Do_Button(context, &back_button_pos, &dim, go_to_all_events_text))
+		{
 			s_global_data.active_menu = Menus::all_events;
+			
+		}
 		
-		if(GUI_Do_Button(context, AUTO, AUTO, ">"))
-			s_global_data.active_menu = Menus::event_editor_text;
+		dim = v2f{w2, h};
+		if(GUI_Do_Button(context, AUTO, &dim, go_to_event_text_text))
+		{
+			s_global_data.active_menu = Menus::event_editor_text;	
+		}
+		
+		dim = v2f{w3, h};
+		if(GUI_Do_Button(context, AUTO, &dim, go_to_consequences_text))
+		{
+			s_global_data.active_menu = Menus::event_editor_consequences;
+		}
 		
 	}; // ----------------------------------------------------------------------------------------
 	
@@ -544,91 +569,57 @@ static void Do_Event_Editor_Text_Frame()
 		Event_State* event = Begin(s_global_data.all_events) + s_global_data.active_event_index;
 		
 		GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "Tapahtuma Teksti", {}, v2f{4,4}, true);
+		
 		f32 title_height = context->layout.last_element_dim.y;
+		
 		v2f tile_bounds_max = GUI_Get_Bounds_In_Pixel_Space(context).max;
 
 		context->layout.build_direction = GUI_Build_Direction::right_center;
 		
 		f32 padding = context->layout.theme->padding;
 		
-		v2f spacing = {30, 0};
-		GUI_Do_Spacing(context, &spacing);
+		static constexpr char* go_to_all_events_text = "<";
+		static constexpr char* go_to_requirements_text = "Vaatimukset";
+		static constexpr char* go_to_consequences_text = "Seuraamukset";
 		
-		{
-			static constexpr char* button_text = "<";
-			
-			f32 button_width = GUI_Tight_Fit_Text(
-				button_text, 
-				GUI_DEFAULT_TEXT_SCALE, 
-				&context->layout.theme->font).x + padding;
-				
-			v2f dim =  {button_width, context->layout.last_element_dim.y};
-			
-			if(GUI_Do_Button(context, AUTO, &dim, button_text))
-			{
-			}			
-		}
+		v2f scale = GUI_DEFAULT_TEXT_SCALE;
+		Font* font = &context->layout.theme->font;
 		
-		{
-			static constexpr char* button_text = "Vaatimukset";
-			
-			f32 button_width = GUI_Tight_Fit_Text(
-				button_text, 
-				GUI_DEFAULT_TEXT_SCALE, 
-				&context->layout.theme->font).x + padding;
-				
-			v2f dim =  {button_width, context->layout.last_element_dim.y};
-			
-			if(GUI_Do_Button(context, AUTO, &dim, button_text))
-			{
-				s_global_data.active_menu = Menus::event_editor_participents;
-			}			
-		}
+		f32 h = title_height + padding;
+		f32 w1 = GUI_Tight_Fit_Text(go_to_all_events_text,   scale, font).x + padding;
+		f32 w2 = GUI_Tight_Fit_Text(go_to_requirements_text, scale, font).x + padding;
+		f32 w3 = GUI_Tight_Fit_Text(go_to_consequences_text, scale, font).x + padding;
 		
-		
-		{
-			static constexpr char* button_text = "Seuraamukset";
-			
-			f32 button_width = GUI_Tight_Fit_Text(
-				button_text, 
-				GUI_DEFAULT_TEXT_SCALE, 
-				&context->layout.theme->font).x + padding;
-				
-			v2f dim =  {button_width, context->layout.last_element_dim.y};
-			
-			if(GUI_Do_Button(context, AUTO, &dim, button_text))
-			{
-			}			
-		}
-		
-		#if 0
-		f32 padding = context->layout.theme->padding;
-		
-		static constexpr char* back_button_text = "<";
-		v2f back_button_dim = GUI_Tight_Fit_Text(
-			back_button_text, 
-			GUI_DEFAULT_TEXT_SCALE, 
-			&context->layout.theme->font);
-		
-		back_button_dim.x += padding;
-		back_button_dim.y = title_height;
-		f32 menu_buttons_width = back_button_dim.x * 1 + padding * 2 + context->dynamic_slider_girth;
+		f32 ctrl_buttons_width = w1 + w2 + w3 + context->dynamic_slider_girth + padding * 2;
 		f32 back_button_x;
 		
-		if(tile_bounds_max.x + padding > f32(context->canvas->dim.x) - menu_buttons_width)
+		if(tile_bounds_max.x + padding > f32(context->canvas->dim.x) - ctrl_buttons_width)
 			back_button_x = tile_bounds_max.x + padding;
-		
 		else
-			back_button_x = f32(context->canvas->dim.x) - menu_buttons_width;
-		
+			back_button_x = f32(context->canvas->dim.x) - ctrl_buttons_width;
 		
 		f32 back_button_y = f32(context->canvas->dim.y) - padding;
 		v2f back_button_pos = v2f{back_button_x, back_button_y};
 		
-		if(GUI_Do_Button(context, &back_button_pos, &back_button_dim, back_button_text))
-			s_global_data.active_menu = Menus::event_editor_participents;
+		v2f dim = v2f{w1, h};
+		if(GUI_Do_Button(context, &back_button_pos, &dim, go_to_all_events_text))
+		{
+			s_global_data.active_menu = Menus::all_events;
+			
+		}
 		
-		#endif
+		dim = v2f{w2, h};
+		if(GUI_Do_Button(context, AUTO, &dim, go_to_requirements_text))
+		{
+			s_global_data.active_menu = Menus::event_editor_requirements;	
+		}
+		
+		dim = v2f{w3, h};
+		if(GUI_Do_Button(context, AUTO, &dim, go_to_consequences_text))
+		{
+			s_global_data.active_menu = Menus::event_editor_consequences;
+		}
+		
 	}; // ----------------------------------------------------------------------------------------
 
 	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
@@ -640,6 +631,75 @@ static void Do_Event_Editor_Text_Frame()
 			
 			GUI_Do_ML_Input_Field(context, &GUI_AUTO_MIDDLE, &dim, &event->event_text, 0);
 		}
+		
+	}; // ----------------------------------------------------------------------------------------
+
+	Do_GUI_Frame_With_Banner(banner_func, menu_func);
+}
+
+
+static void Do_Event_Editor_Consequences_Frame()
+{
+	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
+	{
+		Event_State* event = Begin(s_global_data.all_events) + s_global_data.active_event_index;
+		
+		GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "Seuraamukset", {}, v2f{4,4}, true);
+		
+		f32 title_height = context->layout.last_element_dim.y;
+		
+		v2f tile_bounds_max = GUI_Get_Bounds_In_Pixel_Space(context).max;
+
+		context->layout.build_direction = GUI_Build_Direction::right_center;
+		
+		f32 padding = context->layout.theme->padding;
+		
+		static constexpr char* go_to_all_events_text = "<";
+		static constexpr char* go_to_requirements_text = "Vaatimukset";
+		static constexpr char* go_to_event_text_text = "Tapahtuma Teksti";
+		
+		v2f scale = GUI_DEFAULT_TEXT_SCALE;
+		Font* font = &context->layout.theme->font;
+		
+		f32 h = title_height + padding;
+		f32 w1 = GUI_Tight_Fit_Text(go_to_all_events_text,   scale, font).x + padding;
+		f32 w2 = GUI_Tight_Fit_Text(go_to_requirements_text, scale, font).x + padding;
+		f32 w3 = GUI_Tight_Fit_Text(go_to_event_text_text, scale, font).x + padding;
+		
+		f32 ctrl_buttons_width = w1 + w2 + w3 + context->dynamic_slider_girth + padding * 2;
+		f32 back_button_x;
+		
+		if(tile_bounds_max.x + padding > f32(context->canvas->dim.x) - ctrl_buttons_width)
+			back_button_x = tile_bounds_max.x + padding;
+		else
+			back_button_x = f32(context->canvas->dim.x) - ctrl_buttons_width;
+		
+		f32 back_button_y = f32(context->canvas->dim.y) - padding;
+		v2f back_button_pos = v2f{back_button_x, back_button_y};
+		
+		v2f dim = v2f{w1, h};
+		if(GUI_Do_Button(context, &back_button_pos, &dim, go_to_all_events_text))
+		{
+			s_global_data.active_menu = Menus::all_events;
+			
+		}
+		
+		dim = v2f{w2, h};
+		if(GUI_Do_Button(context, AUTO, &dim, go_to_requirements_text))
+		{
+			s_global_data.active_menu = Menus::event_editor_requirements;	
+		}
+		
+		dim = v2f{w3, h};
+		if(GUI_Do_Button(context, AUTO, &dim, go_to_event_text_text))
+		{
+			s_global_data.active_menu = Menus::event_editor_text;
+		}
+		
+	}; // ----------------------------------------------------------------------------------------
+
+	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
+	{
 		
 	}; // ----------------------------------------------------------------------------------------
 
@@ -704,45 +764,17 @@ static void Run_Active_Menu(bool quit_app_pop_up)
 		Inverse_Bit_Mask(&s_gui_banner.flags, GUI_Context_Flags::hard_ignore_selection);
 	}
 	
-	
 	Menus current_menu = s_global_data.active_menu;
-	
-	#if 0
-	
-	s_gui.anchor_base = v2f{0.5f, 0.5f};
-	
-	#endif
-	
+		
 	switch(current_menu)
 	{
 		case Menus::none:
 		{
-			#if 0
-			
-			Clear_Canvas(&s_canvas, WHITE);
-
-			GUI_Begin_Context(&s_gui, &s_platform, &s_canvas,  (Action*)&s_global_data.menu_actions, &s_theme);
-			
-			s_gui.layout.anchor = GUI_Anchor::center;
-			
-			f32 time = f32(s_platform.Get_Time_Stamp());
-			v2f scale = {2.f + Sin(time), 2.f + Cos(time)};
-			
-			v2f p = v2u::Cast<f32>(s_canvas.dim) / 2 + (v2f{Cos(time), Sin(time)} * 100);
-			
-			GUI_Do_Text(&s_gui, &p, "does 1x1 text still work?!", {}, scale);
-			
-			GUI_End_Context(&s_gui);
-			
-			#else
-			
 			s_global_data.active_menu = Menus::event_editor_text;
-			
-			#endif
-			
+
 		}break;
 		
-		case Menus::event_editor_participents:
+		case Menus::event_editor_requirements:
 		{
 			Do_Event_Editor_Requirements_Frame();
 		}break;
@@ -750,6 +782,11 @@ static void Run_Active_Menu(bool quit_app_pop_up)
 		case Menus::event_editor_text:
 		{
 			Do_Event_Editor_Text_Frame();
+		}break;
+		
+		case Menus::event_editor_consequences:
+		{
+			Do_Event_Editor_Consequences_Frame();
 		}break;
 		
 		case Menus::all_events:
