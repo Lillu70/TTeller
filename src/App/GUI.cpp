@@ -170,7 +170,11 @@ static inline void GUI_Update_Bounds(GUI_Context* context, Rect rect)
 }
 
 
-static inline GUI_Placement GUI_Get_Placement(GUI_Context* context, v2f* dim, v2f* pos)
+static inline GUI_Placement GUI_Get_Placement(
+	GUI_Context* context, 
+	v2f* dim, 
+	v2f* pos, 
+	bool allow_rect_to_be_invalid = true)
 {
 	GUI_Layout* layout = &context->layout;
 	
@@ -196,7 +200,10 @@ static inline GUI_Placement GUI_Get_Placement(GUI_Context* context, v2f* dim, v2
 	
 	if(!pos)
 	{
-		Assert(last_element_dim.x * last_element_dim.y > 0);
+		//Assert(last_element_dim.x * last_element_dim.y > 0);
+		
+		v2f half_last_dim = last_element_dim / 2;
+		v2f half_out_dim = result.dim / 2;
 		
 		v2f offset;
 		switch(layout->build_direction)
@@ -227,8 +234,6 @@ static inline GUI_Placement GUI_Get_Placement(GUI_Context* context, v2f* dim, v2
 			
 			case GUI_Build_Direction::down_left:
 			{
-				v2f half_last_dim = last_element_dim / 2;
-				v2f half_out_dim = result.dim / 2;
 				offset = v2f{0, -half_last_dim.y - half_out_dim.y - padding};
 			
 				f32 left_shift = half_out_dim.x - half_last_dim.x;
@@ -238,78 +243,50 @@ static inline GUI_Placement GUI_Get_Placement(GUI_Context* context, v2f* dim, v2
 			
 			case GUI_Build_Direction::down_right:
 			{
-				v2f half_last_dim = last_element_dim / 2;
-				v2f half_out_dim = result.dim / 2;
-				offset = v2f{0, -half_last_dim.y - half_out_dim.y - padding};
-			
 				f32 right_shift = half_last_dim.x - half_out_dim.x;
-				offset.x += right_shift;
+				offset = v2f{right_shift, -half_last_dim.y - half_out_dim.y - padding};
 			}break;
 			
 			
 			case GUI_Build_Direction::up_left:
 			{
-				v2f half_last_dim = last_element_dim / 2;
-				v2f half_out_dim = result.dim / 2;
-				offset = v2f{0, half_last_dim.y + half_out_dim.y + padding};
-			
 				f32 left_shift = half_out_dim.x - half_last_dim.x;
-				offset.x += left_shift;
+				offset = v2f{left_shift, half_last_dim.y + half_out_dim.y + padding};
 			}break;
 			
 			
 			case GUI_Build_Direction::up_right:
 			{
-				v2f half_last_dim = last_element_dim / 2;
-				v2f half_out_dim = result.dim / 2;
-				offset = v2f{0, half_last_dim.y + half_out_dim.y + padding};
-			
 				f32 right_shift = half_last_dim.x - half_out_dim.x;
-				offset.x += right_shift;
+				offset = v2f{right_shift, half_last_dim.y + half_out_dim.y + padding};
 			}break;
 			
 			
 			case GUI_Build_Direction::left_top:
 			{
-				v2f half_last_dim = last_element_dim / 2;
-				v2f half_out_dim = result.dim / 2;
-				offset = v2f{-half_last_dim.x - half_out_dim.x - padding, 0};
-			
 				f32 up_shift = half_last_dim.y - half_out_dim.y;
-				offset.y += up_shift;
+				offset = v2f{-half_last_dim.x - half_out_dim.x - padding, up_shift};
 			}break;
 			
 			
 			case GUI_Build_Direction::left_bottom:
 			{
-				v2f half_last_dim = last_element_dim / 2;
-				v2f half_out_dim = result.dim / 2;
-				offset = v2f{-half_last_dim.x - half_out_dim.x - padding, 0};
-			
 				f32 up_shift = half_out_dim.y - half_last_dim.y;
-				offset.y += up_shift;
+				offset = v2f{-half_last_dim.x - half_out_dim.x - padding, up_shift};
 			}break;
 			
 			
 			case GUI_Build_Direction::right_top:
 			{
-				v2f half_last_dim = last_element_dim / 2;
-				v2f half_out_dim = result.dim / 2;
-				offset = v2f{half_last_dim.x + half_out_dim.x + padding, 0};
-			
 				f32 up_shift = half_last_dim.y - half_out_dim.y;
-				offset.y += up_shift;
+				offset = v2f{half_last_dim.x + half_out_dim.x + padding, up_shift};
 			}break;
 			
 			
 			case GUI_Build_Direction::right_bottom:
 			{
-				v2f half_last_dim = last_element_dim / 2;
-				v2f half_out_dim = result.dim / 2;
-				offset = v2f{half_last_dim.x + half_out_dim.x + padding, 0};
-			
 				f32 up_shift = half_out_dim.y - half_last_dim.y;
-				offset.y += up_shift;
+				offset = v2f{half_last_dim.x + half_out_dim.x + padding, up_shift};
 			}break;
 		}
 		
@@ -320,54 +297,55 @@ static inline GUI_Placement GUI_Get_Placement(GUI_Context* context, v2f* dim, v2
 		GUI_Anchor anchor = layout->anchor;
 		
 		v2f p;
+		v2f canvas_size = context->canvas->dim.As<f32>() - 1.f;
 		if(pos == &GUI_AUTO_TOP_CENTER)
 		{
 			pos = &p;
 			
 			anchor = GUI_Anchor::top;
-			p = {f32(context->canvas->dim.x / 2), f32(context->canvas->dim.y - padding)};
+			p = {canvas_size.x / 2, canvas_size.y - padding};
 		}
 		else if(pos == &GUI_AUTO_TOP_RIGHT)
 		{
 			pos = &p;
 			
 			anchor = GUI_Anchor::top_right;
-			p = v2f{f32(context->canvas->dim.x - padding), f32(context->canvas->dim.y - padding)};
+			p = v2f{canvas_size.x - padding, canvas_size.y - padding};
 		}
 		else if(pos == &GUI_AUTO_TOP_LEFT)
 		{
 			pos = &p;
 			
 			anchor = GUI_Anchor::top_left;
-			p = {f32(padding), f32(context->canvas->dim.y - padding)};
+			p = {padding, canvas_size.y - padding};
 		}
 		else if(pos == &GUI_AUTO_MIDDLE_RIGHT)
 		{
 			pos = &p;
 			
 			anchor = GUI_Anchor::right;
-			p = {f32(context->canvas->dim.x - padding), f32(context->canvas->dim.y / 2)};
+			p = {canvas_size.x - padding, canvas_size.y / 2};
 		}
 		else if(pos == &GUI_AUTO_MIDDLE_LEFT)
 		{
 			pos = &p;
 			
 			anchor = GUI_Anchor::left;
-			p = {f32(padding), f32(context->canvas->dim.y / 2)};
+			p = {padding, canvas_size.y / 2};
 		}
 		else if(pos == &GUI_AUTO_BOTTOM_CENTER)
 		{
 			pos = &p;
 			
 			anchor = GUI_Anchor::bottom;
-			p = {f32(context->canvas->dim.x / 2), padding};
+			p = {canvas_size.x / 2, padding};
 		}
 		else if(pos == &GUI_AUTO_BOTTOM_RIGHT)
 		{
 			pos = &p;
 			
 			anchor = GUI_Anchor::bottom_right;
-			p = {f32(context->canvas->dim.x - padding), padding};
+			p = {canvas_size.x - padding, padding};
 		}
 		else if(pos == &GUI_AUTO_BOTTOM_LEFT)
 		{
@@ -381,7 +359,7 @@ static inline GUI_Placement GUI_Get_Placement(GUI_Context* context, v2f* dim, v2
 			pos = &p;
 			
 			anchor = GUI_Anchor::center;
-			p = {f32(context->canvas->dim.x / 2), f32(context->canvas->dim.y / 2)};
+			p = canvas_size / 2;
 		}
 		
 		v2f half_dim = result.dim / 2;
@@ -436,7 +414,7 @@ static inline GUI_Placement GUI_Get_Placement(GUI_Context* context, v2f* dim, v2
 	}
 	
 	result.rect = Create_Rect_Center_HZ(result.pos, result.dim);
-	if(Is_Rect_Valid(result.rect))
+	if(allow_rect_to_be_invalid || Is_Rect_Valid(result.rect))
 	{
 		layout->last_element_pos = result.pos;
 		layout->last_element_dim = result.dim;
@@ -1338,9 +1316,15 @@ static bool GUI_Input_Field_Insert_Characters(
 }
 
 
-static void GUI_Do_Spacing(
-	GUI_Context* context, 
-	v2f* dim)
+static void GUI_Do_Anchor_Point(GUI_Context* context, v2f* pos)
+{
+	v2f dim = v2f{0 ,0};
+	GUI_One_Time_Skip_Padding(context);
+	GUI_Placement p = GUI_Get_Placement(context, &dim, pos, true);
+}
+
+
+static void GUI_Do_Spacing(GUI_Context* context, v2f* dim)
 {
 	Assert(GUI_Is_Context_Ready(context));
 	

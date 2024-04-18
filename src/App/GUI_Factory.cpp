@@ -642,8 +642,6 @@ static void Do_Event_Editor_Consequences_Frame()
 {
 	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
-		Event_State* event = Begin(s_global_data.all_events) + s_global_data.active_event_index;
-		
 		GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "Seuraamukset", {}, v2f{4,4}, true);
 		
 		f32 title_height = context->layout.last_element_dim.y;
@@ -700,6 +698,35 @@ static void Do_Event_Editor_Consequences_Frame()
 
 	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
+		Event_State* event = Begin(s_global_data.all_events) + s_global_data.active_event_index;
+		
+		f32 padding = context->layout.theme->padding;
+		Font* font = &context->layout.theme->font;
+		
+		GUI_Do_Anchor_Point(context, &GUI_AUTO_TOP_LEFT);
+		context->layout.build_direction = GUI_Build_Direction::right_top;
+		v2f spacing = v2f{padding, padding + font->char_height * GUI_DEFAULT_TEXT_SCALE.y};
+		GUI_Do_Spacing(context, &spacing);
+		context->layout.build_direction = GUI_Build_Direction::right_bottom;
+		
+		GUI_One_Time_Skip_Padding(context);
+		
+		for(u32 i = 0; i < event->participents->count; ++i)
+		{
+			Participent* parti = Begin(event->participents) + i;
+			
+			u8 typing_marker_buffer[12 + 2] = {0};
+			char* typing_marker;
+			{
+				typing_marker = U32_To_Char_Buffer((u8*)&typing_marker_buffer[2], i + 1);
+				typing_marker -= 1;
+				*typing_marker = 'k';
+				typing_marker -= 1;
+				*typing_marker = '\\';
+			}
+			
+			GUI_Do_Text(context, AUTO, typing_marker);
+		}
 		
 	}; // ----------------------------------------------------------------------------------------
 
@@ -770,7 +797,7 @@ static void Run_Active_Menu(bool quit_app_pop_up)
 	{
 		case Menus::none:
 		{
-			s_global_data.active_menu = Menus::event_editor_text;
+			s_global_data.active_menu = Menus::event_editor_consequences;
 
 		}break;
 		
