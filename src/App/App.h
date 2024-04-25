@@ -26,8 +26,9 @@
 #include "GUI.cpp"
 
 #include "Nalkapeli.h"
+#include "Nalkapeli.cpp"
 
-#define INTERIM_MEM_SIZE KiB * 32
+#define INTERIM_MEM_SIZE MiB
 
 static Platform_Calltable s_platform;
 

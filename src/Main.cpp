@@ -17,7 +17,7 @@
 
 #include "App\Main_App.h"
 
-static constexpr u32 APP_MEMORY_SIZE = MiB;
+static constexpr u32 APP_MEMORY_SIZE = MiB * 2;
 static const wchar_t* APP_TITLE = L"N\xE4lk\xE4peli";
 
 Declare_Timing_Tables();

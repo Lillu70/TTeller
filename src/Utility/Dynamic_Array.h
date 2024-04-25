@@ -12,6 +12,8 @@ struct Dynamic_Array
 template<typename T>
 static Dynamic_Array<T>* Create_Dynamic_Array(Allocator_Shell* allocator, u32 capacity)
 {
+	Assert(capacity);
+	
 	u32 size = sizeof(Dynamic_Array<T>) + capacity * sizeof(T);
 	
 	if(size < allocator->min_alloc_size)

@@ -79,6 +79,7 @@ static Char_Array Win32_Get_Typing_Information();
 static char* Win32_Get_Clipboard_Data_As_Text();
 static void Win32_Set_Clipboard_Data_As_Text(char* data, u32 lenght);
 static f32 Win32_Get_Scroll_Wheel_Delta();
+static bool Win32_Create_Directory(char* path);
 
 // ---------------------------------------------------------------
 // Silly maps begin here.

@@ -874,7 +874,6 @@ static void Dim_Entire_Screen(Canvas* canvas, f32 s)
 			frame_buffer_color = Pack_Color(unpacked_color);
 			
 			Set_Pixel_HZ(canvas, p, frame_buffer_color);
-			
 		}
 	}
 	

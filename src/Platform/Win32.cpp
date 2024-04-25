@@ -742,6 +742,13 @@ static f32 Win32_Get_Scroll_Wheel_Delta()
 }
 
 
+static bool Win32_Create_Directory(char* path)
+{
+	BOOL result = CreateDirectoryA(path, 0);
+	return result;
+}
+
+
 static Platform_Calltable Win32_Get_Calltable()
 {
 	Platform_Calltable ct = {};
@@ -766,6 +773,7 @@ static Platform_Calltable Win32_Get_Calltable()
 	ct.Get_Clipboard_Data_As_Text = Win32_Get_Clipboard_Data_As_Text;
 	ct.Set_Clipboard_Data_As_Text = Win32_Set_Clipboard_Data_As_Text;
 	ct.Get_Scroll_Wheel_Delta = Win32_Get_Scroll_Wheel_Delta;
+	ct.Create_Directory = Win32_Create_Directory;
 	return ct;
 }
 

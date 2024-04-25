@@ -16,7 +16,7 @@ static const char* s_exists_statement_names[] =
 };
 
 
-enum class Numerical_Relation : u16
+enum class Numerical_Relation : u8
 {
 	equal_to = 0,
 	greater_than,
@@ -33,6 +33,28 @@ static const char* s_numerical_relation_names[] =
 	">=",
 	"<",
 	"<="
+};
+
+
+static const char* s_arithmatic_names[] = 
+{
+	"+",
+	"-"
+};
+
+
+static const char* s_mark_type_names[] = 
+{
+	"Esine Merkki", 
+	"Hahmo Merkki"
+};
+
+
+enum class Mark_Type :u8
+{
+	item = 0,
+	personal,
+	COUNT
 };
 
 
@@ -59,7 +81,7 @@ struct Participation_Requirement
 	static inline const char* type_names[] = 
 		{"Ominaisuus", "Esine Merkki", "Hahmo Merkki"};
 	
-	enum class Type
+	enum class Type : u8
 	{
 		character_stat = 0,
 		mark_item,
@@ -68,10 +90,10 @@ struct Participation_Requirement
 	};
 	
 	Type type;
-	
-	u16 stat_relation_target;
 	Numerical_Relation stat_numerical_relation;
+	u16 stat_relation_target;
 	Character_Stat stat;
+	
 	
 	// Mark
 	String mark;
@@ -80,24 +102,49 @@ struct Participation_Requirement
 	static constexpr u32 initial_mark_capacity = 12;
 };
 
+struct Event_Consequens
+{
+	static inline const char* type_names[] = 
+	{
+		"Kuolema",
+		"Ominaisuus muutos",
+		"Saa merkin",
+		"Menett\xE4\xE4 merkin"
+	};
+	
+	enum class Type : u8
+	{
+		death = 0,
+		stat_change,
+		gains_mark,
+		loses_mark,
+		COUNT
+	};
+	Type type = Type::death;
+	
+	Mark_Type mark_type = Mark_Type::item;
+	bool items_are_inherited = true;
+	i8 stat_change_amount = 1;
+	Character_Stat::Stats stat = Character_Stat::Stats::body;
+	
+	String str = {};
+};
+
 
 struct Participent
 {
 	static constexpr u32 max_requirements = 20;
 	Dynamic_Array<Participation_Requirement>* reqs;
+	
+	static constexpr u32 max_consequenses = 20;
+	Dynamic_Array<Event_Consequens>* cons;
 };
 
 
-static bool Requirement_Is_Mark_Type(Participation_Requirement::Type type)
+struct Event_State
 {
-	bool result = type == Participation_Requirement::Type::mark_item ||
-		type == Participation_Requirement::Type::mark_personal;
-	return result;
-}
-
-
-static void Make_Requirement_Hollow(Participation_Requirement* req)
-{
-	if(Requirement_Is_Mark_Type(req->type))
-		req->mark.free();
-}
+	static constexpr u32 max_participent_count = 100;
+	Dynamic_Array<Participent>* participents;
+	String name;
+	String event_text;
+};

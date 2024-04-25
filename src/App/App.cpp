@@ -63,6 +63,5 @@ void Update_App(f64 delta_time, bool* update_surface)
 
 	Run_Active_Menu(wants_to_exit);
 	
-	
 	End_Timing_Block(internal_run_time);
 }

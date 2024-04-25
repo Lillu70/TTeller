@@ -62,11 +62,13 @@ struct Platform_Calltable
 	
 	u64 (*Get_Frame_Count)() = 0;
 	
-	bool (*Write_File)(const char*, u8*, u32) = 0;
+	bool (*Write_File)(const char* path, u8* buffer, u32 buffer_size) = 0;
 	
 	bool (*Get_File_Size)(const char*, u32*) = 0;
 	
 	bool (*Read_File)(const char*, u8*, u32) = 0;
+	
+	bool (*Create_Directory)(char* path) = 0;
 	
 	char* (*Get_Clipboard_Data_As_Text)() = 0;
 	

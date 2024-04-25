@@ -577,6 +577,21 @@ struct Linear_Allocator
 	u32 capacity = 0;
 	u32 push_count = 0;
 	
+	
+	u32 inline get_free_capacity()
+	{
+		u32 result = u32(capacity - (next_free - memory));
+		return result;
+	}
+	
+	
+	u32 inline get_used_capacity()
+	{
+		u32 result = u32(next_free - memory);
+		return result;
+	}
+	
+	
 	void init(void* _memory, u32 _capacity)
 	{
 		memory = (u8*)_memory;
@@ -585,17 +600,13 @@ struct Linear_Allocator
 		push_count = 0;
 	}
 	
-	u32 inline get_free_capacity()
-	{
-		u32 result = u32(capacity - (next_free - memory));
-		return result;
-	}
 	
 	void clear()
 	{
 		next_free = memory;
 		push_count = 0;
 	}
+	
 	
 	void* push(u32 size)
 	{
@@ -606,10 +617,19 @@ struct Linear_Allocator
 		return result;
 	}
 	
+	
 	template<typename T>
 	T* push()
 	{
 		return (T*)push(sizeof(T));
 	}
-	
 };
+
+
+static Linear_Allocator Clone_From_Linear_Allocator_Free_Space(Linear_Allocator* other)
+{
+	Linear_Allocator result;
+	result.init(other->next_free, other->get_free_capacity());
+	
+	return result;
+}

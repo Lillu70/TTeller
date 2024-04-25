@@ -2,6 +2,13 @@
 #pragma once
 
 
+static bool GUI_Character_Check_Numbers_Only(char* c)
+{
+	bool result = (*c >= '0' && *c <= '9');
+	return result;
+}
+
+
 static inline u32 GUI_Make_Ignore_Selection_Mask()
 {
 	u32 result = GUI_Context_Flags::soft_ignore_selection | GUI_Context_Flags::hard_ignore_selection;
@@ -1217,11 +1224,13 @@ static bool GUI_Input_Field_Insert_Characters(
 				{
 					for(char cb = *clip_buffer; cb; ++clip_buffer, cb = *clip_buffer)
 					{
+						#if 0 // this doens't do anthing? Just delete?
 						if(cb == '\r')
 						{
 							//cb = '\n';							
 							int a = 0;
 						}
+						#endif
 						
 						if(Is_Allowed_Character(cb, allow_new_line_insertion) && 
 							(character_limit == 0 || str->lenght < character_limit) &&
@@ -1233,13 +1242,13 @@ static bool GUI_Input_Field_Insert_Characters(
 								u32 insert_count = 4;
 								for(u32 y = 0; y < insert_count; ++y)
 								{
-									str->insert_at(state->write_cursor_position, *clip_buffer);
+									str->insert_at(state->write_cursor_position, cb);
 									state->write_cursor_position += 1;
 								}
 							}
 							else
 							{
-								str->insert_at(state->write_cursor_position, *clip_buffer);
+								str->insert_at(state->write_cursor_position, cb);
 								state->write_cursor_position += 1;
 							}
 							
@@ -1313,14 +1322,6 @@ static bool GUI_Input_Field_Insert_Characters(
 	}
 	
 	return result;
-}
-
-
-static void GUI_Do_Anchor_Point(GUI_Context* context, v2f* pos)
-{
-	v2f dim = v2f{0 ,0};
-	GUI_One_Time_Skip_Padding(context);
-	GUI_Placement p = GUI_Get_Placement(context, &dim, pos, true);
 }
 
 
@@ -2470,10 +2471,10 @@ static bool GUI_Do_SL_Input_Field(
 
 
 // TODO: 
-// Cursor color on character limit
 // Lookahead
 // Sensible minimums.
 // BUG FIX: Using the mouse selecting a last line that has only one character selectes the wrong one. (minor). 
+// BUG FIX: When selecting text and the initial mouse click is bellow text selection; text select start point isn't properly set.
 
 static void GUI_Do_ML_Input_Field(
 	GUI_Context* context, 
@@ -2567,7 +2568,6 @@ static void GUI_Do_ML_Input_Field(
 		
 		if(state->is_active)
 		{
-			
 			// Handle input
 			bool mouse_pressed_down = context->actions[GUI_Menu_Actions::mouse].Is_Pressed();
 			bool mouse_is_down = context->actions[GUI_Menu_Actions::mouse].Is_Down();

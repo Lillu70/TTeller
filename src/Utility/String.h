@@ -100,6 +100,26 @@ static void Init_String(String* str, Allocator_Shell* allocator, char* c_str)
 }
 
 
+static void Init_String(String* str, Allocator_Shell* allocator, char* c_str, u32 max_characters)
+{
+	Assert(allocator);
+	Assert(c_str);
+	
+	u32 lenght = 0;
+	char* c = c_str;
+	for(; lenght < max_characters && *c != 0; ++lenght, ++c){}
+	
+	str->lenght = lenght;
+	str->alloc = allocator;
+	
+	String_Init_Alloc(str, lenght + 1);
+	if(str->lenght > 0)
+		Mem_Copy(str->buffer, c_str, lenght);
+	
+	str->buffer[lenght] = 0;
+}
+
+
 void String::append_character(char c)
 {
 	if(capacity == 0)
