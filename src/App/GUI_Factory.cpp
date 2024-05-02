@@ -3,8 +3,9 @@
 
 #define AUTO 0
 
-static Color s_background_color = Make_Color(20, 20, 20);
-static Color s_banner_background_color = Make_Color(40, 40, 40);
+static Color s_background_color 		= Make_Color(20, 20, 20);
+static Color s_banner_background_color 	= Make_Color(40, 40, 40);
+static Color s_list_bg_color 			= Make_Color(10, 10, 10);
 
 static GUI_Theme s_theme = {};
 static GUI_Context s_gui;
@@ -16,6 +17,7 @@ static GUI_Context s_gui_pop_up;
 enum class Menus : u32
 {
 	none = 0,
+	main_menu,
 	event_editor_requirements,
 	event_editor_text,
 	event_editor_consequences,
@@ -29,7 +31,8 @@ struct Global_Data
 	
 	Menus active_menu = Menus::none;
 	
-	Dynamic_Array<Event_State>* all_events = 0;
+	Events_Container event_container;
+	
 	u32 active_event_index = 0;
 };
 static Global_Data s_global_data = Global_Data();
@@ -37,13 +40,17 @@ static Global_Data s_global_data = Global_Data();
 
 static inline void Init_GUI()
 {
+	s_gui = GUI_Create_Context();
+	s_gui_banner = GUI_Create_Context();
+	s_gui_pop_up = GUI_Create_Context();
+	
 	s_gui_pop_up.flags |= GUI_Context_Flags::enable_dynamic_sliders;
 	
 	GUI_Set_Default_Menu_Actions(&s_global_data.menu_actions[0]);
 
 	GUI_DEFAULT_TEXT_SCALE = v2f{2, 2};
 	
-	s_global_data.all_events = Create_Dynamic_Array<Event_State>(&s_allocator, 12);
+	s_global_data.event_container.events = Create_Dynamic_Array<Event_State>(&s_allocator, 12);
 	
 	// Make Test event:
 	#if 0
@@ -161,19 +168,17 @@ static void Do_GUI_Frame_With_Banner(
 	banner_dim.y = Min(s_canvas.dim.y, banner_height);
 	
 	u32 banner_offset = banner_dim.x * banner_dim.y;
-	u32* canvas_top = s_canvas.buffer + s_canvas.dim.x * s_canvas.dim.y;
-	u32* banner_buffer = canvas_top - banner_offset;
+	u32 canvas_pixel_count = s_canvas.row_stride * s_canvas.dim.y;
+	u32 banner_buffer_offset = canvas_pixel_count - banner_offset;
 	
-	Canvas banner_canvas;
-	Init_Canvas(&banner_canvas, banner_buffer, banner_dim);
+	Canvas banner_canvas = Create_Sub_Canvas(&s_canvas, banner_dim, banner_buffer_offset);
+	
+	// Clear works on vertical sub canvases
 	Clear_Canvas(&banner_canvas, s_banner_background_color);
 	
 	v2i banner_canvas_pos = v2i{0, i32(s_canvas.dim.y - banner_dim.y)};
 
 	GUI_Context* context = &s_gui_banner;
-	
-	if(Bit_Not_Set(s_gui.flags, GUI_Context_Flags::soft_ignore_selection))
-		s_gui_banner.flags |= GUI_Context_Flags::soft_ignore_selection;
 	
 	GUI_Begin_Context(context, &s_platform, &banner_canvas, actions, &s_theme, banner_canvas_pos);
 	{
@@ -185,20 +190,15 @@ static void Do_GUI_Frame_With_Banner(
 	
 	if(menu_dim.y <= 0)
 	{
-		// Make sure banner is usable.
-		Inverse_Bit_Mask(&s_gui_banner.flags, GUI_Context_Flags::soft_ignore_selection);
-		s_gui.flags |= GUI_Context_Flags::soft_ignore_selection;
 		return;
 	}
 	
-	Canvas menu_canvas;
-	Init_Canvas(&menu_canvas, s_canvas.buffer, menu_dim);
+	Canvas menu_canvas = Create_Sub_Canvas(&s_canvas, menu_dim);
+	
+	// Clear works on vertical sub canvases
 	Clear_Canvas(&menu_canvas, s_background_color);
 	
 	context = &s_gui;
-	
-	if(Bit_Not_Set(s_gui_banner.flags, GUI_Context_Flags::soft_ignore_selection))
-		s_gui.flags |= GUI_Context_Flags::soft_ignore_selection;
 	
 	GUI_Begin_Context(context, &s_platform, &menu_canvas, actions, &s_theme);
 	{
@@ -218,28 +218,74 @@ static void Do_All_Events_Frame()
 		
 		static bool jump_into_new_event = true;
 		
-		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Luo uusi"))
+		v2f checkbox_dim = v2f{30, 30};
+		GUI_Do_Checkbox(context, AUTO, &checkbox_dim, &jump_into_new_event);
+		
+		GUI_Push_Layout(context);
+		
+		context->layout.build_direction = GUI_Build_Direction::right_center;
+		GUI_Do_Text(context, AUTO, "Hypp\xE4\xE4 tapahtumaan.", GUI_Highlight_Prev(context));			
+		
+		GUI_Pop_Layout(context);
+		
+		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Luo uusi p\xE4iv\xE4 tapahtuma"))
 		{
 			if(jump_into_new_event)
 			{
 				s_global_data.active_menu = Menus::event_editor_requirements;
-				s_global_data.active_event_index = s_global_data.all_events->count;			
+				s_global_data.active_event_index = s_global_data.event_container.day_event_count;			
 			}
 			
-			Push_New_Event(&s_global_data.all_events, &s_allocator);
+			//TODO: Change this to take event_container as input
+			String unique_name = Generate_Unique_Name(
+				Begin(s_global_data.event_container.events), 
+				s_global_data.event_container.day_event_count,
+				&s_allocator);
+			
+			u32 temp_count = s_global_data.event_container.events->count;
+			
+			// NOTE: Just to grow the array if needed. 
+			// the actual memory contents is irrelevant at this point in time.
+			Push(&s_global_data.event_container.events, &s_allocator);
+			
+			Event_State* buffer = Begin(s_global_data.event_container.events);
+			
+			// Checks if there are any night events.
+			if(temp_count - s_global_data.event_container.day_event_count > 0)
+			{
+				Insert_Element_Into_Packed_Array(
+					buffer,
+					buffer + temp_count,
+					&temp_count,
+					sizeof(*buffer),
+					s_global_data.event_container.day_event_count);				
+			}
+			
+			Event_State* event = buffer + s_global_data.event_container.day_event_count;
+			Init_Event_Takes_Name_Ownership(event, &s_allocator, &unique_name);
+			
+			s_global_data.event_container.day_event_count += 1;
 		}
-		GUI_Push_Layout(context);
 		
-		context->layout.build_direction = GUI_Build_Direction::right_center;
+		if(GUI_Do_Button(context, AUTO, AUTO, "Luo uusi y\xF6 tapahtuma"))
+		{
+			if(jump_into_new_event)
+			{
+				s_global_data.active_menu = Menus::event_editor_requirements;
+				s_global_data.active_event_index = s_global_data.event_container.events->count;			
+			}
+			
+			String unique_name = Generate_Unique_Name(
+				Begin(s_global_data.event_container.events) + s_global_data.event_container.day_event_count, 
+				s_global_data.event_container.events->count - s_global_data.event_container.day_event_count,
+				&s_allocator);
+			
+			Event_State* event = Push(&s_global_data.event_container.events, &s_allocator);
+			Init_Event_Takes_Name_Ownership(event, &s_allocator, &unique_name);
+		}
 		
-		v2f dim = v2f{context->layout.last_element_dim.y, context->layout.last_element_dim.y};
-		GUI_Do_Checkbox(context, AUTO, &dim, &jump_into_new_event);
-		GUI_Do_Text(context, AUTO, "Hypp\xE4\xE4 tapahtumaan.", GUI_Highlight_Prev(context));
-		
-		GUI_Pop_Layout(context);
-		
-		context->layout.build_direction = GUI_Build_Direction::right_center;
-		
+		// -- title bar buttons --
+		context->layout.build_direction = GUI_Build_Direction::right_center;		
 		f32 padding = context->layout.theme->padding;
 		
 		static constexpr char* load_text = "Lataa";
@@ -263,25 +309,25 @@ static void Do_All_Events_Frame()
 		f32 back_button_y = f32(context->canvas->dim.y) - padding;
 		v2f back_button_pos = v2f{back_button_x, back_button_y};
 		
-		dim = v2f{w1, h};
+		v2f dim = v2f{w1, h};
 		// Load button.
 		if(GUI_Do_Button(context, &back_button_pos, &dim, load_text))
 		{
-			Dynamic_Array<Event_State>* loaded_campaign 
-				= Load_Campaign(&s_allocator, s_interim_mem, &s_platform);
+			Events_Container load_result;
 			
-			if(loaded_campaign)
+			if(Load_Campaign(&load_result, &s_allocator, s_interim_mem, &s_platform))
 			{
-				for(u32 i = 0; i < s_global_data.all_events->count; ++i)
-					Delete_Event(s_global_data.all_events, &s_allocator, i, false);
+				for(u32 i = 0; i < s_global_data.event_container.events->count; ++i)
+					Delete_Event(s_global_data.event_container.events, &s_allocator, i, false);
 				
-				s_allocator.free(s_global_data.all_events);
+				s_allocator.free(s_global_data.event_container.events);
 				
-				s_global_data.all_events = loaded_campaign;
+				s_global_data.event_container = load_result;
 			}
 			else
 			{
-				// CONSIDER: Well, loading failed so what now? Suppose just segfault! ..at least in debug mode.
+				// CONSIDER: Well, loading failed so what now? Suppose just segfault! 
+				// ...at least in debug mode.
 				Assert(false);
 			}
 		}
@@ -290,8 +336,9 @@ static void Do_All_Events_Frame()
 		// Save button.
 		if(GUI_Do_Button(context, AUTO, &dim, save_text))
 		{
-			Serialize_Campaign(s_global_data.all_events, &s_interim_mem, &s_platform);
+			Serialize_Campaign(s_global_data.event_container, &s_interim_mem, &s_platform);
 		}
+		
 	}; // ----------------------------------------------------------------------------------------
 	
 	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
@@ -300,33 +347,157 @@ static void Do_All_Events_Frame()
 		{
 			return;
 		}
+			
+		u32 border_width = 30;
+		u32 border_width_x2 = border_width * 2;
+		u32 canvas_half_width = context->canvas->dim.x / 2;
+		u32 sub_x = canvas_half_width - border_width_x2;
 		
-		GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "Tapahtuma lista:");
-	
-		Event_State* begin = Begin(s_global_data.all_events);
-		for(u32 i = 0; i < s_global_data.all_events->count; ++i)
+		char* day_list_text = "P\xE4iv\xE4 tapahtumat:";
+
+		f32 y_text_pos = f32(context->canvas->dim.y) - f32(context->layout.theme->padding);
+		v2f day_list_text_pos = v2f{f32(border_width), y_text_pos};
+		u32 day_list_text_lenght = Null_Terminated_Buffer_Lenght(day_list_text);
+		Font* font = &context->layout.theme->font;
+		
+		f32 left_edge 
+			= day_list_text_pos.x + f32(font->char_width * day_list_text_lenght * GUI_DEFAULT_TEXT_SCALE.x);
+		
+		
+		v2f night_list_text_pos = v2f{f32(canvas_half_width) + border_width, y_text_pos};
+		u32 bounds;
+		if(left_edge < night_list_text_pos.x)
 		{
-			Event_State* e = begin + i;
-			
-			// Destroy event
-			if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "X"))
-			{
-				Delete_Event(s_global_data.all_events, &s_allocator, i--);
-				continue;
-			}
-			
-			GUI_Push_Layout(context);
-			
-			context->layout.build_direction = GUI_Build_Direction::right_center;
-			
-			if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, e->name.buffer))
-			{
-				s_global_data.active_menu = Menus::event_editor_requirements;
-				s_global_data.active_event_index = i;
-			}
-			
-			GUI_Pop_Layout(context);
+			GUI_Do_Text(context, &day_list_text_pos, day_list_text);
+			GUI_Do_Text(context, &night_list_text_pos, "Y\xF6 tapahtumat:");			
+			bounds = u32(GUI_Get_Bounds_In_Pixel_Space(context).min.y);
 		}
+		else
+		{
+			bounds = context->canvas->dim.y;
+		}
+		
+		u32 top_offset = border_width_x2;
+		top_offset += context->canvas->dim.y - bounds;
+		v2u sub_dim = v2u{sub_x, context->canvas->dim.y - top_offset};
+		
+		// Region too small.
+		if(context->canvas->dim.y <= top_offset || canvas_half_width <= border_width_x2)
+			return;
+		
+		// Day list sub gui
+		{
+			v2u day_list_buffer_offset = v2u{border_width, border_width};
+			Canvas event_list_day_canvas = Create_Sub_Canvas(&s_canvas, sub_dim, day_list_buffer_offset);
+			Clear_Sub_Canvas(&event_list_day_canvas, s_list_bg_color);
+			
+			static GUI_Context gui_event_list_day = GUI_Create_Context();
+			
+			Inverse_Bit_Mask(&gui_event_list_day.flags,  GUI_Context_Flags::hard_ignore_selection);
+			u32 set_mask = GUI_Context_Flags::enable_dynamic_sliders;
+			set_mask |= (context->flags &  GUI_Context_Flags::hard_ignore_selection);
+			gui_event_list_day.flags |= set_mask;
+			
+			GUI_Begin_Context(
+				&gui_event_list_day,
+				&s_platform,
+				&event_list_day_canvas,
+				(Action*)s_global_data.menu_actions,
+				&s_theme,
+				day_list_buffer_offset.As<i32>());
+			{
+				Event_State* begin = Begin(s_global_data.event_container.events);
+				
+				v2f* pos = &GUI_AUTO_TOP_LEFT;
+				for(u32 i = 0; i < s_global_data.event_container.day_event_count; ++i)
+				{
+					Event_State* e = begin + i;
+					
+					// Destroy event
+					if(GUI_Do_Button(&gui_event_list_day, pos, &GUI_AUTO_FIT, "X"))
+					{
+						if(i < s_global_data.event_container.day_event_count)
+							s_global_data.event_container.day_event_count -= 1;
+						
+						Delete_Event(s_global_data.event_container.events, &s_allocator, i--);
+						continue;
+					}
+					pos = 0;
+					
+					GUI_Push_Layout(&gui_event_list_day);
+					
+					gui_event_list_day.layout.build_direction = GUI_Build_Direction::right_center;
+					
+					if(GUI_Do_Button(&gui_event_list_day, AUTO, &GUI_AUTO_FIT, e->name.buffer))
+					{
+						s_global_data.active_menu = Menus::event_editor_requirements;
+						s_global_data.active_event_index = i;
+					}
+					
+					GUI_Pop_Layout(&gui_event_list_day);
+				}
+				
+			}
+			GUI_End_Context(&gui_event_list_day);
+		}
+		
+		// Night list sub gui
+		{
+			v2u night_list_buffer_offset = v2u{border_width * 3 + sub_x, border_width};
+			Canvas event_list_night_canvas = Create_Sub_Canvas(&s_canvas, sub_dim, night_list_buffer_offset);
+			Clear_Sub_Canvas(&event_list_night_canvas, s_list_bg_color);
+			
+			static GUI_Context gui_event_list_night = GUI_Create_Context();
+			
+			Inverse_Bit_Mask(&gui_event_list_night.flags,  GUI_Context_Flags::hard_ignore_selection);
+			u32 set_mask = GUI_Context_Flags::enable_dynamic_sliders;
+			set_mask |= (context->flags &  GUI_Context_Flags::hard_ignore_selection);
+			gui_event_list_night.flags |= set_mask;
+			
+			GUI_Begin_Context(
+				&gui_event_list_night,
+				&s_platform,
+				&event_list_night_canvas,
+				(Action*)s_global_data.menu_actions,
+				&s_theme,
+				night_list_buffer_offset.As<i32>());
+			{
+				Event_State* begin = Begin(s_global_data.event_container.events);
+				
+				v2f* pos = &GUI_AUTO_TOP_LEFT;
+				for(u32 i = s_global_data.event_container.day_event_count; 
+					i < s_global_data.event_container.events->count; ++i)
+				{
+					Event_State* e = begin + i;
+					
+					// Destroy event
+					if(GUI_Do_Button(&gui_event_list_night, pos, &GUI_AUTO_FIT, "X"))
+					{
+						if(i < s_global_data.event_container.day_event_count)
+							s_global_data.event_container.day_event_count -= 1;
+						
+						Delete_Event(s_global_data.event_container.events, &s_allocator, i--);
+						continue;
+					}
+					pos = 0;
+					
+					GUI_Push_Layout(&gui_event_list_night);
+					
+					gui_event_list_night.layout.build_direction = GUI_Build_Direction::right_center;
+					
+					if(GUI_Do_Button(&gui_event_list_night, AUTO, &GUI_AUTO_FIT, e->name.buffer))
+					{
+						s_global_data.active_menu = Menus::event_editor_requirements;
+						s_global_data.active_event_index = i;
+					}
+					
+					GUI_Pop_Layout(&gui_event_list_night);
+				}
+				
+			}
+			GUI_End_Context(&gui_event_list_night);
+		}
+		
 	}; // ----------------------------------------------------------------------------------------
 	
 	Do_GUI_Frame_With_Banner(banner_func, menu_func);
@@ -337,13 +508,17 @@ static void Do_Event_Editor_Requirements_Frame()
 {
 	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
-		Event_State* event = Begin(s_global_data.all_events) + s_global_data.active_event_index;
+		Event_State* event = Begin(s_global_data.event_container.events) + s_global_data.active_event_index;
 		
 		GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "Tapahtuma Editori", {}, v2f{4,4}, true);
 		f32 title_height = context->layout.last_element_dim.y;
 		v2f tile_bounds_max = GUI_Get_Bounds_In_Pixel_Space(context).max;
 		
-		GUI_Do_Text(context, AUTO, "Tapahtuman nimi:");
+		char* event_name_text = 
+			(s_global_data.active_event_index < s_global_data.event_container.day_event_count)?
+			"Tapahtuman (p\xE4iv\xE4) nimi:" : "Tapahtuman (y\xF6) nimi:";
+	
+		GUI_Do_Text(context, AUTO, event_name_text);
 		
 		GUI_Do_SL_Input_Field(context, AUTO, AUTO, &event->name);
 	
@@ -412,9 +587,10 @@ static void Do_Event_Editor_Requirements_Frame()
 		
 	}; // ----------------------------------------------------------------------------------------
 	
+	
 	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
-		Event_State* event = Begin(s_global_data.all_events) + s_global_data.active_event_index;
+		Event_State* event = Begin(s_global_data.event_container.events) + s_global_data.active_event_index;
 	
 		static constexpr f32 collumn_width = 300;
 		
@@ -595,7 +771,7 @@ static void Do_Event_Editor_Text_Frame()
 {
 	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
-		Event_State* event = Begin(s_global_data.all_events) + s_global_data.active_event_index;
+		Event_State* event = Begin(s_global_data.event_container.events) + s_global_data.active_event_index;
 		
 		GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "Tapahtuma Teksti", {}, v2f{4,4}, true);
 		
@@ -656,7 +832,8 @@ static void Do_Event_Editor_Text_Frame()
 		v2f dim = v2u::Cast<f32>(context->canvas->dim) - 50.f;
 		if(dim.x >= 0 && dim.y >= 0)
 		{
-			Event_State* event = Begin(s_global_data.all_events) + s_global_data.active_event_index;
+			Event_State* event 
+				= Begin(s_global_data.event_container.events) + s_global_data.active_event_index;
 			
 			GUI_Do_ML_Input_Field(context, &GUI_AUTO_MIDDLE, &dim, &event->event_text, 0);
 		}
@@ -733,7 +910,7 @@ static void Do_Event_Editor_Consequences_Frame()
 		static f64 death_con_with_additional_cons_time = 0;
 		static u32 death_con_with_additional_cons_idx = 0;
 		
-		Event_State* event = Begin(s_global_data.all_events) + s_global_data.active_event_index;
+		Event_State* event = Begin(s_global_data.event_container.events) + s_global_data.active_event_index;
 		
 		context->layout.build_direction = GUI_Build_Direction::right_center;
 		v2f* pos = &GUI_AUTO_TOP_LEFT;
@@ -1031,7 +1208,7 @@ static void Do_On_Exit_Pop_Up()
 	
 	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t2, scale))
 	{
-		Serialize_Campaign(s_global_data.all_events, &s_interim_mem, &s_platform);
+		Serialize_Campaign(s_global_data.event_container, &s_interim_mem, &s_platform);
 		s_platform.Set_Flag(App_Flags::is_running, false);
 	}
 	
@@ -1042,6 +1219,81 @@ static void Do_On_Exit_Pop_Up()
 	
 	GUI_End_Context(&s_gui_pop_up);
 };
+
+
+static void Do_Main_Menu_Frame()
+{
+	Clear_Canvas(&s_canvas, s_background_color);
+	
+	v2f def_text_scale = GUI_DEFAULT_TEXT_SCALE;
+	
+	GUI_DEFAULT_TEXT_SCALE = v2f{3, 3};
+	
+	GUI_Context* context = &s_gui;
+	GUI_Begin_Context(
+		context, 
+		&s_platform, 
+		&s_canvas, 
+		(Action*)s_global_data.menu_actions, 
+		&s_theme);
+	
+	f32 title_scale = 7.f;
+	GUI_Do_Text(context, &GUI_AUTO_TOP_CENTER, "N\xE4lk\xE4pelit", {}, v2f{title_scale, title_scale}, true);
+	
+	GUI_Do_Spacing(context, AUTO);
+	
+	context->layout.build_direction = GUI_Build_Direction::down_center;
+	
+	static constexpr char* button_texts[] = 
+	{
+		"Jatka",
+		"Uusi Peli",
+		"Lataa Peli",
+		"Avaa editori",
+		"Asetukset",
+	};
+
+	v2f dim = GUI_Tight_Fit_Multi_Line_Text(
+		GUI_Get_Active_Font(context), 
+		(char**)button_texts, 
+		Array_Lenght(button_texts));
+	dim += context->layout.theme->padding;
+	
+	u32 i = 0;
+	// Continue
+	if(GUI_Do_Button(context, AUTO, &dim, button_texts[i++]))
+	{
+		
+	}
+	
+	// New game
+	if(GUI_Do_Button(context, AUTO, AUTO, button_texts[i++]))
+	{
+		
+	}
+	
+	// Load game
+	if(GUI_Do_Button(context, AUTO, AUTO, button_texts[i++]))
+	{
+		
+	}
+	
+	// Open editor
+	if(GUI_Do_Button(context, AUTO, AUTO, button_texts[i++]))
+	{
+		
+	}
+		
+	// Settings
+	if(GUI_Do_Button(context, AUTO, AUTO, button_texts[i++]))
+	{
+		
+	}
+	
+	GUI_End_Context(context);
+	
+	GUI_DEFAULT_TEXT_SCALE = def_text_scale;
+}
 
 
 static void Run_Active_Menu(bool quit_app_pop_up)
@@ -1071,7 +1323,11 @@ static void Run_Active_Menu(bool quit_app_pop_up)
 		case Menus::none:
 		{
 			s_global_data.active_menu = Menus::all_events;
-
+		}break;
+		
+		case Menus::main_menu:
+		{
+			Do_Main_Menu_Frame();
 		}break;
 		
 		case Menus::event_editor_requirements:
@@ -1108,6 +1364,8 @@ static void Run_Active_Menu(bool quit_app_pop_up)
 	
 		s_gui.flags |= f;
 		s_gui_banner.flags |= GUI_Context_Flags::enable_dynamic_sliders;
+		
+		GUI_Context::active_context_id = s_gui_banner._context_id;
 	}
 	
 	

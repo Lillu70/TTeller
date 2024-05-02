@@ -14,6 +14,7 @@ struct Canvas
 {
 	v2u dim = {};
 	u32* buffer = 0;
+	u32 row_stride = 0;
 };
 
 
@@ -27,12 +28,14 @@ static inline Color Pack_Color(v3f color);
 
 static inline bool Init_Canvas(Canvas* canvas, u32* buffer, v2u dim);
 
+static inline Canvas Create_Sub_Canvas(Canvas* master_canvas, v2u dim);
+static inline Canvas Create_Sub_Canvas(Canvas* master_canvas, v2u dim, u32 buffer_offset);
+static inline Canvas Create_Sub_Canvas(Canvas* master_canvas, v2u dim, v2u buffer_offset);
+
 // Does bounds checking.
 static inline bool Get_Pixel_Idx(Canvas* canvas, v2i p, u32* out_idx);
 
 static inline void Set_Pixel(Canvas* canvas, v2i p, Color color);
-static inline void Set_Pixel_Idx(Canvas* canvas, u32 idx, Color color);
-
 
 // Does not do bounds checking.
 static inline u32 Get_Pixel_Idx_HZ(Canvas* canvas, v2i p);
@@ -43,10 +46,14 @@ static inline void Set_Pixel_Idx_HZ(Canvas* canvas, u32 idx, Color color);
 
 static inline void Blend_Pixel_With_Color(Canvas* canvas, v2i p, v3f color, f32 fraction);
 
+
 static inline Color Get_Pixel_HZ(Canvas* canvas, v2i p);
 
 
 static void Clear_Canvas(Canvas* canvas, Color color);
+
+
+static void Clear_Sub_Canvas(Canvas* canvas, Color color);
 
 
 static void Dim_Entire_Screen(Canvas* canvas, f32 s);

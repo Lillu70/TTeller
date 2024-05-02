@@ -81,6 +81,35 @@ static void Init_String(String* str, Allocator_Shell* allocator, u32 capacity)
 }
 
 
+static inline String Create_String(Allocator_Shell* allocator, u32 capacity)
+{
+	String result;
+	Init_String(&result, allocator, capacity);
+	
+	return result;
+}
+
+static void Init_String(String* str, Allocator_Shell* allocator, char* c_str1, char* c_str2)
+{
+	Assert(allocator);
+	
+	u32 lenght1 = Null_Terminated_Buffer_Lenght(c_str1);
+	u32 lenght2 = Null_Terminated_Buffer_Lenght(c_str2);
+
+	str->lenght = lenght1 + lenght2;
+	str->alloc = allocator;
+	
+	String_Init_Alloc(str, str->lenght+ 1);
+	if(lenght1 > 0)
+		Mem_Copy(str->buffer, c_str1, lenght1);
+	
+	if(lenght2 > 0)
+		Mem_Copy(str->buffer + lenght1, c_str2, lenght2);
+	
+	str->buffer[str->lenght] = 0;
+}
+
+
 // Takes a null terminted C style string, as an argument. Lenght of it, determines capacity.
 static void Init_String(String* str, Allocator_Shell* allocator, char* c_str)
 {
@@ -97,6 +126,15 @@ static void Init_String(String* str, Allocator_Shell* allocator, char* c_str)
 		Mem_Copy(str->buffer, c_str, lenght);
 	
 	str->buffer[lenght] = 0;
+}
+
+
+static inline String Create_String(Allocator_Shell* allocator, char* c_str)
+{
+	String result;
+	Init_String(&result, allocator, c_str);
+	
+	return result;
 }
 
 
@@ -219,6 +257,25 @@ void String::free()
 static void operator += (String& str, char c)
 {
 	str.append_character(c);
+}
+
+
+static bool String_Compare(String* a, String* b)
+{
+	if(a->lenght != b->lenght)
+		return false;
+	
+	char* aa = a->buffer;
+	char* bb = b->buffer;
+	
+	u32 c = 0;
+	while(*aa++ == *bb++)
+	{
+		if(++c == a->lenght)
+			return true;
+	}
+	
+	return false;
 }
 
 

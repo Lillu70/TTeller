@@ -93,7 +93,7 @@ static void Insert_Element_Into_Packed_Array(
 		Mem_Copy(a, b, element_size);
 	}
 	
-	Mem_Copy(((u8*)array + insert_idx), element, element_size);
+	Mem_Copy(((u8*)array + element_size * insert_idx), element, element_size);
 	
 	*array_count += 1;
 }

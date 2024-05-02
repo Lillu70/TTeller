@@ -148,3 +148,11 @@ struct Event_State
 	String name;
 	String event_text;
 };
+
+
+struct Events_Container
+{
+	// Day events are stored first, then night events.
+	Dynamic_Array<Event_State>* events = 0;
+	u32 day_event_count = 0;
+};

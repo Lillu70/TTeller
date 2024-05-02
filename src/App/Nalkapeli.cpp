@@ -64,19 +64,14 @@ static inline void Delete_Participent(
 }
 
 
-static inline Event_State* Push_New_Event(
-	Dynamic_Array<Event_State>** event_darray,
-	Allocator_Shell* allocator,
-	char* def_name = "Uusi tapahtuma")
+static inline void Init_Event_Takes_Name_Ownership(
+	Event_State* event, 
+	Allocator_Shell* allocator, 
+	String* name)
 {
-	Assert(event_darray);
-	
-	Event_State* event = Push(event_darray, allocator);
 	event->participents = Create_Dynamic_Array<Participent>(allocator, 4);
-	Init_String(&event->name, allocator, def_name);
 	Init_String(&event->event_text, allocator, 128);
-	
-	return event;
+	event->name = *name;
 }
 
 
@@ -111,52 +106,78 @@ static void Delete_Event(
 }
 
 
+static String Generate_Unique_Name(Event_State* events, u32 event_count, Allocator_Shell* allocator)
+{
+	char* def_name = "Uusi tapahtuma";
+	u32 def_name_len = Null_Terminated_Buffer_Lenght(def_name);
+	String unique_name = Create_String(allocator, def_name);
+	for(u32 attempt_count = 1; ;++attempt_count)
+	{
+		bool name_is_unique = true;
+		
+		for(Event_State* e = events; e < events + event_count; ++e)
+		{
+			if(String_Compare(&unique_name, &e->name))
+			{
+				// make a new name!
+				u8 num_buffer[14];
+				
+				char* num_ptr = U32_To_Char_Buffer((u8*)num_buffer + 2, attempt_count) - 2;
+				*(num_ptr) = ' ';
+				*(num_ptr + 1) = '(';
+				num_buffer[12] = ')';
+				num_buffer[13] = 0;
+				
+				u32 byte_count = u32(((u8*)num_buffer + 14) - (u8*)num_ptr);
+				u32 total_str_lenght = def_name_len + byte_count;
+				
+				// Effectively needs a realloc!
+				if(total_str_lenght > unique_name.capacity)
+				{
+					unique_name.free();
+					Init_String(&unique_name, allocator, def_name, num_ptr);					
+				}
+				// Can just the memory that is there.
+				else
+				{
+					Mem_Copy(unique_name.buffer, def_name, def_name_len);
+					Mem_Copy(unique_name.buffer + def_name_len, num_ptr, byte_count);							
+					unique_name.lenght = total_str_lenght - 1;
+				}
+				
+				name_is_unique = false;
+				break;
+			}	
+		}
+		
+		if(name_is_unique)
+			break;
+	}
+	
+	return unique_name;
+}
+
+
 static void Serialize_Campaign(
-	Dynamic_Array<Event_State>* events, 
+	Events_Container event_container, 
 	Linear_Allocator* inter_mem, 
 	Platform_Calltable* platform)
 {
 	/*
-		File descrition:
-		- 4 bytes for version - must 1 atm.
-		- 4 bytes for event count.
-		
-		Per event:
-			- 4 bytes for name lenght.
-			- followed by the event name characters in 1-byte ascii.
-			
-			- 4 bytes for the event text lenght.
-			- followed by the event text characters in 1-byte ascii.
-			
-			- 4 bytes for the participent count.
-			
-			Per participent:
-				- 4 bytes for the req count.
-				Per req:
-					- 1 byte for type:
-					if type is character start:
-						- 1 byte for numerical relation.
-						- 2 bytes for stat relation target.
-						- sizeof(Character start) bytes for the stat.
-					if type is mark:
-						- 4 bytes for name lenght
-						- followed by the mark characters in 1-byte ascii.
-				
-				- 4 bytes for the con count.
-				Per con:
-					- 1 byte for the type:
-					if type is death:
-						-1 byte for inheritance
+	Version History 1->2: Added seperation of day and night events.
 	*/
+	
+	//TODO: Write like a file description thing or something maybe?
 	
 	Linear_Allocator write_buffer = Clone_From_Linear_Allocator_Free_Space(inter_mem);
 	
 	#define WRITE(X, type) *(type*)write_buffer.push(sizeof(type)) = X
 	
-	u32 version = 1;
+	u32 version = 2;
 	WRITE(version, u32);
-	WRITE(events->count, u32);
-	for(Event_State* e = Begin(events); e < End(events); ++e)
+	WRITE(event_container.events->count, u32);
+	WRITE(event_container.day_event_count, u32);
+	for(Event_State* e = Begin(event_container.events); e < End(event_container.events); ++e)
 	{
 		// event name
 		WRITE(e->name.lenght, u32);
@@ -282,7 +303,8 @@ static void Serialize_Campaign(
 
 
 //TODO: get the minim alloc sizes from some constants.
-static Dynamic_Array<Event_State>* Load_Campaign(
+static bool Load_Campaign(
+	Events_Container* container,
 	Allocator_Shell* allocator,
 	Linear_Allocator inter_mem, 
 	Platform_Calltable* platform)
@@ -296,19 +318,31 @@ static Dynamic_Array<Event_State>* Load_Campaign(
 	u8* buffer = (u8*)inter_mem.push(buffer_size);	
 	u32 read_head = 0;
 	
-	Dynamic_Array<Event_State>* result = 0;
+	*container = {};
+	
+	bool load_success_full;
+	
 	if(platform->Read_File("Kamppaniat/test.event", (u8*)buffer, buffer_size))
 	{
+		load_success_full = true;
+		
 		u32 version = READ(u32);
-		Assert(version == 1);
+		if(version != 2)
+		{
+			return false;
+		}
 		
 		u32 event_count = READ(u32);
+		container->day_event_count = READ(u32);
+		
+		Assert(container->day_event_count <= event_count);
+		
 		if(event_count)
 		{
-			result = Create_Dynamic_Array<Event_State>(allocator, event_count);
-			result->count = event_count;
+			container->events = Create_Dynamic_Array<Event_State>(allocator, event_count);
+			container->events->count = event_count;
 			
-			for(Event_State* e = Begin(result); e < End(result); ++e)
+			for(Event_State* e = Begin(container->events); e < End(container->events); ++e)
 			{
 				u32 event_name_lenght = READ(u32);
 				if(event_name_lenght)
@@ -461,11 +495,12 @@ static Dynamic_Array<Event_State>* Load_Campaign(
 		}
 		else
 		{
-			result = Create_Dynamic_Array<Event_State>(allocator, 1);			
+			load_success_full = false;
+			container->events = Create_Dynamic_Array<Event_State>(allocator, 1);			
 		}
 	}
 	
-	return result;
+	return load_success_full;
 	
 	#undef READ
 }

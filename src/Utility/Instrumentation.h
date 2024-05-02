@@ -28,6 +28,7 @@ enum class __Time_Table_Names : u64
 	render_glyph,
 	clear_canvas,
 	scale_pixel,
+	set_sub_canvas,
 	COUNT
 };
 

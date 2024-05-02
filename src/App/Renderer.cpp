@@ -24,9 +24,9 @@ static inline v2f Get_Middle(Canvas* canvas)
 static inline v3f Unpack_Color(Color color)
 {
 	v3f result;
-	result.b = f32(color.blue);//f32(color & 0xFF);
-	result.g = f32(color.green);//f32((color >> 8) & 0xFF);
-	result.r = f32(color.red);//f32((color >> 16) & 0xFF);
+	result.b = f32(color.blue);
+	result.g = f32(color.green);
+	result.r = f32(color.red);
 	
 	return result;
 }
@@ -39,7 +39,7 @@ static inline v4f Unpack_Color_With_Alpha(Color color)
 	result.b = f32(color.blue);
 	result.g = f32(color.green);
 	result.r = f32(color.red);
-	result.a = f32(color.alpha); //f32((color >> 24) & 0xFF);
+	result.a = f32(color.alpha);
 	
 	return result;
 }
@@ -52,8 +52,63 @@ static inline bool Init_Canvas(Canvas* canvas, u32* buffer, v2u dim)
 	
 	canvas->buffer = buffer;
 	canvas->dim = dim;
+	canvas->row_stride = dim.x;
+	//canvas->row_stride = 0;
 	
 	return buffer != 0;
+}
+
+
+static inline Canvas Create_Sub_Canvas(Canvas* master_canvas, v2u dim)
+{
+	Assert(master_canvas);
+	Assert(master_canvas->buffer);
+	Assert(dim.x && dim.y);
+	
+	Assert(dim.x <= master_canvas->dim.x && dim.y <= master_canvas->dim.y);
+	//Assert(dim.x < master_canvas->dim.x || dim.y < master_canvas->dim.y);
+	
+	Canvas result;
+	
+	result.buffer = master_canvas->buffer;
+	result.dim = dim;
+	result.row_stride = master_canvas->dim.x;
+	
+	return result;
+}
+
+
+static inline Canvas Create_Sub_Canvas(Canvas* master_canvas, v2u dim, u32 buffer_offset)
+{
+	#ifdef _DB
+	u32 master_memory_count = master_canvas->row_stride * master_canvas->dim.y;
+	if(buffer_offset >= master_memory_count)
+	{
+		Terminate;
+	}
+	#endif
+	
+	Canvas result = Create_Sub_Canvas(master_canvas, dim);
+	result.buffer += buffer_offset;
+	
+	#ifdef _DB
+	u32 sub_memory_count = result.row_stride * result.dim.y;
+	if(sub_memory_count + buffer_offset > master_memory_count)
+	{
+		Terminate;
+	}
+	#endif
+	
+	return result;
+}
+
+
+static inline Canvas Create_Sub_Canvas(Canvas* master_canvas, v2u dim, v2u buffer_offset)
+{
+	u32 offset = buffer_offset.y * master_canvas->row_stride + buffer_offset.x;
+	Canvas result = Create_Sub_Canvas(master_canvas, dim, offset);
+	
+	return result;
 }
 
 
@@ -61,7 +116,8 @@ static inline bool Is_Point_On_Canvas(Canvas* canvas, v2i p)
 {
 	Assert(canvas);
 	
-	v2u up = v2i::Cast<u32>(p);
+	// Negative values overflow, so are big values and result in "false".
+	v2u up = p.As<u32>();
 	bool result = up.x < canvas->dim.x && up.y < canvas->dim.y;
 	return result;
 }
@@ -71,13 +127,15 @@ static inline bool Get_Pixel_Idx(Canvas* canvas, v2i p, u32* out_idx)
 {
 	Assert(canvas);
 	
-	v2u up = v2i::Cast<u32>(p);
+	v2u up = p.As<u32>();
 	
 	if(up.x < canvas->dim.x && up.y < canvas->dim.y)
 	{
 		u32 idx = Get_Pixel_Idx_HZ(canvas, p);
 		if(out_idx)
+		{
 			*out_idx = idx;
+		}
 		
 		return true;
 	}
@@ -97,22 +155,11 @@ static inline void Set_Pixel(Canvas* canvas, v2i p, Color color)
 }
 
 
-static inline void Set_Pixel_Idx(Canvas* canvas, u32 idx, Color color)
-{
-	Assert(canvas);
-	
-	u32 canvas_pixel_count = canvas->dim.x * canvas->dim.y;
-	
-	if(idx < canvas_pixel_count)
-		*(canvas->buffer + idx) = color.as_u32;
-}
-
-
 static inline u32 Get_Pixel_Idx_HZ(Canvas* canvas, v2i p)
 {
 	Assert(canvas);
 	Assert(Is_Point_On_Canvas(canvas, p));
-	u32 result = canvas->dim.x * p.y + p.x;
+	u32 result = canvas->row_stride * p.y + p.x;
 	
 	return result;
 }
@@ -130,7 +177,10 @@ static inline void Set_Pixel_HZ(Canvas* canvas, v2i p, Color color)
 static inline void Set_Pixel_Idx_HZ(Canvas* canvas, u32 idx, Color color)
 {
 	Assert(canvas);
-	Assert(idx < canvas->dim.x * canvas->dim.y);
+	
+	// Only checks if the idx is on the master canvas, 
+	// at this point there is no way to know if is on a sub canvas.
+	Assert(idx < canvas->row_stride * canvas->dim.y);
 	*(canvas->buffer + idx) = color.as_u32;
 }
 
@@ -151,10 +201,24 @@ static void Clear_Canvas(Canvas* canvas, Color color)
 	
 	Assert(canvas);
 	
-	u32 canvas_area = canvas->dim.x * canvas->dim.y;
+	u32 canvas_area = canvas->row_stride * canvas->dim.y;
 	
 	for(u32 i = 0; i < canvas_area; ++i)
 		Set_Pixel_Idx_HZ(canvas, i, color);
+}
+
+
+static void Clear_Sub_Canvas(Canvas* canvas, Color color)
+{
+	Start_Scope_Timer(set_sub_canvas);
+	
+	for(i32 y = 0; y < i32(canvas->dim.y); ++y)
+	{
+		for(i32 x = 0; x < i32(canvas->dim.x); ++x)
+		{
+			Set_Pixel_HZ(canvas, v2i{x, y}, color);
+		}
+	}
 }
 
 
@@ -817,7 +881,7 @@ static void Dim_Entire_Screen(Canvas* canvas, f32 s)
 	Begin_Timing_Block(scale_pixel);
 	
 	#ifdef SSE
-	u32 pixel_count = canvas->dim.x * canvas->dim.y;
+	u32 pixel_count = canvas->row_stride * canvas->dim.y;
 	
 	u32 mask_255 = 0xFF;
 	
@@ -860,6 +924,8 @@ static void Dim_Entire_Screen(Canvas* canvas, f32 s)
 	}
 
 	#else
+	
+	// TODO: Impelement consistant behavior with the SSE version.
 	for(u32 y = 0; y < canvas->dim.y; ++y)
 	{
 		for(u32 x = 0; x < canvas->dim.x; ++x)
@@ -876,7 +942,6 @@ static void Dim_Entire_Screen(Canvas* canvas, f32 s)
 			Set_Pixel_HZ(canvas, p, frame_buffer_color);
 		}
 	}
-	
 	#endif
 	
 	End_Timing_Block(scale_pixel);

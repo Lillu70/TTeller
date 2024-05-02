@@ -20,6 +20,7 @@ static thread_local v2f GUI_DEFAULT_TEXT_SCALE 	= v2f{2, 2};
 
 static thread_local f32 GUI_MOUSE_SCROLL_SPEED 	= 50;
 
+
 struct GUI_Theme
 {
 	Color selected_color = Make_Color(250, 220, 115);
@@ -204,20 +205,6 @@ union GUI_Element_State
 };
 
 
-struct GUI_Layout
-{
-	GUI_Anchor anchor;
-	GUI_Build_Direction build_direction;
-	
-	GUI_Theme* theme;
-	
-	v2f last_element_pos = {};
-	v2f last_element_dim = {};
-	
-	bool one_time_skip_padding = false;
-};
-
-
 namespace GUI_Context_Flags
 {
 	enum : u32
@@ -237,6 +224,20 @@ namespace GUI_Context_Flags
 }
 
 
+struct GUI_Layout
+{
+	GUI_Anchor anchor;
+	GUI_Build_Direction build_direction;
+	
+	GUI_Theme* theme;
+	
+	v2f last_element_pos = {};
+	v2f last_element_dim = {};
+	
+	bool one_time_skip_padding = false;
+};
+
+
 struct GUI_Context
 {
 	Canvas* canvas = 0;
@@ -244,6 +245,7 @@ struct GUI_Context
 	Action* actions;
 	Rect bounds_rel_anchor_base = {};
 	
+	u32 _context_id = 0;
 	u32 flags = 0;
 	i32 selected_index = 0;
 	i32 widget_count = 0; 
@@ -270,6 +272,8 @@ struct GUI_Context
 	GUI_Defered_Render_Type defered_render = GUI_Defered_Render_Type::none;
 	
 	GUI_Element_State selection_state = {};
+	
+	static inline u32 active_context_id = 1;
 };
 
 

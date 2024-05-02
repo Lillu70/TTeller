@@ -9,6 +9,13 @@ static bool GUI_Character_Check_Numbers_Only(char* c)
 }
 
 
+static inline Font* GUI_Get_Active_Font(GUI_Context* context)
+{
+	Font* result = &context->layout.theme->font;
+	return result;
+}
+
+
 static inline u32 GUI_Make_Ignore_Selection_Mask()
 {
 	u32 result = GUI_Context_Flags::soft_ignore_selection | GUI_Context_Flags::hard_ignore_selection;
@@ -20,18 +27,6 @@ static inline bool GUI_Is_Context_Ready(GUI_Context* context)
 {
 	bool result = context->flags & GUI_Context_Flags::context_ready;
 	return result;
-}
-
-
-static inline void GUI_Reset_Context(GUI_Context* context)
-{
-	// Make sure context is not reset between begin and end.
-	Assert(!GUI_Is_Context_Ready(context));
-	
-	f32 dynamic_slider_girth = context->dynamic_slider_girth;
-	*context = GUI_Context();
-	
-	context->dynamic_slider_girth = dynamic_slider_girth;
 }
 
 
@@ -156,6 +151,36 @@ static inline v2f GUI_Tight_Fit_Text(char* text, v2f text_scale, Font* font)
 		text_scale.x * f32(font->char_width) * f32(Null_Terminated_Buffer_Lenght(text)), 
 		text_scale.y * f32(font->char_height)
 	};
+	
+	return result;
+}
+
+
+static v2f GUI_Tight_Fit_Multi_Line_Text(
+	Font* font, 
+	char** text_array, 
+	u32 array_count, 
+	v2f text_scale = GUI_DEFAULT_TEXT_SCALE)
+{
+	Assert(font);
+	Assert(text_array);
+	Assert(array_count);
+	Assert(text_scale.x != 0 && text_scale.y != 0);
+	
+	u32 long_idx = 0;
+	u32 long_len = 0;
+	for(u32 i = 0; i < array_count; ++i)
+	{
+		u32 len = Null_Terminated_Buffer_Lenght(text_array[i]);
+		if(len > long_len)
+		{
+			long_idx = i;
+			long_len = len;
+		}
+	}
+	
+	v2f result = v2f{f32(long_len * font->char_width), f32(font->char_height)};
+	result = Hadamar_Product(result, text_scale);
 	
 	return result;
 }
@@ -304,7 +329,8 @@ static inline GUI_Placement GUI_Get_Placement(
 		GUI_Anchor anchor = layout->anchor;
 		
 		v2f p;
-		v2f canvas_size = context->canvas->dim.As<f32>() - 1.f;
+		// TODO: Figure out if this should be -1
+		v2f canvas_size = context->canvas->dim.As<f32>() - 0.f;
 		if(pos == &GUI_AUTO_TOP_CENTER)
 		{
 			pos = &p;
@@ -457,6 +483,31 @@ static inline void GUI_Reset_Selection_State(GUI_Context* context)
 }
 
 
+static inline GUI_Context GUI_Create_Context()
+{
+	static u32 id = 1;
+	
+	GUI_Context result = {};
+	result._context_id = id++;
+	
+	return result;
+}
+
+
+static inline void GUI_Reset_Context(GUI_Context* context)
+{
+	// Make sure context is not reset between begin and end.
+	Assert(!GUI_Is_Context_Ready(context));
+	
+	f32 dynamic_slider_girth = context->dynamic_slider_girth;
+	u32 id = context->_context_id;
+	*context = GUI_Context();
+	
+	context->_context_id = id;
+	context->dynamic_slider_girth = dynamic_slider_girth;
+}
+
+
 static inline void GUI_Begin_Context(
 	GUI_Context* context,
 	Platform_Calltable* platform,
@@ -474,6 +525,7 @@ static inline void GUI_Begin_Context(
 	Assert(!GUI_Is_Context_Ready(context));
 	Assert(platform);
 	Assert(actions);
+	Assert(context->_context_id);
 	
 	context->layout = {};
 	
@@ -491,6 +543,9 @@ static inline void GUI_Begin_Context(
 	context->selected_element_dim = {};
 	context->selected_element_pos = {};
 	context->bounds_rel_anchor_base = { {F32_MAX, F32_MAX}, {-F32_MAX, -F32_MAX} };
+	
+	if(GUI_Context::active_context_id != context->_context_id)
+		context->flags |= GUI_Context_Flags::soft_ignore_selection;
 	
 	Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::cursor_mask_validation);
 	
@@ -1042,7 +1097,8 @@ static inline bool GUI_Is_Element_Selected(GUI_Context* context, bool cursor_on_
 		context->selected_element_pos = context->layout.last_element_pos;
 		context->selected_element_dim = context->layout.last_element_dim;		
 		result = true;
-
+		
+		GUI_Context::active_context_id = context->_context_id;
 		Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::soft_ignore_selection);
 	}		
 
