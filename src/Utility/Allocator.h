@@ -59,9 +59,11 @@ struct General_Allocator
 	u32 full_capacity = 0;
 	u32 push_call_count = 0;
 	u32 free_call_count = 0;
+	
+	bool owns_memory = 0;
+	bool crash_on_out_of_memory = 0;
 
-
-	void init(void* _memory, u32 _capacity)
+	void init(void* _memory, u32 _capacity, bool _crash_on_out_of_memory=true)
 	{
 		memory = (u8*)_memory;
 		Free_Block* block = (Free_Block*)memory;
@@ -70,9 +72,26 @@ struct General_Allocator
 		last_block = block;
 		
 		full_capacity = _capacity;
+		owns_memory = false;
+		crash_on_out_of_memory = _crash_on_out_of_memory;
 	}
-
+	
+	
+	void init(Platform_Calltable* platform, u32 _capacity, bool _crash_on_out_of_memory=true)
+	{
+		if(owns_memory)
+		{
+			Assert(memory);
+			platform->Free_Memory(memory);
+		}
+		
+		void* _memory = platform->Allocate_Memory(_capacity, &_capacity);
+		init(_memory, _capacity, _crash_on_out_of_memory);
+		
+		owns_memory = true;
+	}
     
+	
 	void clear()
 	{
 		Free_Block* block = (Free_Block*)memory;
@@ -283,8 +302,11 @@ struct General_Allocator
 		
 		}
 		
+		if(crash_on_out_of_memory)
+		{
+			Terminate;			
+		}
 		
-		Terminate;
 		return 0;
 	}
 
@@ -531,6 +553,159 @@ private:
 };
 
 
+struct Paged_General_Allocator
+{	
+	static u32 constexpr min_alloc_size = General_Allocator::min_alloc_size + sizeof(u32);
+
+	Platform_Calltable* platform;
+	General_Allocator* page_table = 0;
+	u32 page_capacity = 0;
+	u32 active_page_count = 0;
+	u32 active_page_idx = 0;
+	u32 default_page_size = 0;
+	
+	u32 push_call_count = 0;
+	u32 free_call_count = 0;
+
+	void clear()
+	{
+		for(u32 i = 0; i < active_page_count; ++i)
+		{
+			page_table[i].clear();
+		}
+		active_page_idx = 0;
+		
+		push_call_count = 0;
+		free_call_count = 0;
+	}
+	
+	
+	void resize_page_table(u32 new_table_capacity)
+	{
+		if(new_table_capacity <= page_capacity)
+			return;
+		
+		u32 page_size = sizeof(*page_table);
+		u32 alloc_size = page_size * new_table_capacity;
+		u32 result_alloc_size;
+		General_Allocator* new_table = 
+			(General_Allocator*)platform->Allocate_Memory(alloc_size, &result_alloc_size);
+		
+		if(result_alloc_size != alloc_size)
+			new_table_capacity = result_alloc_size / page_size;
+		
+		page_capacity = new_table_capacity;
+		
+		if(page_table)
+		{
+			u32 old_table_size = active_page_count * page_size;
+			Mem_Copy(new_table, page_table, old_table_size);			
+			
+			platform->Free_Memory(page_table);
+		}
+		
+		page_table = new_table;
+	}
+	
+	
+	void init(Platform_Calltable* _platform, u32 _page_count=255, u32 _default_page_size = MiB)
+	{
+		Assert(_default_page_size);
+		
+		default_page_size = _default_page_size;
+		platform = _platform;
+		
+		clear();
+		resize_page_table(_page_count);
+		active_page_count = 1;
+		active_page_idx = 0;
+		(*page_table).init(platform, default_page_size, false);
+	}
+    
+	
+    void* push(u32 size)
+	{
+		push_call_count += 1;
+		size += sizeof(size);
+		
+		void* result = page_table[active_page_idx].push(size);
+		
+		// Try to push the allocation in one of the existing buckets.
+		if(!result)
+		{
+			for(u32 i = 0; i < active_page_count; ++i)
+			{
+				if(i == active_page_idx)
+					continue;
+				
+				// TODO: Keep track of the largest free chunk to quickly see if this allocation could fit.
+				result = page_table[i].push(size);
+				if(result)
+				{
+					active_page_idx = i;
+					break;
+				}
+			}
+		
+			// Still no luck. Make a new bucket.
+			if(!result)
+			{
+				active_page_idx = active_page_count;
+				active_page_count += 1;
+				
+				if(active_page_count > page_capacity)
+					resize_page_table(page_capacity * 2);
+				
+				Assert(active_page_count < page_capacity);
+				
+				u32 page_size = Max(default_page_size, u32(size + sizeof(size)));
+				page_table[active_page_idx].init(platform, page_size, false);
+				
+				result = page_table[active_page_idx].push(size);
+			}
+		}
+		
+		Assert(result);
+		
+		u32* raw_result = (u32*)result;
+		*raw_result = active_page_idx;
+		
+		return raw_result + 1;
+	}
+	
+	
+	template<typename T>
+	T* push()
+	{
+		return (T*)push(sizeof(T));
+	}
+	
+	
+	void free(void* ptr)
+	{
+		free_call_count += 1;
+		
+		u32* source_page_idx = ((u32*)ptr) - 1;
+		Assert(*source_page_idx < active_page_count);
+		
+		page_table[*source_page_idx].free(source_page_idx);
+	}
+	
+	
+	static void* _Static_Push(void* allocator, u32 size)
+	{
+		void* result = ((Paged_General_Allocator*)allocator)->push(size);
+		return result;
+	}
+	
+	
+	static void _Static_Free(void* allocator, void* ptr)
+	{
+		((Paged_General_Allocator*)allocator)->free(ptr);
+	}
+};
+
+
 static inline void Init_Shell_From_General_Allocator(
 	Allocator_Shell* shell, 
 	General_Allocator* general_allocator)
@@ -539,6 +714,17 @@ static inline void Init_Shell_From_General_Allocator(
 	shell->_push = General_Allocator::_Static_Push;
 	shell->_free = General_Allocator::_Static_Free;
 	shell->min_alloc_size = General_Allocator::min_alloc_size;
+}
+
+
+static inline void Init_Shell_From_Paged_General_Allocator(
+	Allocator_Shell* shell, 
+	Paged_General_Allocator* page_general_allocator)
+{
+	shell->internal_alloc_adr = page_general_allocator;
+	shell->_push = Paged_General_Allocator::_Static_Push;
+	shell->_free = Paged_General_Allocator::_Static_Free;
+	shell->min_alloc_size = Paged_General_Allocator::min_alloc_size;
 }
 
 
@@ -576,6 +762,7 @@ struct Linear_Allocator
 	u8* next_free = 0;
 	u32 capacity = 0;
 	u32 push_count = 0;
+	bool owns_memory = 0;
 	
 	
 	u32 inline get_free_capacity()
@@ -594,10 +781,31 @@ struct Linear_Allocator
 	
 	void init(void* _memory, u32 _capacity)
 	{
+		Assert(_capacity);
+		
 		memory = (u8*)_memory;
 		next_free = memory;
 		capacity = _capacity;
 		push_count = 0;
+		
+		owns_memory = false;
+	}
+	
+	
+	void init(Platform_Calltable* platform, u32 _capacity)
+	{
+		Assert(_capacity);
+		
+		if(owns_memory)
+		{
+			Assert(memory);
+			platform->Free_Memory(memory);
+		}
+		
+		void* _memory = platform->Allocate_Memory(_capacity, &_capacity);
+		init(_memory, _capacity);
+		
+		owns_memory = true;
 	}
 	
 	
@@ -610,11 +818,30 @@ struct Linear_Allocator
 	
 	void* push(u32 size)
 	{
+		Assert(memory);
+		
 		Assert(get_free_capacity() >= size);
 		push_count += 1;
 		u8* result = next_free;
 		next_free += size;
 		return result;
+	}
+	
+	
+	void* safe_push(u32 size)
+	{
+		Assert(memory);
+		
+		u8* result = 0;
+		
+		if(get_free_capacity() >= size)
+		{
+			push_count += 1;
+			result = next_free;
+			next_free += size;
+		}
+		
+		return result;			
 	}
 	
 	

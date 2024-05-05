@@ -315,7 +315,7 @@ static void Do_All_Events_Frame()
 		{
 			Events_Container load_result;
 			
-			if(Load_Campaign(&load_result, &s_allocator, s_interim_mem, &s_platform))
+			if(Load_Campaign(&load_result, &s_allocator, &s_platform))
 			{
 				for(u32 i = 0; i < s_global_data.event_container.events->count; ++i)
 					Delete_Event(s_global_data.event_container.events, &s_allocator, i, false);
@@ -336,7 +336,7 @@ static void Do_All_Events_Frame()
 		// Save button.
 		if(GUI_Do_Button(context, AUTO, &dim, save_text))
 		{
-			Serialize_Campaign(s_global_data.event_container, &s_interim_mem, &s_platform);
+			Serialize_Campaign(s_global_data.event_container, &s_platform);
 		}
 		
 	}; // ----------------------------------------------------------------------------------------
@@ -368,8 +368,8 @@ static void Do_All_Events_Frame()
 		u32 bounds;
 		if(left_edge < night_list_text_pos.x)
 		{
-			GUI_Do_Text(context, &day_list_text_pos, day_list_text);
-			GUI_Do_Text(context, &night_list_text_pos, "Y\xF6 tapahtumat:");			
+			GUI_Do_Text(context, &day_list_text_pos, day_list_text, {}, GUI_DEFAULT_TEXT_SCALE, true);
+			GUI_Do_Text(context, &night_list_text_pos, "Y\xF6 tapahtumat:", {}, GUI_DEFAULT_TEXT_SCALE, true);			
 			bounds = u32(GUI_Get_Bounds_In_Pixel_Space(context).min.y);
 		}
 		else
@@ -1208,7 +1208,7 @@ static void Do_On_Exit_Pop_Up()
 	
 	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t2, scale))
 	{
-		Serialize_Campaign(s_global_data.event_container, &s_interim_mem, &s_platform);
+		Serialize_Campaign(s_global_data.event_container, &s_platform);
 		s_platform.Set_Flag(App_Flags::is_running, false);
 	}
 	

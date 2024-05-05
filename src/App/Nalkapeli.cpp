@@ -158,20 +158,45 @@ static String Generate_Unique_Name(Event_State* events, u32 event_count, Allocat
 }
 
 
+static Linear_Allocator serialization_lalloc = {};
+
 static void Serialize_Campaign(
 	Events_Container event_container, 
-	Linear_Allocator* inter_mem, 
 	Platform_Calltable* platform)
-{
+{	
 	/*
 	Version History 1->2: Added seperation of day and night events.
 	*/
 	
 	//TODO: Write like a file description thing or something maybe?
 	
-	Linear_Allocator write_buffer = Clone_From_Linear_Allocator_Free_Space(inter_mem);
+	#define WRITE(X, type)\
+	{\
+		void* adrs = serialization_lalloc.safe_push(sizeof(type));\
+		if(adrs != 0)\
+		{\
+			*(type*)adrs = X;\
+		}\
+		else\
+		{\
+			goto OUT_OF_MEMORY;\
+		}\
+	}
 	
-	#define WRITE(X, type) *(type*)write_buffer.push(sizeof(type)) = X
+	#define WRITE_BLOCK(copy_buffer, copy_amount)\
+	{\
+		void* adrs = serialization_lalloc.safe_push(copy_amount);\
+		if(adrs != 0)\
+		{\
+			Mem_Copy((u8*)adrs, copy_buffer, copy_amount);\
+		}\
+		else\
+		{\
+			goto OUT_OF_MEMORY;\
+		}\
+	}
+	
+	serialization_lalloc.clear();
 	
 	u32 version = 2;
 	WRITE(version, u32);
@@ -183,17 +208,14 @@ static void Serialize_Campaign(
 		WRITE(e->name.lenght, u32);
 		if(e->name.lenght)
 		{
-			Mem_Copy((u8*)write_buffer.push(e->name.lenght), e->name.buffer, e->name.lenght);	
+			WRITE_BLOCK(e->name.buffer, e->name.lenght);
 		}
 		
 		// event text
 		WRITE(e->event_text.lenght, u32);
 		if(e->event_text.lenght)
 		{
-			Mem_Copy(
-				(u8*)write_buffer.push(e->event_text.lenght), 
-				e->event_text.buffer, 
-				e->event_text.lenght);
+			WRITE_BLOCK(e->event_text.buffer, e->event_text.lenght);
 		}
 		
 		WRITE(e->participents->count, u32);
@@ -219,10 +241,7 @@ static void Serialize_Campaign(
 						WRITE(req->mark.lenght, u32);
 						if(req->mark.lenght)
 						{
-							Mem_Copy(
-								(u8*)write_buffer.push(req->mark.lenght), 
-								req->mark.buffer, 
-								req->mark.lenght);
+							WRITE_BLOCK(req->mark.buffer, req->mark.lenght);
 						}
 						WRITE(req->mark_exists, Exists_Statement);
 					
@@ -248,10 +267,7 @@ static void Serialize_Campaign(
 							WRITE(con->str.lenght, u32);
 							if(con->str.lenght)
 							{
-								Mem_Copy(
-									(u8*)write_buffer.push(con->str.lenght), 
-									con->str.buffer, 
-									con->str.lenght);
+								WRITE_BLOCK(con->str.buffer, con->str.lenght);
 							}							
 						}
 						else
@@ -267,10 +283,7 @@ static void Serialize_Campaign(
 						WRITE(con->str.lenght, u32);
 						if(con->str.lenght)
 						{
-							Mem_Copy(
-								(u8*)write_buffer.push(con->str.lenght), 
-								con->str.buffer, 
-								con->str.lenght);
+							WRITE_BLOCK(con->str.buffer, con->str.lenght);
 						}
 						
 					}break;
@@ -291,14 +304,22 @@ static void Serialize_Campaign(
 		}
 	}
 	
-	u32 buffer_size = write_buffer.get_used_capacity();
+	#undef WRITE
+	#undef WRITE_BLOCK
+	
+	u32 buffer_size = serialization_lalloc.get_used_capacity();
 	if(buffer_size)
 	{
 		platform->Create_Directory("Kamppaniat");
-		platform->Write_File("Kamppaniat/test.event", (u8*)write_buffer.memory, buffer_size);
+		platform->Write_File("Kamppaniat/test.event", (u8*)serialization_lalloc.memory, buffer_size);
 	}
+	return;
 	
-	#undef WRITE
+	OUT_OF_MEMORY:
+	Assert(serialization_lalloc.capacity);
+	
+	serialization_lalloc.init(platform, serialization_lalloc.capacity * 2);
+	Serialize_Campaign(event_container, platform);
 }
 
 
@@ -306,16 +327,21 @@ static void Serialize_Campaign(
 static bool Load_Campaign(
 	Events_Container* container,
 	Allocator_Shell* allocator,
-	Linear_Allocator inter_mem, 
 	Platform_Calltable* platform)
 {
 	#define READ(type) *(type*)(buffer + read_head); read_head += sizeof(type); Assert(read_head <= buffer_size);
 	#define READ_TEXT(lenght) (char*)(buffer + read_head); read_head += lenght; Assert(read_head <= buffer_size);
 	
 	u32 buffer_size = 0;
-	platform->Get_File_Size("Kamppaniat/test.event", &buffer_size);
+	if(!platform->Get_File_Size("Kamppaniat/test.event", &buffer_size))
+		return false;
+
+	serialization_lalloc.clear();
 	
-	u8* buffer = (u8*)inter_mem.push(buffer_size);	
+	if(serialization_lalloc.get_free_capacity() < buffer_size)
+		serialization_lalloc.init(platform, buffer_size);
+	
+	u8* buffer = (u8*)serialization_lalloc.push(buffer_size);
 	u32 read_head = 0;
 	
 	*container = {};
@@ -495,7 +521,7 @@ static bool Load_Campaign(
 		}
 		else
 		{
-			load_success_full = false;
+			load_success_full = true;
 			container->events = Create_Dynamic_Array<Event_State>(allocator, 1);			
 		}
 	}
@@ -503,4 +529,5 @@ static bool Load_Campaign(
 	return load_success_full;
 	
 	#undef READ
+	#undef READ_TEXT
 }

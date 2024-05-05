@@ -72,5 +72,9 @@ struct Platform_Calltable
 	
 	char* (*Get_Clipboard_Data_As_Text)() = 0;
 	
-	void (*Set_Clipboard_Data_As_Text)(char*, u32) = 0;
+	void  (*Set_Clipboard_Data_As_Text)(char*, u32) = 0;
+	
+	void* (*Allocate_Memory)(u32 amount, u32* out_amount) = 0;
+	
+	void  (*Free_Memory)(void* memory) = 0;
 };

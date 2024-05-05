@@ -63,17 +63,19 @@ static u32* Win32_Resize_Pixel_Buffer(i32 new_width, i32 new_height)
 	s_bitmap.height = new_height;
 	s_bitmap.width = new_width;
 	
-	if (s_bitmap.memory)
-		VirtualFree(s_bitmap.memory, 0, MEM_RELEASE);
-	
 	s_bitmap.info.bmiHeader.biWidth = new_width;
 	s_bitmap.info.bmiHeader.biHeight = new_height;
 	
-	u64 pixel_count = (u64)new_width * new_height;
-	u64 bitmap_memory_size = (pixel_count + extra_pp) * s_bitmap.bytes_per_pixel;
-	
-	s_bitmap.memory = 
-		(u32*)VirtualAlloc(0, bitmap_memory_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	u32 pixel_count = new_width * new_height;
+	u32 required_memory_ammount = (pixel_count + extra_pp) * s_bitmap.bytes_per_pixel;
+	if(s_bitmap.allocated_memory < required_memory_ammount)
+	{
+		if(s_bitmap.memory)
+			VirtualFree(s_bitmap.memory, 0, MEM_RELEASE);
+		
+		s_bitmap.memory = (u32*)Win32_Allocate_Memory(required_memory_ammount, &required_memory_ammount);
+		s_bitmap.allocated_memory = required_memory_ammount;
+	}
 	
 	return s_bitmap.memory;
 }
@@ -192,9 +194,10 @@ static void Win32_Init(
 	u32 window_height, 
 	u32 window_pos_x, 
 	u32 window_pos_y, 
-	const wchar_t* window_title,
-	u32 app_memory_size)
+	const wchar_t* window_title)
 {
+	GetSystemInfo(&s_app.sys_info);
+	
 	Window_Create_Info wci = 
 	{
 		window_width, 
@@ -211,8 +214,6 @@ static void Win32_Init(
 		s_app.timer_counter_freg = perf_freg.QuadPart;
 		QueryPerformanceCounter(&s_app.last_time_counter);
 	}
-	
-	s_app.game_state_memory = VirtualAlloc(0, app_memory_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	
 	s_app.main_thread_id = GetCurrentThreadId();
 	
@@ -749,6 +750,34 @@ static bool Win32_Create_Directory(char* path)
 }
 
 
+static void* Win32_Allocate_Memory(u32 amount, u32* out_amount)
+{
+	u32 page = u32(s_app.sys_info.dwPageSize);
+	u32 p_count = amount / page;
+	if(p_count * page < amount)
+	{
+		p_count += 1;
+		u32 new_amount = p_count * page;
+		Assert(new_amount >= amount);
+		amount = new_amount;
+		
+		if(out_amount)
+		{
+			*out_amount = amount;
+		}
+	}
+	
+	void* memory = VirtualAlloc(0, amount, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	return memory;
+}
+
+
+static void Win32_Free_Memory(void* memory)
+{
+	VirtualFree(memory, 0, MEM_RELEASE);
+}
+
+
 static Platform_Calltable Win32_Get_Calltable()
 {
 	Platform_Calltable ct = {};
@@ -774,6 +803,9 @@ static Platform_Calltable Win32_Get_Calltable()
 	ct.Set_Clipboard_Data_As_Text = Win32_Set_Clipboard_Data_As_Text;
 	ct.Get_Scroll_Wheel_Delta = Win32_Get_Scroll_Wheel_Delta;
 	ct.Create_Directory = Win32_Create_Directory;
+	ct.Allocate_Memory = Win32_Allocate_Memory;
+	ct.Free_Memory = Win32_Free_Memory;
+	
 	return ct;
 }
 

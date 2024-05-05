@@ -23,11 +23,11 @@ struct Win32_App
 	
 	Char_Array typing_information = {};
 	
-	void* game_state_memory = 0;
-	
 	inline static constexpr i32 max_controllers = 1;
 	
 	Controller_State controller_state[max_controllers];
+	
+	_SYSTEM_INFO sys_info;
 	
 	bool force_update_surface = false;
 	volatile bool init_done = false;
@@ -38,19 +38,20 @@ struct Win32_Bitmap
 {
 	inline static constexpr i32 bytes_per_pixel = 4;
 	
+	u64 allocated_memory = 0;
 	u32* memory = nullptr;
 	i32 width = 0, height = 0;
 	BITMAPINFO info{};
 };
 
 
-static void Win32_Init(HINSTANCE instance, 
+static void Win32_Init(
+	HINSTANCE instance, 
 	u32 window_width, 
 	u32 window_height, 
 	u32 window_pos_x, 
 	u32 window_pos_y, 
-	char* window_title, 
-	u32 app_memory_size);
+	char* window_title);
 
 	
 static void Win32_Update_Surface(bool update_from_game);
@@ -80,6 +81,8 @@ static char* Win32_Get_Clipboard_Data_As_Text();
 static void Win32_Set_Clipboard_Data_As_Text(char* data, u32 lenght);
 static f32 Win32_Get_Scroll_Wheel_Delta();
 static bool Win32_Create_Directory(char* path);
+static void* Win32_Allocate_Memory(u32 amount, u32* out_amount);
+static void Win32_Free_Memory(void* memory);
 
 // ---------------------------------------------------------------
 // Silly maps begin here.

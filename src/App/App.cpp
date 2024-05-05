@@ -7,17 +7,15 @@
 #include "GUI_Factory.cpp"
 
 
-void Init_App(Platform_Calltable platform_calltable, void* app_memory, u32 app_memory_size)
+void Init_App(Platform_Calltable platform_calltable)
 {
-	Init_Shell_From_General_Allocator(&s_allocator, &s_mem);
+	Init_Shell_From_Paged_General_Allocator(&s_allocator, &s_mem);
 	
 	s_platform = platform_calltable;
 	
-	Assert(app_memory_size > INTERIM_MEM_SIZE);
-	
 	{
-		s_interim_mem.init(app_memory, INTERIM_MEM_SIZE);	
-		s_mem.init(s_interim_mem.memory + s_interim_mem.capacity, app_memory_size - INTERIM_MEM_SIZE);
+		serialization_lalloc.init(&s_platform, MiB);
+		s_mem.init(&s_platform, 1);
 	}
 	
 	Init_GUI();
@@ -50,8 +48,6 @@ void Update_App(f64 delta_time, bool* update_surface)
 	if(!s_canvas.buffer)
 		return;
 	 
-	s_interim_mem.clear();
-	
 	bool wants_to_exit = Is_Flag_Set(app_flags, (u32)App_Flags::wants_to_exit);
 	
 	#if 0

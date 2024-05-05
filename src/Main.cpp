@@ -17,17 +17,16 @@
 
 #include "App\Main_App.h"
 
-static constexpr u32 APP_MEMORY_SIZE = MiB * 2;
 static const wchar_t* APP_TITLE = L"N\xE4lk\xE4peli";
 
 Declare_Timing_Tables();
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
-	Win32_Init(620 * 2, 480 * 2, CW_USEDEFAULT, CW_USEDEFAULT, APP_TITLE, APP_MEMORY_SIZE);
+	Win32_Init(620 * 2, 480 * 2, CW_USEDEFAULT, CW_USEDEFAULT, APP_TITLE);
 	
 	Platform_Calltable calltable = Win32_Get_Calltable();
-	Init_App(calltable, s_app.game_state_memory, APP_MEMORY_SIZE);
+	Init_App(calltable);
 	
 	f64 frame_time = 0;
 	
