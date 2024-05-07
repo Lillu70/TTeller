@@ -24,6 +24,8 @@ void Init_App(Platform_Calltable platform_calltable)
 
 void Update_App(f64 delta_time, bool* update_surface)
 {
+	u32 size = sizeof(Participation_Requirement);
+	
 	*update_surface = true;
 	Begin_Timing_Block(internal_run_time);
 	

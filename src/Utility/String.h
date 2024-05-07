@@ -5,10 +5,10 @@
 struct String
 {
 	char* buffer;
+	Allocator_Shell* alloc;
 	u32 lenght;		// Character count of the string. Does not include the null terminator.
 	u32 capacity; 	// The memory reserved for the string.
 	
-	Allocator_Shell* alloc;
 	
 	// CONSIDER: To member function or not? For some reason feels good here.
 	void append_character(char c);

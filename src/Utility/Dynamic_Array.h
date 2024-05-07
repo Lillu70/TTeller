@@ -51,6 +51,7 @@ static T* End(Dynamic_Array<T>* darray)
 template<typename T>
 static T* Push(Dynamic_Array<T>** darray_ptr, Allocator_Shell* allocator)
 {
+	Assert(*darray_ptr);
 	Assert((*darray_ptr)->count <= (*darray_ptr)->capacity);
 	
 	if((*darray_ptr)->count == (*darray_ptr)->capacity)

@@ -9,6 +9,23 @@ static bool GUI_Character_Check_Numbers_Only(char* c)
 }
 
 
+static inline GUI_Layout_Recovery_Point GUI_Get_Layout_Recovery_Point(GUI_Context* context)
+{
+	GUI_Layout_Recovery_Point result;
+	result.last_element_pos = context->layout.last_element_pos;
+	result.last_element_dim = context->layout.last_element_dim;
+	return result;
+}
+
+
+static inline void GUI_Restore_Layout_From_Recovery_Point(
+	GUI_Context* context, 
+	GUI_Layout_Recovery_Point* rcp)
+{
+	context->layout.last_element_pos = rcp->last_element_pos;
+	context->layout.last_element_dim = rcp->last_element_dim;
+}
+
 static inline Font* GUI_Get_Active_Font(GUI_Context* context)
 {
 	Font* result = &context->layout.theme->font;
@@ -37,6 +54,48 @@ static Rect GUI_Get_Bounds_In_Pixel_Space(GUI_Context* context)
 	result.max -= context->anchor_base;
 	
 	return result;
+}
+
+
+static inline f32 GUI_Get_Collumn_Start(GUI_Context* context, u32 axis)
+{
+	#if 0
+	v2f pixel_space_bounds = GUI_Get_Bounds_In_Pixel_Space(context).max;
+	Assert(axis < Array_Lenght(pixel_space_bounds.elements));
+	
+	f32 result = pixel_space_bounds.elements[axis] - context->layout.last_element_dim.elements[axis];
+	#else
+	f32 last_half_dim = context->layout.last_element_dim.elements[axis] / 2;
+	f32 pixel_space_pos = context->layout.last_element_pos.elements[axis];
+	pixel_space_pos -= context->anchor_base.elements[axis];
+	
+	f32 result = pixel_space_pos - last_half_dim;
+		
+	#endif
+	
+	return result;
+}
+
+
+static inline void GUI_End_Collumn(GUI_Context* context, f32 collumn_min_width, f32 collumn_start, u32 axis)
+{
+	f32 padding = context->layout.theme->padding;
+	
+	v2f pixel_space_bounds = GUI_Get_Bounds_In_Pixel_Space(context).max;
+	Assert(axis < Array_Lenght(pixel_space_bounds.elements));
+	
+	f32 collumn_width = pixel_space_bounds.elements[axis] - collumn_start;
+	
+	f32 last_directional_dim = context->layout.last_element_dim.elements[axis];
+	context->layout.last_element_pos.elements[axis] -= last_directional_dim;
+	
+	if(collumn_width > collumn_min_width)
+	{	
+		context->layout.last_element_pos.elements[axis] += collumn_width + padding;
+	}else
+	{
+		context->layout.last_element_pos.elements[axis] += collumn_min_width;
+	}
 }
 
 

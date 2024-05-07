@@ -224,6 +224,13 @@ namespace GUI_Context_Flags
 }
 
 
+struct GUI_Layout_Recovery_Point
+{
+	v2f last_element_pos;
+	v2f last_element_dim;
+};
+
+
 struct GUI_Layout
 {
 	GUI_Anchor anchor;

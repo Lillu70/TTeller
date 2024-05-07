@@ -54,13 +54,14 @@ static inline void Init_GUI()
 	
 	// Make Test event:
 	#if 0
-	
-	static constexpr char* event_name = "Peformance test event";
-	Event_State* event = Push_New_Event(&s_global_data.all_events, &s_allocator, event_name);
+	String event_name = Create_String(&s_allocator, "Peformance test event");
+	Event_State* event = Push(&s_global_data.event_container.events, &s_allocator);
+	Init_Event_Takes_Name_Ownership(event, &s_allocator, &event_name);
 	
 	static constexpr char* long_text = 
 		"\xE4\xF6\xC4\xD6QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm,.:;!#1234567890";
 	
+	u32 long_text_leng = Null_Terminated_Buffer_Lenght(long_text);
 	u32 t = 0;
 	u32 t2 = 0;
 	for(u32 p = 0; p < Event_State::max_participent_count; ++p)
@@ -73,12 +74,11 @@ static inline void Init_GUI()
 			Participation_Requirement::Type new_type = (Participation_Requirement::Type)(t++ % mod);
 			
 			Participation_Requirement* new_req = Push(&new_participent->reqs, &s_allocator);
-			*new_req = { new_type };
-			
-			if(Requirement_Is_Mark_Type(new_type))
+			Init_Participation_Requirement(new_req, new_type, &s_allocator, long_text_leng + 1);
+			if(new_req->mark.buffer)
 			{
-				Init_String(&new_req->mark, &s_allocator, long_text);
-				new_req->mark_exists = Exists_Statement::does_have;
+				Mem_Copy(new_req->mark.buffer, long_text, long_text_leng + 1);
+				new_req->mark.lenght = long_text_leng;
 			}
 		}
 		
@@ -88,20 +88,23 @@ static inline void Init_GUI()
 			Event_Consequens::Type new_type = (Event_Consequens::Type)((t2++ % mod) + 1);
 			
 			Event_Consequens* new_con = Push(&new_participent->cons, &s_allocator);
-			*new_con = { new_type };
-			
-			if(new_type == Event_Consequens::Type::gains_mark ||
-				new_type == Event_Consequens::Type::loses_mark)
+			Init_Event_Consequense(new_con, new_type, &s_allocator, long_text_leng + 1);
+			if(new_con->str.buffer)
 			{
-				Init_String(&new_con->str, &s_allocator, long_text);
+				Mem_Copy(new_con->str.buffer, long_text, long_text_leng + 1);
+				new_con->str.lenght = long_text_leng;
 			}
 		}
 		
 		// add death
 		{
+			static constexpr char* death_text = "123";
 			Event_Consequens* new_con = Push(&new_participent->cons, &s_allocator);
-			*new_con = { Event_Consequens::Type::death };
-			Init_String(&new_con->str, &s_allocator, "123");
+			
+			Init_Event_Consequense(new_con, Event_Consequens::Type::death, &s_allocator);
+			
+			Mem_Copy(new_con->str.buffer, death_text, 4);
+			new_con->str.lenght = 3;
 		}
 	}
 	
@@ -235,8 +238,7 @@ static void Do_All_Events_Frame()
 				s_global_data.active_menu = Menus::event_editor_requirements;
 				s_global_data.active_event_index = s_global_data.event_container.day_event_count;			
 			}
-			
-			//TODO: Change this to take event_container as input
+
 			String unique_name = Generate_Unique_Name(
 				Begin(s_global_data.event_container.events), 
 				s_global_data.event_container.day_event_count,
@@ -413,9 +415,14 @@ static void Do_All_Events_Frame()
 				{
 					Event_State* e = begin + i;
 					
+					GUI_Layout_Recovery_Point rcp = GUI_Get_Layout_Recovery_Point(&gui_event_list_day);
+					
 					// Destroy event
 					if(GUI_Do_Button(&gui_event_list_day, pos, &GUI_AUTO_FIT, "X"))
 					{
+						pos = 0;
+						GUI_Restore_Layout_From_Recovery_Point(&gui_event_list_day, &rcp);
+						
 						if(i < s_global_data.event_container.day_event_count)
 							s_global_data.event_container.day_event_count -= 1;
 						
@@ -470,9 +477,13 @@ static void Do_All_Events_Frame()
 				{
 					Event_State* e = begin + i;
 					
+					GUI_Layout_Recovery_Point rcp = GUI_Get_Layout_Recovery_Point(&gui_event_list_night);
+					
 					// Destroy event
 					if(GUI_Do_Button(&gui_event_list_night, pos, &GUI_AUTO_FIT, "X"))
 					{
+						pos = 0;
+						GUI_Restore_Layout_From_Recovery_Point(&gui_event_list_night, &rcp);
 						if(i < s_global_data.event_container.day_event_count)
 							s_global_data.event_container.day_event_count -= 1;
 						
@@ -510,19 +521,12 @@ static void Do_Event_Editor_Requirements_Frame()
 	{
 		Event_State* event = Begin(s_global_data.event_container.events) + s_global_data.active_event_index;
 		
-		GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "Tapahtuma Editori", {}, v2f{4,4}, true);
+		GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "Osallistujat", {}, v2f{4,4}, true);
 		f32 title_height = context->layout.last_element_dim.y;
 		v2f tile_bounds_max = GUI_Get_Bounds_In_Pixel_Space(context).max;
 		
-		char* event_name_text = 
-			(s_global_data.active_event_index < s_global_data.event_container.day_event_count)?
-			"Tapahtuman (p\xE4iv\xE4) nimi:" : "Tapahtuman (y\xF6) nimi:";
-	
-		GUI_Do_Text(context, AUTO, event_name_text);
-		
-		GUI_Do_SL_Input_Field(context, AUTO, AUTO, &event->name);
-	
-		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lis\xE4\xE4 uusi osallistuja"))
+		v2f new_parti_button_pos = v2f{10, 57};
+		if(GUI_Do_Button(context, &new_parti_button_pos, &GUI_AUTO_FIT, "Lis\xE4\xE4 uusi osallistuja"))
 		{
 			s_gui.flags |= GUI_Context_Flags::maxout_horizontal_slider;
 			if(event->participents->count < event->max_participent_count)
@@ -531,18 +535,24 @@ static void Do_Event_Editor_Requirements_Frame()
 			}
 		}
 		
+		context->layout.build_direction = GUI_Build_Direction::right_center;
+		
 		if(event->participents->count > 0)
-		{
-			context->layout.build_direction = GUI_Build_Direction::right_center;
-			
+		{	
 			if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Poista kaikki osallistujat"))
 				Delete_All_Participants_From_Event(event, &s_allocator);
-		}		
+		}	
+		
+		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lis\xE4\xE4 yleis vaatimus"))
+		{
+			Global_Mark_Requirement* gmr = Push(&event->global_mark_reqs, &s_allocator);
+			*gmr = {};
+			gmr->mark = Create_String(&s_allocator, 12);
+		}
 		
 		context->layout.build_direction = GUI_Build_Direction::right_center;
 		
 		f32 padding = context->layout.theme->padding;
-		
 		static constexpr char* go_to_all_events_text = "<";
 		static constexpr char* go_to_event_text_text = "Tapahtuma Teksti";
 		static constexpr char* go_to_consequences_text = "Seuraamukset";
@@ -569,8 +579,7 @@ static void Do_Event_Editor_Requirements_Frame()
 		v2f dim = v2f{w1, h};
 		if(GUI_Do_Button(context, &back_button_pos, &dim, go_to_all_events_text))
 		{
-			s_global_data.active_menu = Menus::all_events;
-			
+			s_global_data.active_menu = Menus::all_events;	
 		}
 		
 		dim = v2f{w2, h};
@@ -592,23 +601,130 @@ static void Do_Event_Editor_Requirements_Frame()
 	{
 		Event_State* event = Begin(s_global_data.event_container.events) + s_global_data.active_event_index;
 	
-		static constexpr f32 collumn_width = 300;
+		static constexpr f32 collumn_min_width = 300;
+		f32 padding = context->layout.theme->padding;
+		
+		v2f* start_pos_ptr = &GUI_AUTO_TOP_LEFT;
+		if(event->global_mark_reqs->count)
+		{
+			
+			GUI_Do_Text(context, start_pos_ptr, "Yleis vaatimukset:", {}, GUI_DEFAULT_TEXT_SCALE, true);
+			start_pos_ptr = 0;
+			
+			GUI_Push_Layout(context);
+			
+			f32 collumn_start = GUI_Get_Collumn_Start(context, X_AXIS);
+			
+			Global_Mark_Requirement* global_mark_reqs = Begin(event->global_mark_reqs);
+			for(u32 i = 0; i < event->global_mark_reqs->count; ++i)
+			{
+				GUI_Layout_Recovery_Point rcp = GUI_Get_Layout_Recovery_Point(context);
+				
+				v2f dim = v2f{36, 36};
+				if(GUI_Do_Button(context, start_pos_ptr, &dim, "X"))
+				{
+					GUI_Restore_Layout_From_Recovery_Point(context, &rcp);
+					
+					Delete_Global_Mark_Requirement(event->global_mark_reqs, i--);
+					continue;
+				}
+				
+				f32 left_size 
+					= context->layout.last_element_pos.x - context->layout.last_element_dim.x / 2; 
+				
+				GUI_Push_Layout(context);
+				context->layout.build_direction = GUI_Build_Direction::right_center;
+				
+				Global_Mark_Requirement* gmr = global_mark_reqs + i;
+				
+				GUI_Do_Text(context, AUTO, "Yleis merkki", GUI_Highlight_Prev(context));
+				
+				f32 right_side 
+					= context->layout.last_element_pos.x + context->layout.last_element_dim.x / 2; 
+				
+				GUI_Pop_Layout(context);
+				
+				f32 width = right_side - left_size;
+				GUI_Do_SL_Input_Field(context, AUTO, &width, &gmr->mark);
+				
+				if(u32 s = GUI_Do_Dropdown_Button(
+					context, AUTO, AUTO, 
+					(char*)s_exists_statement_names[u32(gmr->mark_exists)],
+					Array_Lenght(s_exists_statement_names),
+					(char**)s_exists_statement_names))
+				{
+					gmr->mark_exists = Exists_Statement(s - 1);
+				}
+				
+				if(gmr->mark_exists == Exists_Statement::does_have)
+				{
+					GUI_Do_Text(context, AUTO, "Kestoa j\xE4ljell\xE4:", GUI_Highlight_Next(context, 2));
+					
+					// Numerical_Relation
+					if(u32 s = GUI_Do_Dropdown_Button(
+						context, AUTO, &GUI_AUTO_FIT, 
+						(char*)s_numerical_relation_names[u32(gmr->numerical_relation)],
+						Array_Lenght(s_numerical_relation_names),
+						(char**)s_numerical_relation_names))
+					{
+						gmr->numerical_relation = Numerical_Relation(s - 1);
+					}
+					
+					GUI_Push_Layout(context);
+					
+					context->layout.build_direction = GUI_Build_Direction::right_center;
+					
+					// Target value
+					if(u32 s = GUI_Do_Dropdown_Button(
+						context, AUTO, &GUI_AUTO_FIT, 
+						(char*)s_duration_names[gmr->relation_target],
+						Array_Lenght(s_duration_names) - 1,
+						(char**)s_duration_names + 1))
+					{
+						gmr->relation_target = i8(s);
+					}
+					
+					GUI_Pop_Layout(context);
+				}
+				
+				GUI_Do_Spacing(context, AUTO);
+			}
+			
+			GUI_Pop_Layout(context);
+		
+			GUI_End_Collumn(context, collumn_min_width, collumn_start, X_AXIS);
+		}		
+		
+		// -- participants --
+		
+		context->layout.build_direction = GUI_Build_Direction::right_top;
+		
+		GUI_Do_Text(context, start_pos_ptr, "Osallistujat:", {}, GUI_DEFAULT_TEXT_SCALE, true);
+		
+		context->layout.build_direction = GUI_Build_Direction::down_left;
 		
 		for(u32 p = 0; p < event->participents->count; ++p)
 		{
 			Participent* parti = Begin(event->participents) + p;
 			
-			GUI_Push_Layout(context);
-			
 			v2f dim = v2f{36, 36};
-			f32 padding = context->layout.theme->padding;
-			v2f collumn_pos = v2f{collumn_width * p + padding, f32(context->canvas->dim.y - 1) - padding};
-			if(GUI_Do_Button(context, &collumn_pos, &dim, "X"))
+			
+			GUI_Layout_Recovery_Point rcp = GUI_Get_Layout_Recovery_Point(context);
+			
+			if(GUI_Do_Button(context, AUTO, &dim, "X"))
 			{
 				Delete_Participent(p--, event->participents, &s_allocator);
-				GUI_Pop_Layout(context);
+				
+				GUI_Restore_Layout_From_Recovery_Point(context, &rcp);
 				continue;
 			}
+			
+			f32 collumn_start = GUI_Get_Collumn_Start(context, X_AXIS);
+			
+			context->layout.build_direction = GUI_Build_Direction::right_top;
+			
+			GUI_Push_Layout(context);
+			context->layout.build_direction = GUI_Build_Direction::down_left;
 			
 			GUI_Push_Layout(context);
 			
@@ -639,15 +755,7 @@ static void Do_Event_Editor_Requirements_Frame()
 				if(parti->reqs->count < parti->max_requirements)
 				{
 					Participation_Requirement::Type new_type = (Participation_Requirement::Type)(s - 1);
-					
-					Participation_Requirement* new_req = Push(&parti->reqs, &s_allocator);
-					*new_req = { new_type };
-					
-					if(Requirement_Is_Mark_Type(new_type))
-					{
-						Init_String(&new_req->mark, &s_allocator, new_req->initial_mark_capacity);
-						new_req->mark_exists = Exists_Statement::does_have;
-					}						
+					Init_Participation_Requirement(Push(&parti->reqs, &s_allocator), new_type, &s_allocator);
 				}
 			}
 			
@@ -658,12 +766,17 @@ static void Do_Event_Editor_Requirements_Frame()
 			{
 				Participation_Requirement* req = requirement_array + r;
 				
+				rcp = GUI_Get_Layout_Recovery_Point(context);
+				
 				if(GUI_Do_Button(context, AUTO, &dim, "X"))
 				{
 					Make_Requirement_Hollow(req);
 					
 					u32 size = sizeof(Participation_Requirement);
 					Remove_Element_From_Packed_Array(requirement_array, &parti->reqs->count, size, r--);
+					
+					GUI_Restore_Layout_From_Recovery_Point(context, &rcp);
+					continue;
 				}
 				
 				GUI_Push_Layout(context);
@@ -674,7 +787,7 @@ static void Do_Event_Editor_Requirements_Frame()
 				GUI_Do_Text(context, AUTO, req_type_text, GUI_Highlight_Prev(context));
 				
 				f32 right_side_x = context->layout.last_element_pos.x + context->layout.last_element_dim.x / 2;
-				
+					
 				GUI_Pop_Layout(context);
 				
 				f32 left_side_x = context->layout.last_element_pos.x - context->layout.last_element_dim.x / 2; 
@@ -695,6 +808,38 @@ static void Do_Event_Editor_Requirements_Frame()
 						{
 							req->mark_exists = Exists_Statement(s - 1);
 						}
+						
+						if(req->mark_exists == Exists_Statement::does_have)
+						{
+							GUI_Do_Text(context, AUTO, "Kestoa j\xE4ljell\xE4:", GUI_Highlight_Next(context, 2));
+							
+							
+							// Numerical_Relation
+							if(u32 s = GUI_Do_Dropdown_Button(
+								context, AUTO, &GUI_AUTO_FIT, 
+								(char*)s_numerical_relation_names[u32(req->numerical_relation)],
+								Array_Lenght(s_numerical_relation_names),
+								(char**)s_numerical_relation_names))
+							{
+								req->numerical_relation = Numerical_Relation(s - 1);
+							}
+							
+							GUI_Push_Layout(context);
+							
+							context->layout.build_direction = GUI_Build_Direction::right_center;
+							
+							// Target value
+							if(u32 s = GUI_Do_Dropdown_Button(
+								context, AUTO, &GUI_AUTO_FIT, 
+								(char*)s_duration_names[req->relation_target],
+								Array_Lenght(s_duration_names) - 1,
+								(char**)s_duration_names + 1))
+							{
+								req->relation_target = u16(s);
+							}
+							
+							GUI_Pop_Layout(context);
+						}
 					}break;
 					
 					case Participation_Requirement::Type::character_stat:
@@ -702,11 +847,11 @@ static void Do_Event_Editor_Requirements_Frame()
 						// Stat
 						if(u32 s = GUI_Do_Dropdown_Button(
 							context, AUTO, &GUI_AUTO_FIT, 
-							(char*)Character_Stat::stat_names[u32(req->stat.type)],
+							(char*)Character_Stat::stat_names[u32(req->stat_type)],
 							Array_Lenght(Character_Stat::stat_names),
 							(char**)Character_Stat::stat_names))
 						{
-							req->stat.type = Character_Stat::Stats(s - 1);
+							req->stat_type = Character_Stat::Stats(s - 1);
 						}
 						
 						GUI_Push_Layout(context);
@@ -714,40 +859,39 @@ static void Do_Event_Editor_Requirements_Frame()
 						context->layout.build_direction = GUI_Build_Direction::right_center;
 						
 						// Numerical_Relation
-						u32 nr_idx = u32(req->stat_numerical_relation);
+						static const char* value_option_names[] = {"0", "1", "2", "3"};
 						if(u32 s = GUI_Do_Dropdown_Button(
 							context, AUTO, &GUI_AUTO_FIT, 
-							(char*)s_numerical_relation_names[nr_idx],
+							(char*)s_numerical_relation_names[u32(req->numerical_relation)],
 							Array_Lenght(s_numerical_relation_names),
 							(char**)s_numerical_relation_names))
 						{
-							req->stat_numerical_relation = Numerical_Relation(s - 1);
+							req->numerical_relation = Numerical_Relation(s - 1);
 						}
 						
 						// Target value
-						static const char* value_option_names[] = {"0", "1", "2", "3"};
 						if(u32 s = GUI_Do_Dropdown_Button(
 							context, AUTO, AUTO, 
-							(char*)value_option_names[req->stat_relation_target],
+							(char*)value_option_names[req->relation_target],
 							Array_Lenght(value_option_names),
 							(char**)value_option_names))
 						{
-							req->stat_relation_target = u16(s - 1);
+							req->relation_target = u16(s - 1);
 						}
 						
 						GUI_Pop_Layout(context);
 						
-						if((req->stat_numerical_relation == Numerical_Relation::greater_than &&
-							req->stat_relation_target == Array_Lenght(value_option_names) - 1) ||
-							(req->stat_numerical_relation == Numerical_Relation::less_than &&
-							req->stat_relation_target == 0))
+						if((req->numerical_relation == Numerical_Relation::greater_than &&
+							req->relation_target == Array_Lenght(value_option_names) - 1) ||
+							(req->numerical_relation == Numerical_Relation::less_than &&
+							req->relation_target == 0))
 						{
 							GUI_Do_Text(context, AUTO, "Mahdoton!", {0}, v2f{1.f,1.f}, true);
 						}
-						else if((req->stat_numerical_relation == Numerical_Relation::less_than_equals &&
-							req->stat_relation_target == Array_Lenght(value_option_names) - 1) || 
-							(req->stat_numerical_relation == Numerical_Relation::greater_than_equals &&
-							req->stat_relation_target == 0))
+						else if((req->numerical_relation == Numerical_Relation::less_than_equals &&
+							req->relation_target == Array_Lenght(value_option_names) - 1) || 
+							(req->numerical_relation == Numerical_Relation::greater_than_equals &&
+							req->relation_target == 0))
 						{
 							GUI_Do_Text(context, AUTO, "Aina totta!", {0}, v2f{1.f,1.f}, true);
 						}
@@ -760,6 +904,8 @@ static void Do_Event_Editor_Requirements_Frame()
 			}
 			
 			GUI_Pop_Layout(context);
+			
+			GUI_End_Collumn(context, collumn_min_width, collumn_start, X_AXIS);
 		}
 	}; // ----------------------------------------------------------------------------------------
 	
@@ -778,13 +924,28 @@ static void Do_Event_Editor_Text_Frame()
 		f32 title_height = context->layout.last_element_dim.y;
 		
 		v2f tile_bounds_max = GUI_Get_Bounds_In_Pixel_Space(context).max;
-
+		
+		{
+			v2f event_name_sl_field_pos =  v2f{10, 57};
+			f32 event_name_sl_field_width = 500;
+			GUI_Do_SL_Input_Field(context, &event_name_sl_field_pos, &event_name_sl_field_width, &event->name);			
+			
+			context->layout.build_direction = GUI_Build_Direction::up_left;
+		
+			char* event_name_text = 
+				(s_global_data.active_event_index < s_global_data.event_container.day_event_count)?
+				"Tapahtuman (p\xE4iv\xE4) nimi:" : "Tapahtuman (y\xF6) nimi:";
+			
+			GUI_Do_Text(context, AUTO, event_name_text);
+			
+		}
+		
 		context->layout.build_direction = GUI_Build_Direction::right_center;
 		
 		f32 padding = context->layout.theme->padding;
 		
 		static constexpr char* go_to_all_events_text = "<";
-		static constexpr char* go_to_requirements_text = "Vaatimukset";
+		static constexpr char* go_to_requirements_text = "Osallistujat";
 		static constexpr char* go_to_consequences_text = "Seuraamukset";
 		
 		v2f scale = GUI_DEFAULT_TEXT_SCALE;
@@ -853,13 +1014,23 @@ static void Do_Event_Editor_Consequences_Frame()
 		f32 title_height = context->layout.last_element_dim.y;
 		
 		v2f tile_bounds_max = GUI_Get_Bounds_In_Pixel_Space(context).max;
-
+		
+		v2f new_global_con_button_pos = v2f{10, 57};
+		if(GUI_Do_Button(context, &new_global_con_button_pos, &GUI_AUTO_FIT, "Lis\xE4\xE4 yleis seuraamus"))
+		{
+			Event_State* event 
+				= Begin(s_global_data.event_container.events) + s_global_data.active_event_index;
+			
+			Global_Mark_Consequence* gmc = Push(&event->global_mark_cons, &s_allocator);
+			*gmc = {};
+			gmc->mark = Create_String(&s_allocator, 4);
+		}
 		context->layout.build_direction = GUI_Build_Direction::right_center;
 		
 		f32 padding = context->layout.theme->padding;
 		
 		static constexpr char* go_to_all_events_text = "<";
-		static constexpr char* go_to_requirements_text = "Vaatimukset";
+		static constexpr char* go_to_requirements_text = "Osallistujat";
 		static constexpr char* go_to_event_text_text = "Tapahtuma Teksti";
 		
 		v2f scale = GUI_DEFAULT_TEXT_SCALE;
@@ -910,10 +1081,83 @@ static void Do_Event_Editor_Consequences_Frame()
 		static f64 death_con_with_additional_cons_time = 0;
 		static u32 death_con_with_additional_cons_idx = 0;
 		
+		static constexpr f32 collumn_min_width = 300;
+		
+		v2f* start_pos_ptr = &GUI_AUTO_TOP_LEFT;
+		
 		Event_State* event = Begin(s_global_data.event_container.events) + s_global_data.active_event_index;
 		
-		context->layout.build_direction = GUI_Build_Direction::right_center;
-		v2f* pos = &GUI_AUTO_TOP_LEFT;
+		if(event->global_mark_cons->count)
+		{
+			GUI_Do_Text(context, start_pos_ptr, "Yleis seuraamukset:", {}, GUI_DEFAULT_TEXT_SCALE, true);
+			start_pos_ptr = 0;
+			
+			GUI_Push_Layout(context);
+			
+			f32 collumn_start = GUI_Get_Collumn_Start(context, X_AXIS);
+			
+			Global_Mark_Consequence* global_mark_cons = Begin(event->global_mark_cons);
+			for(u32 i = 0; i < event->global_mark_cons->count; ++i)
+			{
+				GUI_Layout_Recovery_Point rcp = GUI_Get_Layout_Recovery_Point(context);
+				
+				v2f dim = v2f{36, 36};
+				if(GUI_Do_Button(context, start_pos_ptr, &dim, "X"))
+				{
+					GUI_Restore_Layout_From_Recovery_Point(context, &rcp);
+					
+					Delete_Global_Mark_Consequence(event->global_mark_cons, i--);
+					continue;
+				}
+				
+				f32 left_size 
+					= context->layout.last_element_pos.x - context->layout.last_element_dim.x / 2; 
+				
+				GUI_Push_Layout(context);
+				context->layout.build_direction = GUI_Build_Direction::right_center;
+				
+				GUI_Do_Text(context, AUTO, "Yleis merkki", GUI_Highlight_Prev(context));
+				
+				f32 right_side 
+					= context->layout.last_element_pos.x + context->layout.last_element_dim.x / 2; 
+				
+				f32 width = right_side - left_size;
+				
+				GUI_Pop_Layout(context);
+				
+				
+				Global_Mark_Consequence* gmc = global_mark_cons + i;
+				GUI_Do_SL_Input_Field(context, AUTO, &width, &gmc->mark);
+				
+				dim = context->layout.last_element_dim;
+				
+				GUI_Do_Text(context, AUTO, "Kesto:", GUI_Highlight_Next(context));
+				
+				if(u32 s = GUI_Do_Dropdown_Button(
+					context, 
+					AUTO, 
+					&dim, 
+					(char*)s_duration_names[u32(gmc->mark_duration)], 
+					Array_Lenght(s_duration_names),
+					(char**)s_duration_names))
+				{
+					gmc->mark_duration = i8(s - 1);
+				}
+				
+				GUI_Do_Spacing(context, AUTO);
+			}
+			
+			GUI_Pop_Layout(context);
+		
+			GUI_End_Collumn(context, collumn_min_width, collumn_start, X_AXIS);
+			
+			context->layout.build_direction = GUI_Build_Direction::right_top;
+		}
+		
+		GUI_Do_Text(context, start_pos_ptr, "Osallistujat:", {}, GUI_DEFAULT_TEXT_SCALE, true);
+
+		context->layout.build_direction = GUI_Build_Direction::down_left;
+		
 		for(u32 i = 0; i < event->participents->count; ++i)
 		{
 			Participent* parti = Begin(event->participents) + i;
@@ -928,16 +1172,12 @@ static void Do_Event_Editor_Consequences_Frame()
 				*typing_marker = '\\';
 			}
 			
-			{
-				GUI_Do_Text(context, pos, typing_marker);
-				pos = AUTO;				
-			}
+			GUI_Do_Text(context, AUTO, typing_marker);
 			
-			f32 pre_bounds_x_min = 
-				GUI_Get_Bounds_In_Pixel_Space(context).max.x - context->layout.last_element_dim.x;
+			f32 collumn_start = GUI_Get_Collumn_Start(context, X_AXIS);
 			
-			GUI_Push_Layout(context);
 			context->layout.build_direction = GUI_Build_Direction::down_left;
+			GUI_Push_Layout(context);
 			
 			f64 time = s_platform.Get_Time_Stamp();
 			
@@ -950,7 +1190,6 @@ static void Do_Event_Editor_Consequences_Frame()
 					break;
 				}
 			}
-			
 			
 			if(u32 s = GUI_Do_Dropdown_Button(
 				context, 
@@ -979,28 +1218,7 @@ static void Do_Event_Editor_Consequences_Frame()
 					}
 					
 					if(allow_consequense)
-					{
-						Event_Consequens* new_consequnse = Push(&parti->cons, &s_allocator);
-						*new_consequnse = Event_Consequens();
-						new_consequnse->type = con_type;
-						
-						switch(new_consequnse->type)
-						{
-							case Event_Consequens::Type::gains_mark:
-							case Event_Consequens::Type::loses_mark:
-							case Event_Consequens::Type::death:
-							{
-								u32 init_capacity = Participation_Requirement::initial_mark_capacity;
-								Init_String(&new_consequnse->str, &s_allocator, init_capacity);
-								break;
-							}
-							
-							default:
-							{
-								new_consequnse->str = {};
-							}
-						}
-					}
+						Init_Event_Consequense(Push(&parti->cons, &s_allocator), con_type, &s_allocator);
 				}
 			}
 			
@@ -1029,9 +1247,10 @@ static void Do_Event_Editor_Consequences_Frame()
 					u32 size = sizeof(*con);
 					Remove_Element_From_Packed_Array(cons, &parti->cons->count, size, y--);
 				}
-				GUI_Push_Layout(context);
 				
+				GUI_Push_Layout(context);
 				context->layout.build_direction = GUI_Build_Direction::right_center;
+				
 				
 				char* con_type_name = (char*)Event_Consequens::type_names[u32(con->type)];
 				GUI_Do_Text(context, AUTO, con_type_name, GUI_Highlight_Prev(context));
@@ -1139,6 +1358,37 @@ static void Do_Event_Editor_Consequences_Frame()
 					
 					
 					case Event_Consequens::Type::gains_mark:
+					{
+						GUI_Do_SL_Input_Field(context, AUTO, &collumn_button_width, &con->str);
+						
+						if(u32 s = GUI_Do_Dropdown_Button(
+							context, 
+							AUTO, 
+							&GUI_AUTO_FIT, 
+							(char*)s_mark_type_names[u32(con->mark_type)], 
+							Array_Lenght(s_mark_type_names),
+							(char**)s_mark_type_names))
+						{
+							con->mark_type = Mark_Type(s - 1);
+						}
+						
+						v2f dim = context->layout.last_element_dim;
+						
+						GUI_Do_Text(context, AUTO, "Kesto:", GUI_Highlight_Next(context));
+						
+						if(u32 s = GUI_Do_Dropdown_Button(
+							context, 
+							AUTO, 
+							&dim, 
+							(char*)s_duration_names[u32(con->mark_duration)], 
+							Array_Lenght(s_duration_names),
+							(char**)s_duration_names))
+						{
+							con->mark_duration = i8(s - 1);
+						}
+						
+					}break;
+					
 					case Event_Consequens::Type::loses_mark:
 					{
 						GUI_Do_SL_Input_Field(context, AUTO, &collumn_button_width, &con->str);
@@ -1162,19 +1412,9 @@ static void Do_Event_Editor_Consequences_Frame()
 			}
 			
 			GUI_Pop_Layout(context);
+			context->layout.build_direction = GUI_Build_Direction::right_top;
 			
-			f32 post_bounds_x_max = GUI_Get_Bounds_In_Pixel_Space(context).max.x;
-			f32 collumn_width = post_bounds_x_max - pre_bounds_x_min;
-			// Move back on top of the last thing.
-			context->layout.last_element_pos.x -= context->layout.last_element_dim.x;
-			
-			if(collumn_width > 300)
-			{	
-				context->layout.last_element_pos.x += collumn_width + 20;				
-			}else
-			{
-				context->layout.last_element_pos.x += 300;
-			}
+			GUI_End_Collumn(context, collumn_min_width, collumn_start, X_AXIS);
 		}
 		
 	}; // ----------------------------------------------------------------------------------------
@@ -1317,12 +1557,21 @@ static void Run_Active_Menu(bool quit_app_pop_up)
 	}
 	
 	Menus current_menu = s_global_data.active_menu;
-		
+	
+	
 	switch(current_menu)
 	{
 		case Menus::none:
 		{
-			s_global_data.active_menu = Menus::all_events;
+			if(s_global_data.event_container.events->count)
+			{
+				s_global_data.active_menu = Menus::event_editor_requirements;
+			}
+			else
+			{				
+				s_global_data.active_menu = Menus::all_events;
+			}
+			
 		}break;
 		
 		case Menus::main_menu:

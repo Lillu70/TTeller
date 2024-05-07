@@ -50,6 +50,14 @@ static const char* s_mark_type_names[] =
 };
 
 
+static const char* s_duration_names[] = 
+{
+	"Rajaton",
+	"1 p\xE4iv\xE4",
+	"2 p\xE4iv\xE4\xE4",
+	"3 p\xE4iv\xE4\xE4",
+};
+
 enum class Mark_Type :u8
 {
 	item = 0,
@@ -60,7 +68,7 @@ enum class Mark_Type :u8
 
 struct Character_Stat
 {
-	enum class Stats : u16
+	enum class Stats : u8
 	{
 		body = 0,
 		mind
@@ -74,10 +82,25 @@ struct Character_Stat
 };
 
 
+struct Global_Mark_Requirement
+{
+	Exists_Statement mark_exists = Exists_Statement::does_have;
+	i8 relation_target = 1;
+	Numerical_Relation numerical_relation = Numerical_Relation::greater_than_equals;
+	
+	String mark = {};
+};
+
+
+struct Global_Mark_Consequence
+{
+	i8 mark_duration = 0;
+	String mark = {};
+};
+
+
 struct Participation_Requirement
 {
-	// TODO/CONSIDER: an union?
-	
 	static inline const char* type_names[] = 
 		{"Ominaisuus", "Esine Merkki", "Hahmo Merkki"};
 	
@@ -90,17 +113,19 @@ struct Participation_Requirement
 	};
 	
 	Type type;
-	Numerical_Relation stat_numerical_relation;
-	u16 stat_relation_target;
-	Character_Stat stat;
+	Exists_Statement mark_exists;
+	Numerical_Relation numerical_relation = Numerical_Relation::greater_than_equals;
 	
+	Character_Stat::Stats stat_type;
+	
+	u16 relation_target = 1;
 	
 	// Mark
 	String mark;
-	Exists_Statement mark_exists;
 	
 	static constexpr u32 initial_mark_capacity = 12;
 };
+
 
 struct Event_Consequens
 {
@@ -124,7 +149,11 @@ struct Event_Consequens
 	
 	Mark_Type mark_type = Mark_Type::item;
 	bool items_are_inherited = true;
-	i8 stat_change_amount = 1;
+	union
+	{
+		i8 mark_duration;
+		i8 stat_change_amount;
+	};
 	Character_Stat::Stats stat = Character_Stat::Stats::body;
 	
 	String str = {};
@@ -145,6 +174,9 @@ struct Event_State
 {
 	static constexpr u32 max_participent_count = 100;
 	Dynamic_Array<Participent>* participents;
+	Dynamic_Array<Global_Mark_Requirement>* global_mark_reqs = 0;
+	Dynamic_Array<Global_Mark_Consequence>* global_mark_cons = 0;
+	
 	String name;
 	String event_text;
 };

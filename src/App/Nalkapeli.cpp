@@ -1,15 +1,7 @@
 
 #pragma once
 
-static inline bool Requirement_Is_Mark_Type(Participation_Requirement::Type type)
-{
-	bool result = type == Participation_Requirement::Type::mark_item ||
-		type == Participation_Requirement::Type::mark_personal;
-	
-	return result;
-}
-
-
+// lol these silly functions :D
 static inline void Make_Requirement_Hollow(Participation_Requirement* req)
 {
 	req->mark.free();
@@ -19,6 +11,18 @@ static inline void Make_Requirement_Hollow(Participation_Requirement* req)
 static inline void Make_Consequense_Hollow(Event_Consequens* con)
 {
 	con->str.free();
+}
+
+
+static void Make_Global_Mark_Requirement_Hollow(Global_Mark_Requirement* gmr)
+{
+	gmr->mark.free();
+}
+
+
+static void Make_Global_Mark_Consequence_Hollow(Global_Mark_Consequence* gmc)
+{
+	gmc->mark.free();
 }
 
 
@@ -51,11 +55,41 @@ static inline void Hollow_Participent(u32 idx_to_delete,
 }
 
 
+static inline void Delete_Global_Mark_Requirement(
+	Dynamic_Array<Global_Mark_Requirement>* darray,
+	u32 idx_to_delete)
+{
+	Assert(idx_to_delete < darray->count);
+	
+	Global_Mark_Requirement* buffer = Begin(darray);
+	Global_Mark_Requirement* gmr = buffer + idx_to_delete;
+	Make_Global_Mark_Requirement_Hollow(gmr);
+	
+	Remove_Element_From_Packed_Array(buffer, &darray->count, sizeof(*gmr), idx_to_delete);
+}
+
+
+static inline void Delete_Global_Mark_Consequence(
+	Dynamic_Array<Global_Mark_Consequence>* darray,
+	u32 idx_to_delete)
+{
+	Assert(idx_to_delete < darray->count);
+	
+	Global_Mark_Consequence* buffer = Begin(darray);
+	Global_Mark_Consequence* gmc = buffer + idx_to_delete;
+	Make_Global_Mark_Consequence_Hollow(gmc);
+	
+	Remove_Element_From_Packed_Array(buffer, &darray->count, sizeof(*gmc), idx_to_delete);
+}
+
+
 static inline void Delete_Participent(
 	u32 idx_to_delete, 
 	Dynamic_Array<Participent>* darray, 
 	Allocator_Shell* allocator)
 {
+	Assert(idx_to_delete < darray->count);
+	
 	Hollow_Participent(idx_to_delete, darray, allocator);
 	
 	Participent* buffer = Begin(darray);
@@ -70,6 +104,9 @@ static inline void Init_Event_Takes_Name_Ownership(
 	String* name)
 {
 	event->participents = Create_Dynamic_Array<Participent>(allocator, 4);
+	event->global_mark_reqs = Create_Dynamic_Array<Global_Mark_Requirement>(allocator, 4);
+	event->global_mark_cons = Create_Dynamic_Array<Global_Mark_Consequence>(allocator, 4);
+	
 	Init_String(&event->event_text, allocator, 128);
 	event->name = *name;
 }
@@ -97,12 +134,89 @@ static void Delete_Event(
 	
 	Delete_All_Participants_From_Event(element, allocator);
 	allocator->free(element->participents);
+	
+	// Free the global reqs:
+	Global_Mark_Requirement* gmr_begin = Begin(element->global_mark_reqs);
+	Global_Mark_Requirement* gmr_end = End(element->global_mark_reqs);
+	for(Global_Mark_Requirement* gmr = gmr_begin; gmr < gmr_end; ++gmr)
+		Make_Global_Mark_Requirement_Hollow(gmr);
+	
+	// Free the global cons:
+	Global_Mark_Consequence* gmc_begin = Begin(element->global_mark_cons);
+	Global_Mark_Consequence* gmc_end = End(element->global_mark_cons);
+	for(Global_Mark_Consequence* gmc = gmc_begin; gmc < gmc_end; ++gmc)
+		Make_Global_Mark_Consequence_Hollow(gmc);
+	
+	allocator->free(element->global_mark_reqs);
+	
 	element->name.free();
 	element->event_text.free();
 	
 	// Optional toggle, to allow optimization when deleting all events, normaly this should be "true"
 	if(remove_from_array)
 		Remove_Element_From_Packed_Array(buffer, &darray->count, sizeof(*element), idx_to_delete);
+}
+
+
+static void Init_Participation_Requirement(
+	Participation_Requirement* req,
+	Participation_Requirement::Type type,
+	Allocator_Shell* allocator,
+	u32 mark_str_capacity = Participation_Requirement::initial_mark_capacity)
+{
+	*req = Participation_Requirement();
+	req->type = type;
+	
+	switch(type)
+	{
+		case Participation_Requirement::Type::mark_personal:
+		case Participation_Requirement::Type::mark_item:
+		{
+			Init_String(&req->mark, allocator, mark_str_capacity);
+			req->mark_exists = Exists_Statement::does_have;
+			req->numerical_relation = Numerical_Relation::greater_than_equals;
+			req->relation_target = 1;
+		}break;
+	}
+}
+
+
+static void Init_Event_Consequense(
+	Event_Consequens* con, 
+	Event_Consequens::Type type,
+	Allocator_Shell* allocator,
+	u32 mark_str_capacity =  Participation_Requirement::initial_mark_capacity)
+{
+	*con = Event_Consequens();
+	con->type = type;
+	
+	u32 init_capacity = mark_str_capacity;
+	
+	switch(type)
+	{
+		case Event_Consequens::Type::stat_change:
+		{
+			con->stat_change_amount = 1;
+		}break;
+		
+		case Event_Consequens::Type::death:
+		{
+			init_capacity = 4;
+			
+		} // Fall through!
+		case Event_Consequens::Type::gains_mark:
+		case Event_Consequens::Type::loses_mark:
+		{
+			con->mark_duration = 0;
+			Init_String(&con->str, allocator, init_capacity);
+			break;
+		}break;
+		
+		default:
+		{
+			Terminate;
+		}
+	}
 }
 
 
@@ -165,7 +279,9 @@ static void Serialize_Campaign(
 	Platform_Calltable* platform)
 {	
 	/*
-	Version History 1->2: Added seperation of day and night events.
+	 ---- Version History ---- 
+	1->2: Added seperation of day and night events.
+	2->3: Added duration as part of marks for consequenses and requirements.
 	*/
 	
 	//TODO: Write like a file description thing or something maybe?
@@ -198,7 +314,7 @@ static void Serialize_Campaign(
 	
 	serialization_lalloc.clear();
 	
-	u32 version = 2;
+	u32 version = 3;
 	WRITE(version, u32);
 	WRITE(event_container.events->count, u32);
 	WRITE(event_container.day_event_count, u32);
@@ -209,6 +325,32 @@ static void Serialize_Campaign(
 		if(e->name.lenght)
 		{
 			WRITE_BLOCK(e->name.buffer, e->name.lenght);
+		}
+		
+		// global reqs
+		WRITE(e->global_mark_reqs->count, u32);
+		for(Global_Mark_Requirement* gmr = Begin(e->global_mark_reqs); gmr < End(e->global_mark_reqs); ++gmr)
+		{
+			WRITE(gmr->mark_exists, Exists_Statement);
+			WRITE(gmr->relation_target, i8);
+			WRITE(gmr->numerical_relation, Numerical_Relation);
+			WRITE(gmr->mark.lenght, u32);
+			if(gmr->mark.lenght)
+			{
+				WRITE_BLOCK(gmr->mark.buffer, gmr->mark.lenght);
+			}
+		}
+		
+		// global cons
+		WRITE(e->global_mark_cons->count, u32);
+		for(Global_Mark_Consequence* gmc = Begin(e->global_mark_cons); gmc < End(e->global_mark_cons); ++gmc)
+		{
+			WRITE(gmc->mark_duration, i8);
+			WRITE(gmc->mark.lenght, u32);
+			if(gmc->mark.lenght)
+			{
+				WRITE_BLOCK(gmc->mark.buffer, gmc->mark.lenght);
+			}
 		}
 		
 		// event text
@@ -225,13 +367,15 @@ static void Serialize_Campaign(
 			for(Participation_Requirement* req = Begin(p->reqs); req < End(p->reqs); ++req)
 			{
 				WRITE(req->type, Participation_Requirement::Type);
+				
+				WRITE(req->numerical_relation, Numerical_Relation);
+				WRITE(req->relation_target, u16);
+				
 				switch(req->type)
 				{
 					case Participation_Requirement::Type::character_stat:
 					{
-						WRITE(req->stat_numerical_relation, Numerical_Relation);
-						WRITE(req->stat_relation_target, u16);
-						WRITE(req->stat, Character_Stat);
+						WRITE(req->stat_type, Character_Stat::Stats);
 					
 					}break;
 					
@@ -280,6 +424,7 @@ static void Serialize_Campaign(
 					case Event_Consequens::Type::loses_mark:
 					{
 						WRITE(con->mark_type, Mark_Type);
+						WRITE(con->mark_duration, i8);
 						WRITE(con->str.lenght, u32);
 						if(con->str.lenght)
 						{
@@ -290,7 +435,7 @@ static void Serialize_Campaign(
 					
 					case Event_Consequens::Type::stat_change:
 					{
-						WRITE(con->stat_change_amount, u8);
+						WRITE(con->stat_change_amount, i8);
 						WRITE(con->stat, Character_Stat::Stats);
 					}break;
 					
@@ -322,6 +467,410 @@ static void Serialize_Campaign(
 	Serialize_Campaign(event_container, platform);
 }
 
+#define READ(type) *(type*)(buffer + read_head); read_head += sizeof(type); Assert(read_head <= buffer_size);
+#define READ_TEXT(lenght) (char*)(buffer + read_head); read_head += lenght; Assert(read_head <= buffer_size);
+	
+static inline void Load_Campaign_V2(
+	Events_Container* container,
+	Allocator_Shell* allocator,
+	u8* buffer,
+	u32 buffer_size,
+	u32 read_head)
+{
+	u32 event_count = READ(u32);
+	container->day_event_count = READ(u32);
+	
+	Assert(container->day_event_count <= event_count);
+	
+	container->events = Create_Dynamic_Array<Event_State>(allocator, Max(u32(4), event_count));
+	container->events->count = event_count;
+	
+	for(Event_State* e = Begin(container->events); e < End(container->events); ++e)
+	{
+		e->global_mark_reqs = Create_Dynamic_Array<Global_Mark_Requirement>(allocator, 4);
+		e->global_mark_cons = Create_Dynamic_Array<Global_Mark_Consequence>(allocator, 4);
+		
+		u32 event_name_lenght = READ(u32);
+		if(event_name_lenght)
+		{
+			char* event_name_buffer = READ_TEXT(event_name_lenght);	
+			Init_String(&e->name, allocator, event_name_buffer, event_name_lenght);					
+		}
+		else
+		{
+			Init_String(&e->name, allocator, u32(0));
+		}
+		
+		u32 event_text_lenght = READ(u32);
+		if(event_text_lenght)
+		{
+			char* event_text_buffer = READ_TEXT(event_text_lenght);
+			Init_String(&e->event_text, allocator, event_text_buffer, event_text_lenght);					
+		}
+		else
+		{
+			Init_String(&e->event_text, allocator, u32(0));
+		}
+		
+		u32 participent_count = READ(u32);
+		e->participents = Create_Dynamic_Array<Participent>(allocator, Max(u32(4), participent_count));
+		e->participents->count = participent_count;
+		Participent* parti_buffer = Begin(e->participents);
+		
+		for(u32 p = 0; p < participent_count; ++p)
+		{
+			Participent* participent = parti_buffer + p;
+			
+			// Requirements block
+			{
+				u32 req_count = READ(u32);
+				participent->reqs = Create_Dynamic_Array<Participation_Requirement>(
+					allocator, 
+					Max(u32(3), 
+					req_count));
+				
+				participent->reqs->count = req_count;
+				
+				Participation_Requirement* begin = Begin(participent->reqs);
+				Participation_Requirement* end = End(participent->reqs);
+				for(Participation_Requirement* req = begin; req < end; ++req)
+				{
+					*req = {};
+					req->type = READ(Participation_Requirement::Type);
+					switch(req->type)
+					{
+						case Participation_Requirement::Type::character_stat:
+						{
+							req->numerical_relation = READ(Numerical_Relation);
+							req->relation_target = READ(u16);
+							
+							struct Character_Stat_V2
+							{
+								enum class Stats : u16
+								{
+									body = 0,
+									mind
+								};
+								Stats type;
+								u16 value;
+							};
+							
+							Character_Stat_V2 s = READ(Character_Stat_V2);
+							req->stat_type = (Character_Stat::Stats)s.type;
+						}break;
+						
+						case Participation_Requirement::Type::mark_item:
+						case Participation_Requirement::Type::mark_personal:
+						{
+							u32 mark_lenght = READ(u32);
+							if(mark_lenght)
+							{
+								char* mark_buffer = READ_TEXT(mark_lenght);
+								Init_String(&req->mark, allocator, mark_buffer, mark_lenght);					
+							}
+							else
+							{
+								Init_String(&req->mark, allocator, u32(0));
+							}
+							req->mark_exists = READ(Exists_Statement);
+						
+						}break;
+						
+						default:
+						{
+							Terminate;
+						}
+					}
+				}
+			}
+			
+			// Consequenses block
+			{
+				u32 con_count = READ(u32);
+				participent->cons 
+					= Create_Dynamic_Array<Event_Consequens>(allocator, Max(u32(3), con_count));
+				participent->cons->count = con_count;
+				
+				Event_Consequens* begin = Begin(participent->cons);		
+				Event_Consequens* end = End(participent->cons);
+			
+				for(Event_Consequens* con = begin; con < end; ++con)
+				{
+					*con = {};
+					con->type = READ(Event_Consequens::Type);
+					switch(con->type)
+					{
+						case Event_Consequens::Type::death:
+						{
+							u32 inherit_lenght = READ(u32);
+							if(inherit_lenght)
+							{
+								con->items_are_inherited = true;
+								char* inherit_text = READ_TEXT(inherit_lenght);
+								Init_String(&con->str, allocator, inherit_text, inherit_lenght);
+							}
+							else
+							{
+								con->items_are_inherited = false;
+								Init_String(&con->str, allocator, u32(0));
+							}
+							
+						}break;
+						
+						case Event_Consequens::Type::gains_mark:
+						case Event_Consequens::Type::loses_mark:
+						{
+							con->mark_type = READ(Mark_Type);
+							
+							u32 mark_lenght = READ(u32);
+							if(mark_lenght)
+							{
+								char* mark_text = READ_TEXT(mark_lenght);
+								Init_String(&con->str, allocator, mark_text, mark_lenght);
+							}
+							else
+							{
+								Init_String(&con->str, allocator, u32(0));
+							}
+							
+						}break;
+						
+						case Event_Consequens::Type::stat_change:
+						{
+							con->stat_change_amount = READ(i8);
+							con->stat = (Character_Stat::Stats)READ(u16);
+						}break;
+						
+						
+						default:
+						{
+							Terminate;
+						}
+					}
+				}			
+			}
+		}
+	}
+
+}
+
+
+static inline void Load_Campaign_V3(
+	Events_Container* container,
+	Allocator_Shell* allocator,
+	u8* buffer,
+	u32 buffer_size,
+	u32 read_head)
+{
+	u32 event_count = READ(u32);
+	container->day_event_count = READ(u32);
+	
+	Assert(container->day_event_count <= event_count);
+	
+	container->events = Create_Dynamic_Array<Event_State>(allocator, Max(u32(4), event_count));
+	container->events->count = event_count;
+	
+	for(Event_State* e = Begin(container->events); e < End(container->events); ++e)
+	{
+		// -- event name 
+		u32 event_name_lenght = READ(u32);
+		if(event_name_lenght)
+		{
+			char* event_name_buffer = READ_TEXT(event_name_lenght);	
+			Init_String(&e->name, allocator, event_name_buffer, event_name_lenght);					
+		}
+		else
+		{
+			Init_String(&e->name, allocator, u32(0));
+		}
+		
+		// -- event reqs
+		u32 global_req_count = READ(u32);
+		e->global_mark_reqs 
+			= Create_Dynamic_Array<Global_Mark_Requirement>(allocator, Max(u32(4), global_req_count));
+		e->global_mark_reqs->count = global_req_count;
+		for(Global_Mark_Requirement* gmr = Begin(e->global_mark_reqs); gmr < End(e->global_mark_reqs); ++gmr)
+		{
+			gmr->mark_exists = READ(Exists_Statement);
+			gmr->relation_target = READ(i8);
+			gmr->numerical_relation = READ(Numerical_Relation);
+			u32 mark_lenght = READ(u32);
+			if(mark_lenght)
+			{
+				char* gmr_mark_buffer = READ_TEXT(mark_lenght);	
+				Init_String(&gmr->mark, allocator, gmr_mark_buffer, mark_lenght);					
+			}
+			else
+			{
+				Init_String(&gmr->mark, allocator, u32(0));
+			}
+		}
+		
+		// -- event cons
+		u32 global_con_count = READ(u32);
+		e->global_mark_cons 
+			= Create_Dynamic_Array<Global_Mark_Consequence>(allocator, Max(u32(4), global_con_count));
+		e->global_mark_cons->count = global_con_count;
+		for(Global_Mark_Consequence* gmc = Begin(e->global_mark_cons); gmc < End(e->global_mark_cons); ++gmc)
+		{
+			gmc->mark_duration = READ(i8);
+			u32 mark_lenght = READ(u32);
+			if(mark_lenght)
+			{
+				char* gmc_mark_buffer = READ_TEXT(mark_lenght);	
+				Init_String(&gmc->mark, allocator, gmc_mark_buffer, mark_lenght);					
+			}
+			else
+			{
+				Init_String(&gmc->mark, allocator, u32(0));
+			}
+		}
+		
+		// -- event text
+		u32 event_text_lenght = READ(u32);
+		if(event_text_lenght)
+		{
+			char* event_text_buffer = READ_TEXT(event_text_lenght);
+			Init_String(&e->event_text, allocator, event_text_buffer, event_text_lenght);					
+		}
+		else
+		{
+			Init_String(&e->event_text, allocator, u32(0));
+		}
+		
+		// -- participents
+		u32 participent_count = READ(u32);
+		e->participents = Create_Dynamic_Array<Participent>(allocator, Max(u32(4), participent_count));
+		e->participents->count = participent_count;
+		Participent* parti_buffer = Begin(e->participents);
+		
+		for(u32 p = 0; p < participent_count; ++p)
+		{
+			Participent* participent = parti_buffer + p;
+			
+			// Requirements block
+			{
+				u32 req_count = READ(u32);
+				participent->reqs = Create_Dynamic_Array<Participation_Requirement>(
+					allocator, 
+					Max(u32(3), 
+					req_count));
+				
+				participent->reqs->count = req_count;
+				
+				Participation_Requirement* begin = Begin(participent->reqs);
+				Participation_Requirement* end = End(participent->reqs);
+				for(Participation_Requirement* req = begin; req < end; ++req)
+				{
+					*req = {};
+					req->type = READ(Participation_Requirement::Type);
+					
+					req->numerical_relation = READ(Numerical_Relation);
+					req->relation_target = READ(u16);
+					
+					switch(req->type)
+					{
+						case Participation_Requirement::Type::character_stat:
+						{
+							req->stat_type = READ(Character_Stat::Stats);
+						}break;
+						
+						case Participation_Requirement::Type::mark_item:
+						case Participation_Requirement::Type::mark_personal:
+						{
+							u32 mark_lenght = READ(u32);
+							if(mark_lenght)
+							{
+								char* mark_buffer = READ_TEXT(mark_lenght);
+								Init_String(&req->mark, allocator, mark_buffer, mark_lenght);					
+							}
+							else
+							{
+								Init_String(&req->mark, allocator, u32(0));
+							}
+							req->mark_exists = READ(Exists_Statement);
+						
+						}break;
+						
+						default:
+						{
+							Terminate;
+						}
+					}
+				}
+			}
+			
+			// Consequenses block
+			{
+				u32 con_count = READ(u32);
+				participent->cons 
+					= Create_Dynamic_Array<Event_Consequens>(allocator, Max(u32(3), con_count));
+				participent->cons->count = con_count;
+				
+				Event_Consequens* begin = Begin(participent->cons);		
+				Event_Consequens* end = End(participent->cons);
+			
+				for(Event_Consequens* con = begin; con < end; ++con)
+				{
+					*con = {};
+					con->type = READ(Event_Consequens::Type);
+					switch(con->type)
+					{
+						case Event_Consequens::Type::death:
+						{
+							u32 inherit_lenght = READ(u32);
+							if(inherit_lenght)
+							{
+								con->items_are_inherited = true;
+								char* inherit_text = READ_TEXT(inherit_lenght);
+								Init_String(&con->str, allocator, inherit_text, inherit_lenght);
+							}
+							else
+							{
+								con->items_are_inherited = false;
+								Init_String(&con->str, allocator, u32(0));
+							}
+							
+						}break;
+						
+						case Event_Consequens::Type::gains_mark:
+						case Event_Consequens::Type::loses_mark:
+						{
+							con->mark_type = READ(Mark_Type);
+							con->mark_duration = READ(i8);
+							
+							u32 mark_lenght = READ(u32);
+							if(mark_lenght)
+							{
+								char* mark_text = READ_TEXT(mark_lenght);
+								Init_String(&con->str, allocator, mark_text, mark_lenght);
+							}
+							else
+							{
+								Init_String(&con->str, allocator, u32(0));
+							}
+							
+						}break;
+						
+						case Event_Consequens::Type::stat_change:
+						{
+							con->stat_change_amount = READ(i8);
+							con->stat = READ(Character_Stat::Stats);
+						}break;
+						
+						
+						default:
+						{
+							Terminate;
+						}
+					}
+				}			
+			}
+		}
+	}
+
+}
+
 
 //TODO: get the minim alloc sizes from some constants.
 static bool Load_Campaign(
@@ -329,9 +878,6 @@ static bool Load_Campaign(
 	Allocator_Shell* allocator,
 	Platform_Calltable* platform)
 {
-	#define READ(type) *(type*)(buffer + read_head); read_head += sizeof(type); Assert(read_head <= buffer_size);
-	#define READ_TEXT(lenght) (char*)(buffer + read_head); read_head += lenght; Assert(read_head <= buffer_size);
-	
 	u32 buffer_size = 0;
 	if(!platform->Get_File_Size("Kamppaniat/test.event", &buffer_size))
 		return false;
@@ -351,178 +897,23 @@ static bool Load_Campaign(
 	if(platform->Read_File("Kamppaniat/test.event", (u8*)buffer, buffer_size))
 	{
 		load_success_full = true;
-		
 		u32 version = READ(u32);
-		if(version != 2)
+		switch(version)
 		{
-			return false;
-		}
-		
-		u32 event_count = READ(u32);
-		container->day_event_count = READ(u32);
-		
-		Assert(container->day_event_count <= event_count);
-		
-		if(event_count)
-		{
-			container->events = Create_Dynamic_Array<Event_State>(allocator, event_count);
-			container->events->count = event_count;
-			
-			for(Event_State* e = Begin(container->events); e < End(container->events); ++e)
+			case 2:
 			{
-				u32 event_name_lenght = READ(u32);
-				if(event_name_lenght)
-				{
-					char* event_name_buffer = READ_TEXT(event_name_lenght);	
-					Init_String(&e->name, allocator, event_name_buffer, event_name_lenght);					
-				}
-				else
-				{
-					Init_String(&e->name, allocator, u32(0));
-				}
-				
-				u32 event_text_lenght = READ(u32);
-				if(event_text_lenght)
-				{
-					char* event_text_buffer = READ_TEXT(event_text_lenght);
-					Init_String(&e->event_text, allocator, event_text_buffer, event_text_lenght);					
-				}
-				else
-				{
-					Init_String(&e->event_text, allocator, u32(0));
-				}
-				
-				u32 participent_count = READ(u32);
-				e->participents = Create_Dynamic_Array<Participent>(allocator, Max(u32(4), participent_count));
-				e->participents->count = participent_count;
-				Participent* parti_buffer = Begin(e->participents);
-				
-				for(u32 p = 0; p < participent_count; ++p)
-				{
-					Participent* participent = parti_buffer + p;
-					
-					// Requirements block
-					{
-						u32 req_count = READ(u32);
-						participent->reqs = Create_Dynamic_Array<Participation_Requirement>(
-							allocator, 
-							Max(u32(3), 
-							req_count));
-						
-						participent->reqs->count = req_count;
-						
-						Participation_Requirement* begin = Begin(participent->reqs);
-						Participation_Requirement* end = End(participent->reqs);
-						for(Participation_Requirement* req = begin; req < end; ++req)
-						{
-							*req = {};
-							req->type = READ(Participation_Requirement::Type);
-							switch(req->type)
-							{
-								case Participation_Requirement::Type::character_stat:
-								{
-									req->stat_numerical_relation = READ(Numerical_Relation);
-									req->stat_relation_target = READ(u16);
-									req->stat = READ(Character_Stat);
-								}break;
-								
-								case Participation_Requirement::Type::mark_item:
-								case Participation_Requirement::Type::mark_personal:
-								{
-									u32 mark_lenght = READ(u32);
-									if(mark_lenght)
-									{
-										char* mark_buffer = READ_TEXT(mark_lenght);
-										Init_String(&req->mark, allocator, mark_buffer, mark_lenght);					
-									}
-									else
-									{
-										Init_String(&req->mark, allocator, u32(0));
-									}
-									req->mark_exists = READ(Exists_Statement);
-								
-								}break;
-								
-								default:
-								{
-									Terminate;
-								}
-							}
-						}
-					}
-					
-					// Consequenses block
-					{
-						u32 con_count = READ(u32);
-						participent->cons 
-							= Create_Dynamic_Array<Event_Consequens>(allocator, Max(u32(3), con_count));
-						participent->cons->count = con_count;
-						
-						Event_Consequens* begin = Begin(participent->cons);		
-						Event_Consequens* end = End(participent->cons);
-					
-						for(Event_Consequens* con = begin; con < end; ++con)
-						{
-							*con = {};
-							con->type = READ(Event_Consequens::Type);
-							switch(con->type)
-							{
-								case Event_Consequens::Type::death:
-								{
-									u32 inherit_lenght = READ(u32);
-									if(inherit_lenght)
-									{
-										con->items_are_inherited = true;
-										char* inherit_text = READ_TEXT(inherit_lenght);
-										Init_String(&con->str, allocator, inherit_text, inherit_lenght);
-									}
-									else
-									{
-										con->items_are_inherited = false;
-										Init_String(&con->str, allocator, u32(0));
-									}
-									
-								}break;
-								
-								case Event_Consequens::Type::gains_mark:
-								case Event_Consequens::Type::loses_mark:
-								{
-									con->mark_type = READ(Mark_Type);
-									
-									u32 mark_lenght = READ(u32);
-									if(mark_lenght)
-									{
-										char* mark_text = READ_TEXT(mark_lenght);
-										Init_String(&con->str, allocator, mark_text, mark_lenght);
-									}
-									else
-									{
-										Init_String(&con->str, allocator, u32(0));
-									}
-									
-								}break;
-								
-								case Event_Consequens::Type::stat_change:
-								{
-									con->stat_change_amount = READ(u8);
-									con->stat = READ(Character_Stat::Stats);
-								}break;
-								
-								
-								default:
-								{
-									Terminate;
-								}
-							}
-						}			
-					}
-				}
+				Load_Campaign_V2(container, allocator, buffer, buffer_size, read_head);
+			}break;
+			
+			case 3:
+			{
+				Load_Campaign_V3(container, allocator, buffer, buffer_size, read_head);
+			}break;
+			
+			default:
+			{
+				load_success_full = false;
 			}
-		}
-		else
-		{
-			load_success_full = true;
-			container->events = Create_Dynamic_Array<Event_State>(allocator, 1);			
 		}
 	}
 	
