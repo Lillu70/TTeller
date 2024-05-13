@@ -18,6 +18,7 @@ enum class Menus : u32
 {
 	none = 0,
 	main_menu,
+	campaigns_menu,
 	event_editor_requirements,
 	event_editor_text,
 	event_editor_consequences,
@@ -29,7 +30,7 @@ struct Global_Data
 {
 	Action menu_actions[GUI_Menu_Actions::COUNT] = {};
 	
-	Menus active_menu = Menus::none;
+	Menus active_menu = Menus::campaigns_menu;
 	
 	Events_Container event_container;
 	
@@ -1458,7 +1459,43 @@ static void Do_On_Exit_Pop_Up()
 	}
 	
 	GUI_End_Context(&s_gui_pop_up);
-};
+}
+
+
+static void Do_Campaigns_Menu_Frame()
+{
+	Clear_Canvas(&s_canvas, s_background_color);
+	
+	GUI_Context* context = &s_gui;
+	GUI_Begin_Context(
+		context, 
+		&s_platform, 
+		&s_canvas, 
+		(Action*)s_global_data.menu_actions, 
+		&s_theme,
+		v2i{0, 0},
+		GUI_Anchor::top_left,
+		GUI_Build_Direction::right_top);
+	
+	v2f title_scale = v2f{4.f, 4.f};
+	Font* font = GUI_Get_Active_Font(context);
+	v2f back_button_dim = GUI_Tight_Fit_Text("<", title_scale, font);
+	if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
+	{
+		
+	}
+	
+	GUI_Do_Text(context, AUTO, "Kampanja Editori", {}, title_scale, true);
+	
+	char* create_new_event_text = "Luo uusi";
+	v2f create_new_event_text_dim = GUI_Tight_Fit_Text(create_new_event_text, title_scale, font);
+	if(GUI_Do_Button(context, AUTO, &create_new_event_text_dim, create_new_event_text))
+	{
+		
+	}
+
+	GUI_End_Context(context);
+}
 
 
 static void Do_Main_Menu_Frame()
@@ -1523,7 +1560,8 @@ static void Do_Main_Menu_Frame()
 	{
 		
 	}
-		
+	
+	
 	// Settings
 	if(GUI_Do_Button(context, AUTO, AUTO, button_texts[i++]))
 	{
@@ -1577,6 +1615,11 @@ static void Run_Active_Menu(bool quit_app_pop_up)
 		case Menus::main_menu:
 		{
 			Do_Main_Menu_Frame();
+		}break;
+		
+		case Menus::campaigns_menu:
+		{
+			Do_Campaigns_Menu_Frame();
 		}break;
 		
 		case Menus::event_editor_requirements:
