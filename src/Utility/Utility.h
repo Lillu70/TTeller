@@ -15,7 +15,7 @@ static Color Make_Color(u8 red, u8 green, u8 blue, u8 alpha = 0xFF)
 
 
 // Returns the lenght of the buffer. Does NOT include the null terminator.
-static u32 Null_Terminated_Buffer_Lenght(u8* buffer)
+static inline u32 Null_Terminated_Buffer_Lenght(u8* buffer)
 {
 	u8* b;
 	for(b = buffer; *b != 0; ++b){}
@@ -23,9 +23,12 @@ static u32 Null_Terminated_Buffer_Lenght(u8* buffer)
 }
 
 
+// Returns the lenght of the buffer. Does NOT include the null terminator.
 static inline u32 Null_Terminated_Buffer_Lenght(char* buffer)
 {
-	return Null_Terminated_Buffer_Lenght((u8*)buffer);
+	char* b;
+	for(b = buffer; *b != 0; ++b){}
+	return u32(b - buffer);
 }
 
 

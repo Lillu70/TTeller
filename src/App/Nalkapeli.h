@@ -1,6 +1,10 @@
 
 #pragma once
 
+static constexpr char* data_folder_path = "Tiedostot\\";
+static constexpr char* campaigns_folder_path = "Tiedostot\\Kampanjat\\";
+static constexpr char* campaign_file_extension = ".nalkmp";
+static constexpr char* campaign_folder_wildcard_path = "Tiedostot\\Kampanjat\\*.nalkmp";
 
 enum class Exists_Statement : u8
 {
@@ -184,6 +188,8 @@ struct Event_State
 
 struct Events_Container
 {
+	String campaign_name = {};
+	
 	// Day events are stored first, then night events.
 	Dynamic_Array<Event_State>* events = 0;
 	u32 day_event_count = 0;

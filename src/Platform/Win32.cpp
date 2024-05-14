@@ -743,9 +743,30 @@ static f32 Win32_Get_Scroll_Wheel_Delta()
 }
 
 
-static bool Win32_Create_Directory(char* path)
+static Create_Directory_Result::T Win32_Create_Directory(char* path)
 {
-	BOOL result = CreateDirectoryA(path, 0);
+	BOOL win_result = CreateDirectoryA(path, 0);
+	Create_Directory_Result::T result;
+	if(!win_result)
+	{
+		switch(GetLastError())
+		{
+			case ERROR_ALREADY_EXISTS:
+			{
+				result = Create_Directory_Result::file_already_exists;
+			}break;
+			
+			case ERROR_PATH_NOT_FOUND:
+			{
+				result = Create_Directory_Result::path_not_found;
+			}break;
+		}
+	}
+	else
+	{
+		result = Create_Directory_Result::success;
+	}
+	
 	return result;
 }
 
@@ -778,6 +799,36 @@ static void Win32_Free_Memory(void* memory)
 }
 
 
+static Dynamic_Array<String>* Win32_Search_Directory_For_Maching_Names(
+	char* file_name, 
+	Allocator_Shell* allocator)
+{
+	Dynamic_Array<String>* result = 0;
+	
+	WIN32_FIND_DATAA find_data;
+	
+	HANDLE search_handle = FindFirstFileA(file_name, &find_data);
+	if(search_handle != INVALID_HANDLE_VALUE)
+	{
+		result = Create_Dynamic_Array<String>(allocator, 4);
+		{
+			String* file_name = Push(&result, allocator);
+			Init_String(file_name, allocator, &find_data.cFileName[0]);
+		}
+		
+		while(FindNextFileA(search_handle, &find_data))
+		{
+			String* file_name = Push(&result, allocator);
+			Init_String(file_name, allocator, &find_data.cFileName[0]);
+		}
+		
+		FindClose(search_handle);
+	}
+	
+	return result;
+}
+
+
 static Platform_Calltable Win32_Get_Calltable()
 {
 	Platform_Calltable ct = {};
@@ -805,6 +856,7 @@ static Platform_Calltable Win32_Get_Calltable()
 	ct.Create_Directory = Win32_Create_Directory;
 	ct.Allocate_Memory = Win32_Allocate_Memory;
 	ct.Free_Memory = Win32_Free_Memory;
+	ct.Search_Directory_For_Maching_Names = Win32_Search_Directory_For_Maching_Names;
 	
 	return ct;
 }

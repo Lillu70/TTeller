@@ -12,7 +12,7 @@ void Init_App(Platform_Calltable platform_calltable)
 	Init_Shell_From_Paged_General_Allocator(&s_allocator, &s_mem);
 	
 	s_platform = platform_calltable;
-	
+	Generate_Folder_Hierarchy(&s_platform);
 	{
 		serialization_lalloc.init(&s_platform, MiB);
 		s_mem.init(&s_platform, 1);
@@ -24,8 +24,6 @@ void Init_App(Platform_Calltable platform_calltable)
 
 void Update_App(f64 delta_time, bool* update_surface)
 {
-	u32 size = sizeof(Participation_Requirement);
-	
 	*update_surface = true;
 	Begin_Timing_Block(internal_run_time);
 	

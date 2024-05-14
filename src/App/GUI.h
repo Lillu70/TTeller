@@ -125,15 +125,6 @@ enum class GUI_Cardinal_Direction : u8
 };
 
 
-struct GUI_Placement
-{
-	v2f pos;
-	v2f dim;
-	
-	Rect rect;
-};
-
-
 struct GUI_Button_State
 {
 	bool is_pressed_down;
@@ -205,6 +196,7 @@ union GUI_Element_State
 };
 
 
+// TODO: Rework the flags so it's clear wich ones are for internal state!
 namespace GUI_Context_Flags
 {
 	enum : u32
@@ -220,8 +212,18 @@ namespace GUI_Context_Flags
 		maxout_vertical_slider 		= 1 << 8,
 		maxout_horizontal_slider	= 1 << 9,
 		hard_ignore_selection		= 1 << 10, // Makes it so that nothing is selected and to leave this state this flag has to manually set to 0.
+		one_time_skip_padding 		= 1 << 11
 	}; // max shift is 31
 }
+
+
+struct GUI_Placement
+{
+	v2f pos;
+	v2f dim;
+	
+	Rect rect;
+};
 
 
 struct GUI_Layout_Recovery_Point
@@ -233,15 +235,10 @@ struct GUI_Layout_Recovery_Point
 
 struct GUI_Layout
 {
-	GUI_Anchor anchor;
+	GUI_Placement last_element;
+	
 	GUI_Build_Direction build_direction;
-	
-	GUI_Theme* theme;
-	
-	v2f last_element_pos = {};
-	v2f last_element_dim = {};
-	
-	bool one_time_skip_padding = false;
+	GUI_Anchor anchor;
 };
 
 
@@ -251,6 +248,7 @@ struct GUI_Context
 	Platform_Calltable* platform = 0;
 	Action* actions;
 	Rect bounds_rel_anchor_base = {};
+	GUI_Theme* theme;
 	
 	u32 _context_id = 0;
 	u32 flags = 0;

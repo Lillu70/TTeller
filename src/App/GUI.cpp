@@ -9,30 +9,6 @@ static bool GUI_Character_Check_Numbers_Only(char* c)
 }
 
 
-static inline GUI_Layout_Recovery_Point GUI_Get_Layout_Recovery_Point(GUI_Context* context)
-{
-	GUI_Layout_Recovery_Point result;
-	result.last_element_pos = context->layout.last_element_pos;
-	result.last_element_dim = context->layout.last_element_dim;
-	return result;
-}
-
-
-static inline void GUI_Restore_Layout_From_Recovery_Point(
-	GUI_Context* context, 
-	GUI_Layout_Recovery_Point* rcp)
-{
-	context->layout.last_element_pos = rcp->last_element_pos;
-	context->layout.last_element_dim = rcp->last_element_dim;
-}
-
-static inline Font* GUI_Get_Active_Font(GUI_Context* context)
-{
-	Font* result = &context->layout.theme->font;
-	return result;
-}
-
-
 static inline u32 GUI_Make_Ignore_Selection_Mask()
 {
 	u32 result = GUI_Context_Flags::soft_ignore_selection | GUI_Context_Flags::hard_ignore_selection;
@@ -59,42 +35,34 @@ static Rect GUI_Get_Bounds_In_Pixel_Space(GUI_Context* context)
 
 static inline f32 GUI_Get_Collumn_Start(GUI_Context* context, u32 axis)
 {
-	#if 0
-	v2f pixel_space_bounds = GUI_Get_Bounds_In_Pixel_Space(context).max;
-	Assert(axis < Array_Lenght(pixel_space_bounds.elements));
-	
-	f32 result = pixel_space_bounds.elements[axis] - context->layout.last_element_dim.elements[axis];
-	#else
-	f32 last_half_dim = context->layout.last_element_dim.elements[axis] / 2;
-	f32 pixel_space_pos = context->layout.last_element_pos.elements[axis];
+	f32 last_half_dim = context->layout.last_element.dim.elements[axis] / 2;
+	f32 pixel_space_pos = context->layout.last_element.pos.elements[axis];
 	pixel_space_pos -= context->anchor_base.elements[axis];
 	
 	f32 result = pixel_space_pos - last_half_dim;
-		
-	#endif
 	
 	return result;
 }
 
 
-static inline void GUI_End_Collumn(GUI_Context* context, f32 collumn_min_width, f32 collumn_start, u32 axis)
+static inline void GUI_End_Collumn(
+	GUI_Context* context, 
+	f32 collumn_min_width, f32 collumn_start, u32 axis)
 {
-	f32 padding = context->layout.theme->padding;
-	
 	v2f pixel_space_bounds = GUI_Get_Bounds_In_Pixel_Space(context).max;
 	Assert(axis < Array_Lenght(pixel_space_bounds.elements));
 	
 	f32 collumn_width = pixel_space_bounds.elements[axis] - collumn_start;
 	
-	f32 last_directional_dim = context->layout.last_element_dim.elements[axis];
-	context->layout.last_element_pos.elements[axis] -= last_directional_dim;
+	f32 last_directional_dim = context->layout.last_element.dim.elements[axis];
+	context->layout.last_element.pos.elements[axis] -= last_directional_dim;
 	
 	if(collumn_width > collumn_min_width)
 	{	
-		context->layout.last_element_pos.elements[axis] += collumn_width + padding;
+		context->layout.last_element.pos.elements[axis] += collumn_width + context->theme->padding;
 	}else
 	{
-		context->layout.last_element_pos.elements[axis] += collumn_min_width;
+		context->layout.last_element.pos.elements[axis] += collumn_min_width;
 	}
 }
 
@@ -136,12 +104,6 @@ static inline void GUI_Set_Default_Menu_Actions(Action* actions)
 	*(actions + GUI_Menu_Actions::right) 	= Make_Action(Key_Code::RIGHT, Button::DPAD_RIGHT);
 	*(actions + GUI_Menu_Actions::enter) 	= Make_Action(Key_Code::ENTER, Button::BUT_A);
 	*(actions + GUI_Menu_Actions::back) 	= Make_Action(Key_Code::ESC, Button::BUT_X);
-}
-
-
-static inline void GUI_One_Time_Skip_Padding(GUI_Context* context)
-{
-	context->layout.one_time_skip_padding = true;
 }
 
 
@@ -203,7 +165,10 @@ static inline GUI_Highlight GUI_Highlight_Prev(GUI_Context* context)
 }
 
 
-static inline v2f GUI_Tight_Fit_Text(char* text, v2f text_scale, Font* font)
+static inline v2f GUI_Tight_Fit_Text(
+	char* text, 
+	Font* font, 
+	v2f text_scale = GUI_DEFAULT_TEXT_SCALE)
 {
 	v2f result = v2f
 	{
@@ -271,21 +236,21 @@ static inline GUI_Placement GUI_Get_Placement(
 	
 	GUI_Placement result;
 	
-	v2f last_element_dim = layout->last_element_dim;
+	v2f last_element_dim = layout->last_element.dim;
 	
 	// Auto positioning.
 	// NOTE: Dimension effects positioning, so it's handeled first.
 	result.dim = (dim)? *dim : last_element_dim;
 	
 	f32 padding;
-	if(layout->one_time_skip_padding)
+	if(context->flags & GUI_Context_Flags::one_time_skip_padding)
 	{
 		padding = 0;
-		layout->one_time_skip_padding = false;
+		Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::one_time_skip_padding);
 	}
 	else
 	{
-		padding = layout->theme->padding;
+		padding = context->theme->padding;
 	}
 	
 	
@@ -381,7 +346,7 @@ static inline GUI_Placement GUI_Get_Placement(
 			}break;
 		}
 		
-		result.pos = layout->last_element_pos + offset;
+		result.pos = layout->last_element.pos + offset;
 	}
 	else
 	{
@@ -394,63 +359,63 @@ static inline GUI_Placement GUI_Get_Placement(
 		{
 			pos = &p;
 			
-			anchor = GUI_Anchor::top;
+			// anchor = GUI_Anchor::top;
 			p = {canvas_size.x / 2, canvas_size.y - padding};
 		}
 		else if(pos == &GUI_AUTO_TOP_RIGHT)
 		{
 			pos = &p;
 			
-			anchor = GUI_Anchor::top_right;
+			// anchor = GUI_Anchor::top_right;
 			p = v2f{canvas_size.x - padding, canvas_size.y - padding};
 		}
 		else if(pos == &GUI_AUTO_TOP_LEFT)
 		{
 			pos = &p;
 			
-			anchor = GUI_Anchor::top_left;
+			// anchor = GUI_Anchor::top_left;
 			p = {padding, canvas_size.y - padding};
 		}
 		else if(pos == &GUI_AUTO_MIDDLE_RIGHT)
 		{
 			pos = &p;
 			
-			anchor = GUI_Anchor::right;
+			// anchor = GUI_Anchor::right;
 			p = {canvas_size.x - padding, canvas_size.y / 2};
 		}
 		else if(pos == &GUI_AUTO_MIDDLE_LEFT)
 		{
 			pos = &p;
 			
-			anchor = GUI_Anchor::left;
+			// anchor = GUI_Anchor::left;
 			p = {padding, canvas_size.y / 2};
 		}
 		else if(pos == &GUI_AUTO_BOTTOM_CENTER)
 		{
 			pos = &p;
 			
-			anchor = GUI_Anchor::bottom;
+			// anchor = GUI_Anchor::bottom;
 			p = {canvas_size.x / 2, padding};
 		}
 		else if(pos == &GUI_AUTO_BOTTOM_RIGHT)
 		{
 			pos = &p;
 			
-			anchor = GUI_Anchor::bottom_right;
+			// anchor = GUI_Anchor::bottom_right;
 			p = {canvas_size.x - padding, padding};
 		}
 		else if(pos == &GUI_AUTO_BOTTOM_LEFT)
 		{
 			pos = &p;
 			
-			anchor = GUI_Anchor::bottom_left;
+			// anchor = GUI_Anchor::bottom_left;
 			p = {padding, padding};
 		}
 		else if(pos == &GUI_AUTO_MIDDLE)
 		{
 			pos = &p;
 			
-			anchor = GUI_Anchor::center;
+			// anchor = GUI_Anchor::center;
 			p = canvas_size / 2;
 		}
 		
@@ -508,8 +473,9 @@ static inline GUI_Placement GUI_Get_Placement(
 	result.rect = Create_Rect_Center_HZ(result.pos, result.dim);
 	if(allow_rect_to_be_invalid || Is_Rect_Valid(result.rect))
 	{
-		layout->last_element_pos = result.pos;
-		layout->last_element_dim = result.dim;
+		layout->last_element.pos = result.pos;
+		layout->last_element.dim = result.dim;
+		layout->last_element.rect = result.rect;
 		
 		GUI_Update_Bounds(context, result.rect);		
 	}
@@ -591,13 +557,13 @@ static inline void GUI_Begin_Context(
 	context->actions = actions;
 	context->platform = platform;
 	context->canvas = canvas;
-	context->layout.theme = theme;
+	context->theme = theme;
 	
 	context->layout.build_direction = build_direction;
 	context->layout.anchor = anchor;
 	
 	context->canvas_pos = canvas_pos;
-	context->layout.last_element_pos = context->anchor_base;
+	context->layout.last_element.pos = context->anchor_base;
 	context->layout_stack_count = 0;
 	context->selected_element_dim = {};
 	context->selected_element_pos = {};
@@ -739,7 +705,7 @@ static inline void GUI_End_Context(GUI_Context* context)
 	// GUI scrolling
 	if(context->flags & GUI_Context_Flags::enable_dynamic_sliders)
 	{
-		f32 padding = context->layout.theme->padding;
+		f32 padding = context->theme->padding;
 		
 		v2f canvas_dim = v2u::Cast<f32>(context->canvas->dim);
 		
@@ -806,7 +772,7 @@ static inline void GUI_End_Context(GUI_Context* context)
 			
 			bool enable_vertical_slider = gui_height > canvas_height && 
 				context->canvas->dim.x > slider_girth &&
-				context->canvas->dim.y > context->layout.theme->outline_thickness * 2;
+				context->canvas->dim.y > context->theme->outline_thickness * 2;
 			
 			if(enable_vertical_slider)
 			{
@@ -823,7 +789,7 @@ static inline void GUI_End_Context(GUI_Context* context)
 			f32 gui_width = bounds.max.x - bounds.min.x;
 			bool enable_horizontal_slider = gui_width > canvas_width && 
 				context->canvas->dim.y > slider_girth &&
-				context->canvas->dim.x > context->layout.theme->outline_thickness * 2;
+				context->canvas->dim.x > context->theme->outline_thickness * 2;
 			
 			if(enable_horizontal_slider)
 			{
@@ -861,7 +827,7 @@ static inline void GUI_End_Context(GUI_Context* context)
 				{
 					enable_vertical_slider = gui_height > canvas_height && 
 						context->canvas->dim.x > slider_girth &&
-						context->canvas->dim.y > context->layout.theme->outline_thickness * 2;
+						context->canvas->dim.y > context->theme->outline_thickness * 2;
 					
 					if(enable_vertical_slider)
 					{
@@ -882,7 +848,7 @@ static inline void GUI_End_Context(GUI_Context* context)
 				v2f min = v2f{canvas_dim.x - slider_girth, 0};
 				v2f dim = v2f{0} + slider_girth;
 				
-				Color color = context->layout.theme->outline_color;
+				Color color = context->theme->outline_color;
 				Draw_Filled_Rect(context->canvas, Create_Rect_Min_Dim(min, dim), color);
 			}
 			
@@ -909,7 +875,8 @@ static inline void GUI_End_Context(GUI_Context* context)
 				v2f slider_dim = {slider_girth, canvas_height};
 				f32 slider_value = (anchor_base.y + y_factor) / canvas_height;
 				
-				GUI_One_Time_Skip_Padding(context);
+				context->flags |= GUI_Context_Flags::one_time_skip_padding;
+				
 				GUI_Do_Handle_Slider(
 					context, 
 					&GUI_AUTO_TOP_RIGHT, 
@@ -942,8 +909,8 @@ static inline void GUI_End_Context(GUI_Context* context)
 					context->flags |= GUI_Context_Flags::disable_kc_navigation;
 					context->flags |= GUI_Context_Flags::disable_wrapping;
 					
-					v2f pos = context->layout.last_element_pos;
-					v2f dim = context->layout.last_element_dim;
+					v2f pos = context->layout.last_element.pos;
+					v2f dim = context->layout.last_element.dim;
 					Rect window_slider_rect;
 					
 					// NOTE: This is an unsafe union access!
@@ -977,7 +944,7 @@ static inline void GUI_End_Context(GUI_Context* context)
 				v2f slider_dim = {canvas_width, slider_girth};
 				f32 slider_value = (-(anchor_base.x - x_factor)) / canvas_width;
 				
-				GUI_One_Time_Skip_Padding(context);
+				context->flags |= GUI_Context_Flags::one_time_skip_padding;
 				GUI_Do_Handle_Slider(
 					context, 
 					&GUI_AUTO_BOTTOM_LEFT, 
@@ -1009,8 +976,8 @@ static inline void GUI_End_Context(GUI_Context* context)
 					context->flags |= GUI_Context_Flags::disable_kc_navigation;
 					context->flags |= GUI_Context_Flags::disable_wrapping;
 					
-					v2f pos = context->layout.last_element_pos;
-					v2f dim = context->layout.last_element_dim;
+					v2f pos = context->layout.last_element.pos;
+					v2f dim = context->layout.last_element.dim;
 					Rect window_slider_rect;
 					
 					// NOTE: This is an unsafe union access!
@@ -1135,8 +1102,8 @@ static inline bool GUI_Is_Element_Selected(GUI_Context* context, bool cursor_on_
 			context->selected_id = id;
 		}
 		
-		context->selected_element_pos = context->layout.last_element_pos;
-		context->selected_element_dim = context->layout.last_element_dim;
+		context->selected_element_pos = context->layout.last_element.pos;
+		context->selected_element_dim = context->layout.last_element.dim;
 		
 		result = true;
 	}
@@ -1153,8 +1120,8 @@ static inline bool GUI_Is_Element_Selected(GUI_Context* context, bool cursor_on_
 		context->selected_index = context->widget_count;
 		context->selected_id = id;
 		
-		context->selected_element_pos = context->layout.last_element_pos;
-		context->selected_element_dim = context->layout.last_element_dim;		
+		context->selected_element_pos = context->layout.last_element.pos;
+		context->selected_element_dim = context->layout.last_element.dim;		
 		result = true;
 		
 		GUI_Context::active_context_id = context->_context_id;
@@ -1446,15 +1413,15 @@ static void GUI_Do_Spacing(GUI_Context* context, v2f* dim)
 	
 	Rect bounds = context->bounds_rel_anchor_base;
 	
-	GUI_One_Time_Skip_Padding(context);
+	context->flags |= GUI_Context_Flags::one_time_skip_padding;
 	if(dim)
 	{
 		v2f d = *dim;
 		if(d.x == 0)
-			d.x = context->layout.last_element_dim.x;
+			d.x = context->layout.last_element.dim.x;
 		
 		if(d.y == 0)
-			d.y = context->layout.last_element_dim.y;
+			d.y = context->layout.last_element.dim.y;
 		
 		GUI_Get_Placement(context, &d, 0);
 	}
@@ -1464,6 +1431,12 @@ static void GUI_Do_Spacing(GUI_Context* context, v2f* dim)
 	}
 	
 	context->bounds_rel_anchor_base = bounds;
+}
+
+
+static void GUI_Do_Spacing(GUI_Context* context, v2f dim)
+{
+	GUI_Do_Spacing(context, &dim);
 }
 
 
@@ -1479,9 +1452,9 @@ static void GUI_Do_Text(
 	
 	// --------------------------------------------------------------------------
 	
-	GUI_Theme* theme = context->layout.theme;
+	GUI_Theme* theme = context->theme;
 	
-	v2f dim = GUI_Tight_Fit_Text(text, text_scale, &theme->font);
+	v2f dim = GUI_Tight_Fit_Text(text, &theme->font, text_scale);
 	
 	GUI_Placement p = GUI_Get_Placement(context, &dim, pos);
 	if(!Is_Rect_Valid(p.rect))
@@ -1508,6 +1481,30 @@ static void GUI_Do_Text(
 }
 
 
+static void GUI_Do_Pannel(
+	GUI_Context* context,
+	v2f* pos,
+	v2f* dim)
+{
+	// --------------------------------------------------------------------------
+	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
+	if(!Is_Rect_Valid(p.rect))
+		return;
+	// --------------------------------------------------------------------------
+	
+	// Draw
+	if(Rects_Overlap(p.rect, context->canvas_rect))
+	{
+		Draw_Filled_Rect_With_Outline(
+			context->canvas, 
+			p.rect, 
+			context->theme->background_color,
+			context->theme->outline_thickness, 
+			context->theme->outline_color);
+	}
+}
+
+
 static bool GUI_Do_Button(
 	GUI_Context* context, 
 	v2f* pos, 
@@ -1519,11 +1516,11 @@ static bool GUI_Do_Button(
 	
 	// --------------------------------------------------------------------------
 	
-	GUI_Theme* theme = context->layout.theme;
+	GUI_Theme* theme = context->theme;
 	
 	if(dim == &GUI_AUTO_FIT)
 	{
-		*dim = GUI_Tight_Fit_Text(text, text_scale, &theme->font) + theme->padding;
+		*dim = GUI_Tight_Fit_Text(text, &theme->font, text_scale) + theme->padding;
 	}
 	
 	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
@@ -1605,7 +1602,7 @@ static bool GUI_Do_Fill_Slider(
 	bool cursor_on_selection = Is_Point_Inside_Rect(context->cursor_fpos, p.rect);
 	bool is_selected = GUI_Is_Element_Selected(context, cursor_on_selection, id);
 	
-	GUI_Theme* theme = context->layout.theme;
+	GUI_Theme* theme = context->theme;
 	
 	// --------------------------------------------------------------------------
 	
@@ -1728,7 +1725,7 @@ static bool GUI_Do_Handle_Slider(
 	bool cursor_on_selection = Is_Point_Inside_Rect(context->cursor_fpos, p.rect);
 	bool is_selected = GUI_Is_Element_Selected(context, cursor_on_selection, id);
 	
-	GUI_Theme* theme = context->layout.theme;
+	GUI_Theme* theme = context->theme;
 	
 	// --------------------------------------------------------------------------
 	
@@ -1903,7 +1900,7 @@ static bool GUI_Do_Checkbox(GUI_Context* context, v2f* pos, v2f* dim, bool* valu
 	bool cursor_on_selection = Is_Point_Inside_Rect(context->cursor_fpos, p.rect);
 	bool is_selected = GUI_Is_Element_Selected(context, cursor_on_selection, id);
 	
-	GUI_Theme* theme = context->layout.theme;
+	GUI_Theme* theme = context->theme;
 	
 	// --------------------------------------------------------------------------
 	
@@ -1962,7 +1959,7 @@ static u32 GUI_Do_Dropdown_Button(
 	
 	// --------------------------------------------------------------------------
 	
-	GUI_Theme* theme = context->layout.theme;
+	GUI_Theme* theme = context->theme;
 	
 	if(dim == &GUI_AUTO_FIT)
 	{
@@ -1983,7 +1980,7 @@ static u32 GUI_Do_Dropdown_Button(
 		char* longest_text = (button_text_lenght >= longest_sub_lenght)? 
 			text : element_names[longest_sub_idx];
 		
-		*dim = GUI_Tight_Fit_Text(longest_text, text_scale, &theme->font) + theme->padding;
+		*dim = GUI_Tight_Fit_Text(longest_text, &theme->font, text_scale) + theme->padding;
 	}
 	
 	
@@ -2167,7 +2164,7 @@ static bool GUI_Do_SL_Input_Field(
 	
 	static constexpr f32 min_handle_width = 3.f;
 	
-	GUI_Theme* theme = context->layout.theme;
+	GUI_Theme* theme = context->theme;
 	Font* font = &theme->font;
 	
 	f32 outline_thickness = f32(theme->outline_thickness);
@@ -2178,7 +2175,7 @@ static bool GUI_Do_SL_Input_Field(
 	
 	v2f dim;
 	{
-		f32 _width = width? *width : context->layout.last_element_dim.x;
+		f32 _width = width? *width : context->layout.last_element.dim.x;
 		f32 _height = char_height + bar_height + outline_thickness * 2;
 		if((u32)_height % 2)
 			_height += 1;
@@ -2609,7 +2606,7 @@ static void GUI_Do_ML_Input_Field(
 	
 	// --------------------------------------------------------------------------
 	
-	GUI_Theme* theme = context->layout.theme;
+	GUI_Theme* theme = context->theme;
 
 	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
 	if(!Is_Rect_Valid(p.rect))

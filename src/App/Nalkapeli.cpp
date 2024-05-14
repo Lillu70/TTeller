@@ -1,6 +1,20 @@
 
 #pragma once
 
+
+static inline void Generate_Folder_Hierarchy(Platform_Calltable* platform)
+{
+	if(!platform->Create_Directory(data_folder_path))
+	{
+		Terminate;
+	}
+	
+	if(!platform->Create_Directory(campaigns_folder_path))
+	{
+		Terminate;
+	}
+}
+
 // lol these silly functions :D
 static inline void Make_Requirement_Hollow(Participation_Requirement* req)
 {
@@ -148,6 +162,7 @@ static void Delete_Event(
 		Make_Global_Mark_Consequence_Hollow(gmc);
 	
 	allocator->free(element->global_mark_reqs);
+	allocator->free(element->global_mark_cons);
 	
 	element->name.free();
 	element->event_text.free();
@@ -155,6 +170,21 @@ static void Delete_Event(
 	// Optional toggle, to allow optimization when deleting all events, normaly this should be "true"
 	if(remove_from_array)
 		Remove_Element_From_Packed_Array(buffer, &darray->count, sizeof(*element), idx_to_delete);
+}
+
+
+static void Delete_All_Events(Events_Container* event_container, Allocator_Shell* allocator)
+{
+	if(event_container->events)
+	{
+		for(u32 i = 0; i < event_container->events->count; ++i)
+			Delete_Event(event_container->events, allocator, i, false);
+		
+		event_container->campaign_name.free();
+		allocator->free(event_container->events);
+		
+		*event_container = {};		
+	}
 }
 
 
@@ -272,10 +302,19 @@ static String Generate_Unique_Name(Event_State* events, u32 event_count, Allocat
 }
 
 
+static String Create_Campaign_Full_Path(String* source_name, Allocator_Shell* allocator)
+{
+	String result;
+	Init_String(&result, allocator, campaigns_folder_path, source_name, campaign_file_extension);
+	
+	return result;
+}
+
+
 static Linear_Allocator serialization_lalloc = {};
 
 static void Serialize_Campaign(
-	Events_Container event_container, 
+	Events_Container event_container,
 	Platform_Calltable* platform)
 {	
 	/*
@@ -311,6 +350,8 @@ static void Serialize_Campaign(
 			goto OUT_OF_MEMORY;\
 		}\
 	}
+	
+	Assert(event_container.campaign_name.buffer);
 	
 	serialization_lalloc.clear();
 	
@@ -455,14 +496,27 @@ static void Serialize_Campaign(
 	u32 buffer_size = serialization_lalloc.get_used_capacity();
 	if(buffer_size)
 	{
-		platform->Create_Directory("Kamppaniat");
-		platform->Write_File("Kamppaniat/test.event", (u8*)serialization_lalloc.memory, buffer_size);
+		// TODO: Use a part of the serialization_lalloc allocation for the full path buffer,
+		// to avoid this allocation bussines.
+		
+		String full_path = Create_Campaign_Full_Path(
+			&event_container.campaign_name, 
+			event_container.campaign_name.alloc);
+		
+		bool success = platform->Write_File(
+			full_path.buffer, 
+			(u8*)serialization_lalloc.memory, 
+			buffer_size);
+		
+		Assert(success);
+		full_path.free();
 	}
 	return;
 	
 	OUT_OF_MEMORY:
 	Assert(serialization_lalloc.capacity);
 	
+	// TODO: Make sure this actually uses the memory given!
 	serialization_lalloc.init(platform, serialization_lalloc.capacity * 2);
 	Serialize_Campaign(event_container, platform);
 }
@@ -655,6 +709,7 @@ static inline void Load_Campaign_V2(
 }
 
 
+//TODO: get the minim alloc sizes from some constants.
 static inline void Load_Campaign_V3(
 	Events_Container* container,
 	Allocator_Shell* allocator,
@@ -872,52 +927,59 @@ static inline void Load_Campaign_V3(
 }
 
 
-//TODO: get the minim alloc sizes from some constants.
 static bool Load_Campaign(
 	Events_Container* container,
+	String* name,
 	Allocator_Shell* allocator,
 	Platform_Calltable* platform)
 {
+	String full_path = Create_Campaign_Full_Path(name, allocator);
+	
 	u32 buffer_size = 0;
-	if(!platform->Get_File_Size("Kamppaniat/test.event", &buffer_size))
-		return false;
-
-	serialization_lalloc.clear();
-	
-	if(serialization_lalloc.get_free_capacity() < buffer_size)
-		serialization_lalloc.init(platform, buffer_size);
-	
-	u8* buffer = (u8*)serialization_lalloc.push(buffer_size);
-	u32 read_head = 0;
-	
-	*container = {};
-	
-	bool load_success_full;
-	
-	if(platform->Read_File("Kamppaniat/test.event", (u8*)buffer, buffer_size))
+	bool load_successful = false;
+	if(platform->Get_File_Size(full_path.buffer, &buffer_size))
 	{
-		load_success_full = true;
-		u32 version = READ(u32);
-		switch(version)
+		serialization_lalloc.clear();
+		
+		if(serialization_lalloc.get_free_capacity() < buffer_size)
+			serialization_lalloc.init(platform, buffer_size);
+		
+		u8* buffer = (u8*)serialization_lalloc.push(buffer_size);
+		u32 read_head = 0;
+		
+		*container = {};
+		
+		if(platform->Read_File(full_path.buffer, (u8*)buffer, buffer_size))
 		{
-			case 2:
+			load_successful = true;
+			u32 version = READ(u32);
+			switch(version)
 			{
-				Load_Campaign_V2(container, allocator, buffer, buffer_size, read_head);
-			}break;
+				case 2:
+				{
+					Load_Campaign_V2(container, allocator, buffer, buffer_size, read_head);
+				}break;
+				
+				case 3:
+				{
+					Load_Campaign_V3(container, allocator, buffer, buffer_size, read_head);
+				}break;
+				
+				default:
+				{
+					load_successful = false;
+				}
+			}
 			
-			case 3:
+			if(load_successful)
 			{
-				Load_Campaign_V3(container, allocator, buffer, buffer_size, read_head);
-			}break;
-			
-			default:
-			{
-				load_success_full = false;
+				Copy_String(&container->campaign_name, name);
 			}
 		}
 	}
 	
-	return load_success_full;
+	full_path.free();
+	return load_successful;
 	
 	#undef READ
 	#undef READ_TEXT

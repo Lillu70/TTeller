@@ -10,6 +10,9 @@
 #include "Utility\Instrumentation.h"
 #include "Utility\Assert.h"
 #include "Utility\Utility.h"
+#include "Utility\Allocator_Shell.h"
+#include "Utility\Dynamic_Array.h"
+#include "Utility\String.h"
 #include "Platform\Input.h"
 #include "Platform\Platform_Interface.h"
 

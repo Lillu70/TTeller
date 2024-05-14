@@ -27,7 +27,7 @@ struct String_View
 };
 
 
-String_View Create_String_View(String* str)
+static String_View Create_String_View(String* str)
 {
 	Assert(str);
 	Assert(str->buffer);
@@ -39,7 +39,7 @@ String_View Create_String_View(String* str)
 }
 
 
-String_View Create_String_View(char* c_str)
+static String_View Create_String_View(char* c_str)
 {
 	Assert(c_str);
 	String_View result = {c_str, Null_Terminated_Buffer_Lenght(c_str)};
@@ -47,7 +47,7 @@ String_View Create_String_View(char* c_str)
 }
 
 
-String_View Create_String_View(String* str, u32 start, u32 lenght)
+static String_View Create_String_View(String* str, u32 start, u32 lenght)
 {
 	Assert(str);
 	Assert(str->buffer);
@@ -62,7 +62,9 @@ String_View Create_String_View(String* str, u32 start, u32 lenght)
 
 static void String_Init_Alloc(String* str, u32 capacity)
 {
-	capacity = Max(str->alloc->min_alloc_size, capacity);
+	if(capacity < str->alloc->min_alloc_size)
+		capacity = str->alloc->min_alloc_size;
+	
 	str->capacity = capacity;
 	
 	str->buffer = (char*)str->alloc->push(capacity);
@@ -70,43 +72,25 @@ static void String_Init_Alloc(String* str, u32 capacity)
 }
 
 
-static void Init_String(String* str, Allocator_Shell* allocator, u32 capacity)
+static void Copy_String(String* dest, String* src)
 {
-	Assert(allocator);
+	Assert(dest);
+	Assert(src);
 	
-	str->lenght = 0;
-	str->alloc = allocator;
+	dest->lenght = src->lenght;
+	dest->alloc = src->alloc;
 	
-	String_Init_Alloc(str, capacity);
+	String_Init_Alloc(dest, src->capacity);
+	Mem_Copy(dest->buffer, src->buffer, src->lenght);
 }
 
 
-static inline String Create_String(Allocator_Shell* allocator, u32 capacity)
+static String Create_Copy_String(String* src)
 {
 	String result;
-	Init_String(&result, allocator, capacity);
+	Copy_String(&result, src);
 	
 	return result;
-}
-
-static void Init_String(String* str, Allocator_Shell* allocator, char* c_str1, char* c_str2)
-{
-	Assert(allocator);
-	
-	u32 lenght1 = Null_Terminated_Buffer_Lenght(c_str1);
-	u32 lenght2 = Null_Terminated_Buffer_Lenght(c_str2);
-
-	str->lenght = lenght1 + lenght2;
-	str->alloc = allocator;
-	
-	String_Init_Alloc(str, str->lenght+ 1);
-	if(lenght1 > 0)
-		Mem_Copy(str->buffer, c_str1, lenght1);
-	
-	if(lenght2 > 0)
-		Mem_Copy(str->buffer + lenght1, c_str2, lenght2);
-	
-	str->buffer[str->lenght] = 0;
 }
 
 
@@ -138,6 +122,128 @@ static inline String Create_String(Allocator_Shell* allocator, char* c_str)
 }
 
 
+static void Init_String(String* str, Allocator_Shell* allocator, u32 capacity)
+{
+	Assert(allocator);
+	
+	str->lenght = 0;
+	str->alloc = allocator;
+	
+	String_Init_Alloc(str, capacity);
+}
+
+
+static inline String Create_String(Allocator_Shell* allocator, u32 capacity)
+{
+	String result;
+	Init_String(&result, allocator, capacity);
+	
+	return result;
+}
+
+
+static void Init_String(String* str, Allocator_Shell* allocator, char* c_str1, char* c_str2)
+{
+	Assert(allocator);
+	
+	u32 lenght1 = Null_Terminated_Buffer_Lenght(c_str1);
+	u32 lenght2 = Null_Terminated_Buffer_Lenght(c_str2);
+
+	str->lenght = lenght1 + lenght2;
+	str->alloc = allocator;
+	
+	String_Init_Alloc(str, str->lenght+ 1);
+	if(lenght1 > 0)
+		Mem_Copy(str->buffer, c_str1, lenght1);
+	
+	if(lenght2 > 0)
+		Mem_Copy(str->buffer + lenght1, c_str2, lenght2);
+	
+	str->buffer[str->lenght] = 0;
+}
+
+
+static inline String Create_String(Allocator_Shell* allocator, char* c_str1, char* c_str2)
+{
+	String result;
+	Init_String(&result, allocator, c_str1, c_str2);
+	
+	return result;
+}
+
+
+static void Init_String(
+	String* str, 
+	Allocator_Shell* allocator, 
+	char* c_str1, 
+	char* c_str2, 
+	char* c_str3)
+{
+	Assert(allocator);
+	
+	u32 lenght1 = Null_Terminated_Buffer_Lenght(c_str1);
+	u32 lenght2 = Null_Terminated_Buffer_Lenght(c_str2);
+	u32 lenght3 = Null_Terminated_Buffer_Lenght(c_str3);
+
+	str->lenght = lenght1 + lenght2 + lenght3;
+	str->alloc = allocator;
+	
+	String_Init_Alloc(str, str->lenght+ 1);
+	if(lenght1 > 0)
+		Mem_Copy(str->buffer, c_str1, lenght1);
+	
+	if(lenght2 > 0)
+		Mem_Copy(str->buffer + lenght1, c_str2, lenght2);
+	
+	if(lenght3 > 0)
+		Mem_Copy(str->buffer + lenght1 + lenght2, c_str3, lenght3);
+	
+	str->buffer[str->lenght] = 0;
+}
+
+
+static inline String Create_String(
+	Allocator_Shell* allocator, 
+	char* c_str1, 
+	char* c_str2, 
+	char* c_str3)
+{
+	String result;
+	Init_String(&result, allocator, c_str1, c_str2, c_str3);
+	
+	return result;
+}
+
+
+static void Init_String(
+	String* str, 
+	Allocator_Shell* allocator, 
+	char* c_str1, 
+	String* str2, 
+	char* c_str3)
+{
+	Assert(allocator);
+	
+	u32 lenght1 = Null_Terminated_Buffer_Lenght(c_str1);
+	u32 lenght3 = Null_Terminated_Buffer_Lenght(c_str3);
+
+	str->lenght = lenght1 + str2->lenght + lenght3;
+	str->alloc = allocator;
+	
+	String_Init_Alloc(str, str->lenght+ 1);
+	if(lenght1 > 0)
+		Mem_Copy(str->buffer, c_str1, lenght1);
+	
+	if(str2->lenght > 0)
+		Mem_Copy(str->buffer + lenght1, str2->buffer, str2->lenght);
+	
+	if(lenght3 > 0)
+		Mem_Copy(str->buffer + lenght1 + str2->lenght, c_str3, lenght3);
+	
+	str->buffer[str->lenght] = 0;
+}
+
+
 static void Init_String(String* str, Allocator_Shell* allocator, char* c_str, u32 max_characters)
 {
 	Assert(allocator);
@@ -158,7 +264,7 @@ static void Init_String(String* str, Allocator_Shell* allocator, char* c_str, u3
 }
 
 
-void String::append_character(char c)
+inline void String::append_character(char c)
 {
 	if(capacity == 0)
 	{
@@ -186,7 +292,7 @@ void String::append_character(char c)
 }
 
 
-void String::pop_last()
+inline void String::pop_last()
 {
 	Assert(lenght > 0);
 	buffer[lenght - 1] = 0;
@@ -194,7 +300,7 @@ void String::pop_last()
 }
 
 
-void String::insert_at(u32 idx, char c)
+inline void String::insert_at(u32 idx, char c)
 {
 	Assert(idx <= lenght);
 	
@@ -220,7 +326,7 @@ void String::insert_at(u32 idx, char c)
 }
 
 
-void String::remove_at(u32 idx)
+inline void String::remove_at(u32 idx)
 {
 	Assert(idx <= lenght);
 	
@@ -236,14 +342,14 @@ void String::remove_at(u32 idx)
 
 
 // "To" is exclusive.
-void String::erase(u32 from, u32 to)
+inline void String::erase(u32 from, u32 to)
 {
 	for(u32 i = from; i < to; ++i)
 		remove_at(from);
 }
 
 
-void String::free()
+inline void String::free()
 {
 	if(buffer)
 		alloc->free(buffer);
@@ -276,33 +382,4 @@ static bool String_Compare(String* a, String* b)
 	}
 	
 	return false;
-}
-
-
-// Buffer size is assumed to be 11 or greater.
-static char* U32_To_Char_Buffer(u8* buffer, u32 integer)
-{
-	// TODO: This works, but's odd and not very intuitive, so rethink and rework this.
-	
-	u32 buffer_size = 11;
-	
-	buffer[buffer_size - 1] = 0;
-	
-	u32 ascii_numeric_offset = 48;
-	u32 last_non_zero = buffer_size - 2;
-	for(u32 i = 0; i < buffer_size - 1; ++i)
-	{
-		u32 digit = 0;
-		if(i > 0)
-			digit = (u32)(integer / Pow32(10, i)) % 10;	
-		else
-			digit = integer % 10;
-		u32 write_pos = buffer_size - 2 - i;
-		if(digit)
-			last_non_zero = write_pos;
-		
-		buffer[write_pos] = ascii_numeric_offset + digit;
-	}
-	
-	return (char*)(buffer + last_non_zero);
 }

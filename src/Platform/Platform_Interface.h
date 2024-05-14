@@ -14,6 +14,17 @@ enum class App_Flags : u32
 };
 
 
+namespace Create_Directory_Result
+{
+	enum T : u8
+	{
+		path_not_found = 0,
+		success = 1,
+		file_already_exists = 2,	
+	};
+}
+
+
 struct Char_Array
 {
 	char buffer[8];
@@ -68,7 +79,9 @@ struct Platform_Calltable
 	
 	bool (*Read_File)(const char*, u8*, u32) = 0;
 	
-	bool (*Create_Directory)(char* path) = 0;
+	Create_Directory_Result::T (*Create_Directory)(char* path) = 0;
+	
+	Dynamic_Array<String>* (*Search_Directory_For_Maching_Names)(char* file_name, Allocator_Shell* allocator) = 0;
 	
 	char* (*Get_Clipboard_Data_As_Text)() = 0;
 	
