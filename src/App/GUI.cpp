@@ -524,10 +524,12 @@ static inline void GUI_Reset_Context(GUI_Context* context)
 	// Make sure context is not reset between begin and end.
 	Assert(!GUI_Is_Context_Ready(context));
 	
+	u32 retained_flags = context->flags | GUI_Context_Flags::enable_dynamic_sliders;
 	f32 dynamic_slider_girth = context->dynamic_slider_girth;
 	u32 id = context->_context_id;
 	*context = GUI_Context();
 	
+	context->flags |= retained_flags;
 	context->_context_id = id;
 	context->dynamic_slider_girth = dynamic_slider_girth;
 }
@@ -569,8 +571,14 @@ static inline void GUI_Begin_Context(
 	context->selected_element_pos = {};
 	context->bounds_rel_anchor_base = { {F32_MAX, F32_MAX}, {-F32_MAX, -F32_MAX} };
 	
-	if(GUI_Context::active_context_id != context->_context_id)
+	if(GUI_Context::active_context_id == context->_context_id)
+	{
+		Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::soft_ignore_selection);
+	}
+	else
+	{
 		context->flags |= GUI_Context_Flags::soft_ignore_selection;
+	}
 	
 	Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::cursor_mask_validation);
 	

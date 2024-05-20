@@ -12,8 +12,12 @@ static GUI_Context s_gui;
 static GUI_Context s_gui_banner;
 static GUI_Context s_gui_pop_up;
 
-static constexpr f32 post_title_y_spacing = 20;
+static constexpr f32 s_post_title_y_spacing = 20;
 
+static void(*s_popup_func)() = 0;
+
+static void Do_Main_Menu_Name_New_Campaign_Popup();
+static void Do_Event_Editor_On_Exit_Popup();
 
 // TODO: FUCKING RENAME THESE!
 enum class Menus : u32
@@ -37,7 +41,8 @@ struct Global_Data
 	Events_Container event_container;
 	
 	u32 active_event_index = 0;
-
+	
+	String new_campaign_name;
 	Dynamic_Array<String>* on_disk_campaign_names = 0;
 };
 static Global_Data s_global_data = Global_Data();
@@ -59,6 +64,14 @@ static inline v2f Get_Title_Bar_Row_Placement(
 	
 	v2f result = v2f{back_button_x, back_button_y};
 	return result;
+}
+
+
+static inline void Set_Popup_Function(void(*popup_function)())
+{
+	GUI_Reset_Context(&s_gui_pop_up);
+	GUI_Context::active_context_id = s_gui_pop_up._context_id;
+	s_popup_func = popup_function;
 }
 
 
@@ -237,13 +250,27 @@ static void Do_Event_Editor_All_Events_Frame()
 {
 	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
-		GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "Kaikki Tapahtumat", {}, v2f{4, 4}, true);
+		v2f title_scale = v2f{4.f, 4.f};
+		Font* font = &context->theme->font;
+		v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
+		if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
+			Set_Popup_Function(Do_Event_Editor_On_Exit_Popup);
+		
+		GUI_Push_Layout(context);
+		
+		context->layout.build_direction = GUI_Build_Direction::right_center;
+		
+		char* title_text = s_global_data.event_container.campaign_name.buffer;
+		GUI_Do_Text(context, AUTO, title_text, {}, title_scale, true);
+		
 		f32 title_height = context->layout.last_element.dim.y;
 		f32 title_max_x = context->layout.last_element.rect.max.x - context->anchor_base.x;
 		
+		GUI_Pop_Layout(context);
+		
 		static bool jump_into_new_event = true;
 		
-		GUI_Do_Spacing(context, v2f{0, post_title_y_spacing});
+		GUI_Do_Spacing(context, v2f{0, s_post_title_y_spacing});
 		
 		v2f checkbox_dim = v2f{30, 30};
 		GUI_Do_Checkbox(context, AUTO, &checkbox_dim, &jump_into_new_event);
@@ -315,42 +342,18 @@ static void Do_Event_Editor_All_Events_Frame()
 		// -- title bar buttons --	
 		f32 padding = context->theme->padding;
 		
-		static constexpr char* load_text = "Lataa";
 		static constexpr char* save_text = "Tallenna";
 		
-		Font* font = &context->theme->font;
+		f32 w1 = GUI_Tight_Fit_Text(save_text, font).x + padding;
 		
-		f32 w1 = GUI_Tight_Fit_Text(load_text, font).x + padding;
-		f32 w2 = GUI_Tight_Fit_Text(save_text, font).x + padding;
-		
-		f32 ctrl_buttons_width = w1 + w2 + context->dynamic_slider_girth + padding * 2;
+		f32 ctrl_buttons_width = w1 + context->dynamic_slider_girth + padding * 2;
 		v2f title_row_pos 
 			= Get_Title_Bar_Row_Placement(context, title_max_x, padding, ctrl_buttons_width);
 		
 		v2f dim = v2f{w1, title_height};
-		// Load button.
-		if(GUI_Do_Button(context, &title_row_pos, &dim, load_text))
-		{
-			String* campaign_name = &s_global_data.event_container.campaign_name;
-			
-			Events_Container load_result;
-			
-			if(Load_Campaign(&load_result, campaign_name, &s_allocator, &s_platform))
-			{
-				Delete_All_Events(&s_global_data.event_container, &s_allocator);
-				s_global_data.event_container = load_result;
-			}
-			else
-			{
-				// CONSIDER: Well, loading failed so what now? Suppose just segfault! 
-				// ...at least in debug mode.
-				Assert(false);
-			}
-		}
-		
-		dim = v2f{w2, title_height};
+	
 		// Save button.
-		if(GUI_Do_Button(context, AUTO, &dim, save_text))
+		if(GUI_Do_Button(context, &title_row_pos, &dim, save_text))
 		{
 			Serialize_Campaign(s_global_data.event_container, &s_platform);
 		}
@@ -363,7 +366,7 @@ static void Do_Event_Editor_All_Events_Frame()
 		{
 			return;
 		}
-			
+		
 		u32 border_width = 30;
 		u32 border_width_x2 = border_width * 2;
 		u32 canvas_half_width = context->canvas->dim.x / 2;
@@ -533,14 +536,28 @@ static void Do_Event_Editor_Participants_Frame()
 {
 	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
-		Event_State* event = Begin(s_global_data.event_container.events) + s_global_data.active_event_index;
 		
-		GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "Osallistujat", {}, v2f{4,4}, true);
+		v2f title_scale = v2f{4.f, 4.f};
+		Font* font = &context->theme->font;
+		v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
+		if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
+		{
+			s_global_data.active_menu = Menus::all_events;
+		}
+		
+		GUI_Push_Layout(context);
+		
+		context->layout.build_direction = GUI_Build_Direction::right_center;
+		
+		GUI_Do_Text(context, AUTO, "Osallistujat", {}, title_scale, true);
 		f32 title_height = context->layout.last_element.dim.y;
 		f32 title_max_x = context->layout.last_element.rect.max.x - context->anchor_base.x;
 		
-		GUI_Do_Spacing(context, v2f{0, post_title_y_spacing});
+		GUI_Pop_Layout(context);
 		
+		GUI_Do_Spacing(context, v2f{0, s_post_title_y_spacing});
+		
+		Event_State* event = Begin(s_global_data.event_container.events) + s_global_data.active_event_index;
 		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lis\xE4\xE4 uusi osallistuja"))
 		{
 			s_gui.flags |= GUI_Context_Flags::maxout_horizontal_slider;
@@ -554,7 +571,7 @@ static void Do_Event_Editor_Participants_Frame()
 		
 		if(event->participents->count > 0)
 		{	
-			if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Poista kaikki osallistujat"))
+			if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Poista osallistujat"))
 				Delete_All_Participants_From_Event(event, &s_allocator);
 		}	
 		
@@ -569,33 +586,23 @@ static void Do_Event_Editor_Participants_Frame()
 		
 		// -- title bar buttons --	
 		f32 padding = context->theme->padding;
-		static constexpr char* go_to_all_events_text = "<";
 		static constexpr char* go_to_event_text_text = "Tapahtuma Teksti";
 		static constexpr char* go_to_consequences_text = "Seuraamukset";
 		
-		Font* font = &context->theme->font;
+		f32 w1 = GUI_Tight_Fit_Text(go_to_event_text_text, font).x + padding;
+		f32 w2 = GUI_Tight_Fit_Text(go_to_consequences_text, font).x + padding;
 		
-		f32 w1 = GUI_Tight_Fit_Text(go_to_all_events_text, font).x + padding;
-		f32 w2 = GUI_Tight_Fit_Text(go_to_event_text_text, font).x + padding;
-		f32 w3 = GUI_Tight_Fit_Text(go_to_consequences_text, font).x + padding;
-		
-		f32 ctrl_buttons_width = w1 + w2 + w3 + context->dynamic_slider_girth + padding * 2;
+		f32 ctrl_buttons_width = w1 + w2 + context->dynamic_slider_girth + padding * 2;
 		v2f title_row_pos 
 			= Get_Title_Bar_Row_Placement(context, title_max_x, padding, ctrl_buttons_width);
 		
 		v2f dim = v2f{w1, title_height};
-		if(GUI_Do_Button(context, &title_row_pos, &dim, go_to_all_events_text))
-		{
-			s_global_data.active_menu = Menus::all_events;	
-		}
-		
-		dim = v2f{w2, title_height};
-		if(GUI_Do_Button(context, AUTO, &dim, go_to_event_text_text))
+		if(GUI_Do_Button(context, &title_row_pos, &dim, go_to_event_text_text))
 		{
 			s_global_data.active_menu = Menus::event_editor_text;	
 		}
 		
-		dim = v2f{w3, title_height};
+		dim = v2f{w2, title_height};
 		if(GUI_Do_Button(context, AUTO, &dim, go_to_consequences_text))
 		{
 			s_global_data.active_menu = Menus::event_editor_consequences;
@@ -930,12 +937,25 @@ static void Do_Event_Editor_Text_Frame()
 	{
 		Event_State* event = Begin(s_global_data.event_container.events) + s_global_data.active_event_index;
 		
-		GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "Tapahtuma Teksti", {}, v2f{4,4}, true);
+		v2f title_scale = v2f{4.f, 4.f};
+		Font* font = &context->theme->font;
+		v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
+		if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
+		{
+			s_global_data.active_menu = Menus::all_events;
+		}
+		
+		GUI_Push_Layout(context);
+		
+		context->layout.build_direction = GUI_Build_Direction::right_center;
+		
+		GUI_Do_Text(context, AUTO, "Tapahtuma Teksti", {}, title_scale, true);
 		f32 title_height = context->layout.last_element.dim.y;
 		f32 title_max_x = context->layout.last_element.rect.max.x - context->anchor_base.x;
+		GUI_Pop_Layout(context);
 		
 		
-		GUI_Do_Spacing(context, v2f{0, post_title_y_spacing});
+		GUI_Do_Spacing(context, v2f{0, s_post_title_y_spacing});
 		{
 			char* event_name_text = 
 				(s_global_data.active_event_index < s_global_data.event_container.day_event_count)?
@@ -950,34 +970,23 @@ static void Do_Event_Editor_Text_Frame()
 		
 		// -- title bar buttons --	
 		f32 padding = context->theme->padding;
-		static constexpr char* go_to_all_events_text = "<";
 		static constexpr char* go_to_requirements_text = "Osallistujat";
 		static constexpr char* go_to_consequences_text = "Seuraamukset";
 		
-		Font* font = &context->theme->font;
+		f32 w1 = GUI_Tight_Fit_Text(go_to_requirements_text, font).x + padding;
+		f32 w2 = GUI_Tight_Fit_Text(go_to_consequences_text, font).x + padding;
 		
-		f32 w1 = GUI_Tight_Fit_Text(go_to_all_events_text, font).x + padding;
-		f32 w2 = GUI_Tight_Fit_Text(go_to_requirements_text, font).x + padding;
-		f32 w3 = GUI_Tight_Fit_Text(go_to_consequences_text, font).x + padding;
-		
-		f32 ctrl_buttons_width = w1 + w2 + w3 + context->dynamic_slider_girth + padding * 2;
+		f32 ctrl_buttons_width = w1 + w2 + context->dynamic_slider_girth + padding * 2;
 		v2f title_row_pos 
 			= Get_Title_Bar_Row_Placement(context, title_max_x, padding, ctrl_buttons_width);
 		
 		v2f dim = v2f{w1, title_height};
-		if(GUI_Do_Button(context, &title_row_pos, &dim, go_to_all_events_text))
-		{
-			s_global_data.active_menu = Menus::all_events;
-			
-		}
-		
-		dim = v2f{w2, title_height};
-		if(GUI_Do_Button(context, AUTO, &dim, go_to_requirements_text))
+		if(GUI_Do_Button(context, &title_row_pos, &dim, go_to_requirements_text))
 		{
 			s_global_data.active_menu = Menus::event_editor_participants;	
 		}
 		
-		dim = v2f{w3, title_height};
+		dim = v2f{w2, title_height};
 		if(GUI_Do_Button(context, AUTO, &dim, go_to_consequences_text))
 		{
 			s_global_data.active_menu = Menus::event_editor_consequences;
@@ -993,6 +1002,7 @@ static void Do_Event_Editor_Text_Frame()
 			Event_State* event 
 				= Begin(s_global_data.event_container.events) + s_global_data.active_event_index;
 			
+			context->layout.anchor = GUI_Anchor::center;
 			GUI_Do_ML_Input_Field(context, &GUI_AUTO_MIDDLE, &dim, &event->event_text, 0);
 		}
 		
@@ -1006,11 +1016,26 @@ static void Do_Event_Editor_Consequences_Frame()
 {
 	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
-		GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "Seuraamukset", {}, v2f{4,4}, true);	
+		v2f title_scale = v2f{4.f, 4.f};
+		Font* font = &context->theme->font;
+		v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
+		if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
+		{
+			s_global_data.active_menu = Menus::all_events;
+		}
+		
+		GUI_Push_Layout(context);
+		
+		context->layout.build_direction = GUI_Build_Direction::right_center;
+		
+		GUI_Do_Text(context, AUTO, "Seuraamukset", {}, title_scale, true);
 		f32 title_height = context->layout.last_element.dim.y;
 		f32 title_max_x = context->layout.last_element.rect.max.x - context->anchor_base.x;
 		
-		GUI_Do_Spacing(context, v2f{0, post_title_y_spacing});
+		GUI_Pop_Layout(context);
+		
+		
+		GUI_Do_Spacing(context, v2f{0, s_post_title_y_spacing});
 		{
 			if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lis\xE4\xE4 yleis seuraamus"))
 			{
@@ -1027,34 +1052,23 @@ static void Do_Event_Editor_Consequences_Frame()
 		
 		// -- title bar buttons --	
 		f32 padding = context->theme->padding;
-		static constexpr char* go_to_all_events_text = "<";
 		static constexpr char* go_to_requirements_text = "Osallistujat";
 		static constexpr char* go_to_event_text_text = "Tapahtuma Teksti";
+
+		f32 w1 = GUI_Tight_Fit_Text(go_to_requirements_text, font).x + padding;
+		f32 w2 = GUI_Tight_Fit_Text(go_to_event_text_text, font).x + padding;
 		
-		Font* font = &context->theme->font;
-		
-		f32 w1 = GUI_Tight_Fit_Text(go_to_all_events_text, font).x + padding;
-		f32 w2 = GUI_Tight_Fit_Text(go_to_requirements_text, font).x + padding;
-		f32 w3 = GUI_Tight_Fit_Text(go_to_event_text_text, font).x + padding;
-		
-		f32 ctrl_buttons_width = w1 + w2 + w3 + context->dynamic_slider_girth + padding * 2;
+		f32 ctrl_buttons_width = w1 + w2 + context->dynamic_slider_girth + padding * 2;
 		v2f title_row_pos 
 			= Get_Title_Bar_Row_Placement(context, title_max_x, padding, ctrl_buttons_width);
 		
 		v2f dim = v2f{w1, title_height};
-		if(GUI_Do_Button(context, &title_row_pos, &dim, go_to_all_events_text))
-		{
-			s_global_data.active_menu = Menus::all_events;
-			
-		}
-		
-		dim = v2f{w2, title_height};
-		if(GUI_Do_Button(context, AUTO, &dim, go_to_requirements_text))
+		if(GUI_Do_Button(context, &title_row_pos, &dim, go_to_requirements_text))
 		{
 			s_global_data.active_menu = Menus::event_editor_participants;	
 		}
 		
-		dim = v2f{w3, title_height};
+		dim = v2f{w2, title_height};
 		if(GUI_Do_Button(context, AUTO, &dim, go_to_event_text_text))
 		{
 			s_global_data.active_menu = Menus::event_editor_text;
@@ -1449,9 +1463,21 @@ static void Do_Event_Editor_Campaigns_Menu_Frame()
 		
 		if(GUI_Do_Button(context, &title_row_pos, &dim, create_new_text))
 		{
-			s_global_data.active_menu = Menus::all_events;
-			s_global_data.event_container.campaign_name = Create_String(&s_allocator, "Testikampanja");
-			s_global_data.event_container.events = Create_Dynamic_Array<Event_State>(&s_allocator, 12);
+			char* def_name = "Uusi kampanja";
+			if(!s_global_data.new_campaign_name.buffer)
+			{
+				Init_String(&s_global_data.new_campaign_name, &s_allocator, def_name);
+			}
+			else
+			{
+				Mem_Copy(
+					s_global_data.new_campaign_name.buffer, 
+					def_name, 
+					Null_Terminated_Buffer_Lenght(def_name));
+			
+			}
+			
+			Set_Popup_Function(Do_Main_Menu_Name_New_Campaign_Popup);
 		}
 	
 	}; // ----------------------------------------------------------------------------------------
@@ -1494,25 +1520,111 @@ static void Do_Event_Editor_Campaigns_Menu_Frame()
 }
 
 
-static void Do_On_Exit_Pop_Up()
+static void Do_Event_Editor_On_Exit_Popup()
 {
 	Dim_Entire_Screen(&s_canvas, 0.333f);
 	
-	static GUI_Theme panel_theme = [](GUI_Theme* global_theme)
-	{ 
-		GUI_Theme result = *global_theme;
-		result.background_color = s_banner_background_color;
-		result.outline_color = global_theme->selected_color;
-		return result;
-	}(&s_theme);
+	static v2f panel_dim = v2f{0.f, 0.f};
 	
-	GUI_Begin_Context(&s_gui_pop_up, &s_platform, &s_canvas, s_global_data.menu_actions, &panel_theme);
+	GUI_Begin_Context(
+		&s_gui_pop_up, 
+		&s_platform, 
+		&s_canvas, 
+		s_global_data.menu_actions, 
+		&s_theme, 
+		v2i{0, 0}, 
+		GUI_Anchor::top);
 	
-	v2f pannel_dim = v2f{514, 195};
-	s_gui_pop_up.layout.anchor = GUI_Anchor::top;
-	GUI_Do_Pannel(&s_gui_pop_up, &GUI_AUTO_MIDDLE, &pannel_dim);
+	BEGIN:
+	bool panel_dim_set = panel_dim != v2f{0.f, 0.f};
 	
-	s_gui_pop_up.theme = &s_theme;
+	if(panel_dim_set)
+	{
+		static GUI_Theme panel_theme = [](GUI_Theme* global_theme)
+		{ 
+			GUI_Theme result = *global_theme;
+			result.background_color = s_banner_background_color;
+			result.outline_color = global_theme->selected_color;
+			return result;
+		}(&s_theme);
+
+		s_gui_pop_up.theme = &panel_theme;
+		GUI_Do_Pannel(&s_gui_pop_up, &GUI_AUTO_MIDDLE, &panel_dim);
+		s_gui_pop_up.theme = &s_theme;
+	}
+	
+	static constexpr char* text = "Tallenetaanko kampanja?";
+	GUI_Do_Text(&s_gui_pop_up, &GUI_AUTO_MIDDLE, text, {}, GUI_DEFAULT_TEXT_SCALE * 1.5f, true);		
+	
+	s_gui_pop_up.layout.build_direction = GUI_Build_Direction::down_center;
+	
+	static constexpr char* t1 = "Peruuta";
+	static constexpr char* t2 = "Tallena ja jatka";
+	static constexpr char* t3 = "Jatka tallentamatta";
+	
+	v2f button_dim = GUI_Tight_Fit_Text(t3, &s_theme.font) + s_theme.padding;
+	
+	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t1))
+	{
+		s_popup_func = 0;
+	}
+	
+	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t2))
+	{
+		Serialize_Campaign(s_global_data.event_container, &s_platform);
+		s_global_data.active_menu = Menus::campaigns_menu;
+		s_popup_func = 0;
+	}
+	
+	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t3))
+	{
+		s_global_data.active_menu = Menus::campaigns_menu;
+		s_popup_func = 0;
+	}
+	
+	if(!panel_dim_set)
+	{
+		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(&s_gui_pop_up);
+		panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
+		goto BEGIN;
+	}
+	
+	GUI_End_Context(&s_gui_pop_up);
+}
+
+
+static void Do_Event_Editor_Quit_Popup()
+{
+	Dim_Entire_Screen(&s_canvas, 0.333f);
+	
+	static v2f panel_dim = v2f{0.f, 0.f};
+	
+	GUI_Begin_Context(
+		&s_gui_pop_up, 
+		&s_platform, 
+		&s_canvas, 
+		s_global_data.menu_actions, 
+		&s_theme, 
+		v2i{0, 0}, 
+		GUI_Anchor::top);
+	
+	BEGIN:
+	bool panel_dim_set = panel_dim != v2f{0.f, 0.f};
+	
+	if(panel_dim_set)
+	{
+		static GUI_Theme panel_theme = [](GUI_Theme* global_theme)
+		{ 
+			GUI_Theme result = *global_theme;
+			result.background_color = s_banner_background_color;
+			result.outline_color = global_theme->selected_color;
+			return result;
+		}(&s_theme);
+
+		s_gui_pop_up.theme = &panel_theme;
+		GUI_Do_Pannel(&s_gui_pop_up, &GUI_AUTO_MIDDLE, &panel_dim);
+		s_gui_pop_up.theme = &s_theme;
+	}
 	
 	static constexpr char* text = "Suljetaanko varmasti?";
 	GUI_Do_Text(&s_gui_pop_up, &GUI_AUTO_MIDDLE, text, {}, GUI_DEFAULT_TEXT_SCALE * 1.5f, true);		
@@ -1527,7 +1639,7 @@ static void Do_On_Exit_Pop_Up()
 	
 	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t1))
 	{
-		s_platform.Set_Flag(App_Flags::wants_to_exit, false);
+		s_popup_func = 0;
 	}
 	
 	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t2))
@@ -1539,6 +1651,150 @@ static void Do_On_Exit_Pop_Up()
 	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t3))
 	{
 		s_platform.Set_Flag(App_Flags::is_running, false);
+	}
+	
+	if(!panel_dim_set)
+	{
+		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(&s_gui_pop_up);
+		panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
+		goto BEGIN;
+	}
+	
+	GUI_End_Context(&s_gui_pop_up);
+}
+
+
+static void Do_Main_Menu_Quit_Popup()
+{
+	Dim_Entire_Screen(&s_canvas, 0.333f);
+	
+	static v2f panel_dim = v2f{0.f, 0.f};
+	
+	GUI_Begin_Context(
+		&s_gui_pop_up, 
+		&s_platform, 
+		&s_canvas, 
+		s_global_data.menu_actions, 
+		&s_theme, 
+		v2i{0, 0}, 
+		GUI_Anchor::top);
+	
+	BEGIN:
+	bool panel_dim_set = panel_dim != v2f{0.f, 0.f};
+	
+	if(panel_dim_set)
+	{
+		static GUI_Theme panel_theme = [](GUI_Theme* global_theme)
+		{ 
+			GUI_Theme result = *global_theme;
+			result.background_color = s_banner_background_color;
+			result.outline_color = global_theme->selected_color;
+			return result;
+		}(&s_theme);
+
+		s_gui_pop_up.theme = &panel_theme;
+		GUI_Do_Pannel(&s_gui_pop_up, &GUI_AUTO_MIDDLE, &panel_dim);
+		s_gui_pop_up.theme = &s_theme;
+	}
+	
+	static constexpr char* text = "Suljetaanko varmasti?";
+	GUI_Do_Text(&s_gui_pop_up, &GUI_AUTO_MIDDLE, text, {}, GUI_DEFAULT_TEXT_SCALE * 1.5f, true);		
+	
+	s_gui_pop_up.layout.build_direction = GUI_Build_Direction::down_center;
+	
+	static constexpr char* t1 = "Peruuta ja jatka";
+	static constexpr char* t2 = "Sulje";
+	
+	v2f button_dim = GUI_Tight_Fit_Text(t1, &s_theme.font) + s_theme.padding;
+	
+	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t1))
+	{
+		s_popup_func = 0;
+	}
+	
+	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t2))
+	{
+		s_platform.Set_Flag(App_Flags::is_running, false);
+	}
+	
+	if(!panel_dim_set)
+	{
+		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(&s_gui_pop_up);
+		panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
+		goto BEGIN;
+	}
+	
+	GUI_End_Context(&s_gui_pop_up);
+}
+
+
+static void Do_Main_Menu_Name_New_Campaign_Popup()
+{
+	Dim_Entire_Screen(&s_canvas, 0.333f);
+	
+	static v2f panel_dim = v2f{0.f, 0.f};
+	
+	GUI_Begin_Context(
+		&s_gui_pop_up, 
+		&s_platform, 
+		&s_canvas, 
+		s_global_data.menu_actions, 
+		&s_theme, 
+		v2i{0, 0}, 
+		GUI_Anchor::top);
+	
+	BEGIN:
+	bool panel_dim_set = panel_dim != v2f{0.f, 0.f};
+	
+	if(panel_dim_set)
+	{
+		static GUI_Theme panel_theme = [](GUI_Theme* global_theme)
+		{ 
+			GUI_Theme result = *global_theme;
+			result.background_color = s_banner_background_color;
+			result.outline_color = global_theme->selected_color;
+			return result;
+		}(&s_theme);
+
+		s_gui_pop_up.theme = &panel_theme;
+		GUI_Do_Pannel(&s_gui_pop_up, &GUI_AUTO_MIDDLE, &panel_dim);
+		s_gui_pop_up.theme = &s_theme;
+	}
+	
+	static constexpr char* text = "Nime\xE4 uusi kampanja:";
+	GUI_Do_Text(&s_gui_pop_up, &GUI_AUTO_MIDDLE, text, {}, GUI_DEFAULT_TEXT_SCALE * 1.5f, true);		
+	
+	bool force_create = GUI_Do_SL_Input_Field(&s_gui_pop_up, AUTO, AUTO, &s_global_data.new_campaign_name);
+	
+	v2f last_element_dim = s_gui_pop_up.layout.last_element.dim;
+	last_element_dim.x -= s_gui_pop_up.theme->padding;
+	last_element_dim.x *= 0.5f;
+	
+	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &last_element_dim, "Luo") || force_create)
+	{
+		s_global_data.active_menu = Menus::all_events;
+		Init_Event_Container_Takes_Name_Ownership(
+			&s_global_data.event_container, 
+			&s_allocator, 
+			&s_global_data.new_campaign_name);
+		
+		Serialize_Campaign(s_global_data.event_container, &s_platform);
+		
+		s_popup_func = 0;
+	}
+	
+	s_gui_pop_up.layout.build_direction = GUI_Build_Direction::right_center;
+	
+	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &last_element_dim, "Peruuta"))
+	{
+		s_popup_func = 0;
+	}
+	
+	if(!panel_dim_set)
+	{
+		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(&s_gui_pop_up);
+		panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
+		goto BEGIN;
 	}
 	
 	GUI_End_Context(&s_gui_pop_up);
@@ -1559,7 +1815,9 @@ static void Do_Main_Menu_Frame()
 		&s_platform, 
 		&s_canvas, 
 		(Action*)s_global_data.menu_actions, 
-		&s_theme);
+		&s_theme,
+		v2i{0, 0},
+		GUI_Anchor::top);
 	
 	f32 title_scale = 7.f;
 	GUI_Do_Text(
@@ -1630,11 +1888,40 @@ static void Do_Main_Menu_Frame()
 
 static void Run_Active_Menu(bool quit_app_pop_up)
 {
+	Menus current_menu = s_global_data.active_menu;
+	
 	Action* actions = s_global_data.menu_actions;
 	
 	Update_Actions(&s_platform, actions, GUI_Menu_Actions::COUNT);
 	
 	if(quit_app_pop_up)
+	{
+		s_platform.Set_Flag(App_Flags::wants_to_exit, false);
+		
+		switch(current_menu)
+		{
+			case Menus::event_editor_participants:
+			case Menus::event_editor_text:
+			case Menus::event_editor_consequences:
+			case Menus::all_events:
+			{
+				Set_Popup_Function(Do_Event_Editor_Quit_Popup);
+			}break;
+			
+			case Menus::main_menu:
+			case Menus::campaigns_menu:
+			{	
+				Set_Popup_Function(Do_Main_Menu_Quit_Popup);
+			}break;
+			
+			default:
+			{
+				s_platform.Set_Flag(App_Flags::is_running, false);
+			}
+		}
+	}
+	
+	if(s_popup_func)
 	{
 		s_gui.flags 		|= GUI_Context_Flags::hard_ignore_selection;
 		s_gui_banner.flags 	|= GUI_Context_Flags::hard_ignore_selection;
@@ -1647,9 +1934,6 @@ static void Run_Active_Menu(bool quit_app_pop_up)
 		Inverse_Bit_Mask(&s_gui.flags, GUI_Context_Flags::hard_ignore_selection);
 		Inverse_Bit_Mask(&s_gui_banner.flags, GUI_Context_Flags::hard_ignore_selection);
 	}
-	
-	Menus current_menu = s_global_data.active_menu;
-	
 	
 	switch(current_menu)
 	{
@@ -1700,16 +1984,18 @@ static void Run_Active_Menu(bool quit_app_pop_up)
 			Terminate;
 	}
 	
+	if(s_popup_func)
+	{
+		for(Action* action = actions; action < actions + GUI_Menu_Actions::COUNT; ++action)
+			action->disabled = false;
+		
+		s_popup_func();
+	}
 	
 	if(s_global_data.active_menu != current_menu)
 	{
 		GUI_Reset_Context(&s_gui);
 		GUI_Reset_Context(&s_gui_banner);
-		
-		u32 f = GUI_Context_Flags::soft_ignore_selection | GUI_Context_Flags::enable_dynamic_sliders; 
-	
-		s_gui.flags |= f;
-		s_gui_banner.flags |= GUI_Context_Flags::enable_dynamic_sliders;
 		
 		GUI_Context::active_context_id = s_gui_banner._context_id;
 		
@@ -1733,10 +2019,10 @@ static void Run_Active_Menu(bool quit_app_pop_up)
 		// -- Initialization on entering a menu.
 		switch(s_global_data.active_menu)
 		{
-			Delete_All_Events(&s_global_data.event_container, &s_allocator);
-			
 			case Menus::campaigns_menu:
-			{	
+			{
+				Delete_All_Events(&s_global_data.event_container, &s_allocator);
+				
 				s_global_data.on_disk_campaign_names = s_platform.Search_Directory_For_Maching_Names(
 					campaign_folder_wildcard_path, 
 					&s_allocator);
@@ -1758,14 +2044,11 @@ static void Run_Active_Menu(bool quit_app_pop_up)
 					}
 				}
 			}break;
+			
+			case Menus::main_menu:
+			{
+				GUI_Context::active_context_id = s_gui._context_id;
+			}break;
 		}
-	}
-	
-	if(quit_app_pop_up)
-	{
-		for(Action* action = actions; action < actions + GUI_Menu_Actions::COUNT; ++action)
-			action->disabled = false;
-		
-		Do_On_Exit_Pop_Up();
 	}
 }

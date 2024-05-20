@@ -250,6 +250,18 @@ static void Init_Event_Consequense(
 }
 
 
+static void Init_Event_Container_Takes_Name_Ownership(
+	Events_Container* ec, 
+	Allocator_Shell* allocator, 
+	String* name)
+{
+	ec->campaign_name = *name;
+	ec->events = Create_Dynamic_Array<Event_State>(allocator, 12);
+	
+	*name = {};
+}
+
+
 static String Generate_Unique_Name(Event_State* events, u32 event_count, Allocator_Shell* allocator)
 {
 	char* def_name = "Uusi tapahtuma";
