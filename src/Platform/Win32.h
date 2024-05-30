@@ -198,5 +198,6 @@ static constexpr i32 s_keycode_map[(u64)Key_Code::COUNT] =
 	VK_INSERT,
 	VK_DELETE,
 	VK_BACK,
-	VK_RETURN
+	VK_RETURN,
+	VK_TAB
 };

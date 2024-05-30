@@ -92,6 +92,7 @@ enum class Key_Code
 	DEL,
 	BACK,
 	ENTER,
+	TAB,
 	COUNT
 };
 
