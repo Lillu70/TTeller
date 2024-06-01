@@ -81,7 +81,9 @@ static void Copy_String(String* dest, String* src)
 	dest->alloc = src->alloc;
 	
 	String_Init_Alloc(dest, src->capacity);
-	Mem_Copy(dest->buffer, src->buffer, src->lenght);
+	
+	if(src->lenght)
+		Mem_Copy(dest->buffer, src->buffer, src->lenght);
 }
 
 

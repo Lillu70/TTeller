@@ -226,14 +226,13 @@ static const char* s_button_names[]
 
 struct Button_State
 {
+	bool current = 0;
+	bool previous = 0;
 
-	inline bool Is_Down() { return m_curr; }
-	inline bool Is_Up() { return !m_curr; }
-	inline bool Is_Pressed() { return !m_prev && m_curr; }
-	inline bool Is_Released() { return m_prev && !m_curr; }
-	
-	bool m_curr = 0;
-	bool m_prev = 0;
+	inline bool Is_Down() { return current; }
+	inline bool Is_Up() { return !current; }
+	inline bool Is_Pressed() { return !previous && current; }
+	inline bool Is_Released() { return previous && !current; }
 };
 
 struct Controller_State

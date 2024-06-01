@@ -105,7 +105,7 @@ static inline v2f Trunc(v2f v)
 
 
 // Rounds to the nearest whole number towards positive infinity.
-static inline f32 Ceil(f32 value)
+static inline constexpr f32 Ceil(f32 value)
 {
 	f32 result = f32((i32)value);
 	if(result < value)

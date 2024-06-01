@@ -18,6 +18,7 @@ static void(*s_popup_func)() = 0;
 
 static void Do_Main_Menu_Name_New_Campaign_Popup();
 static void Do_Event_Editor_On_Exit_Popup();
+static void Do_Event_Editor_Delete_Event_Popup();
 
 
 // TODO: Figure out where to put these enums
@@ -27,6 +28,7 @@ namespace Global_Hotkeys
 	{
 		toggle_fullscreen = 0,
 		open_quit_popup,
+		COUNT
 	};
 }
 
@@ -34,15 +36,18 @@ namespace Editor_Hotkeys
 {
 	enum T : u32
 	{
-		active_pannel_toggle = Global_Hotkeys::open_quit_popup + 1,
+		active_pannel_toggle = Global_Hotkeys::COUNT,
 		save,
 		jump_to_all_events,
 		jump_to_participants,
 		jump_to_event_text,
-		jump_to_consequences
+		jump_to_consequences,
+		jump_right,
+		jump_left,
+		COUNT
 	};
 }
-static constexpr u32 s_hotkey_count = Editor_Hotkeys::jump_to_consequences + 1;
+static constexpr u32 s_hotkey_count = Editor_Hotkeys::COUNT;
 static Action s_hotkeys[s_hotkey_count] = {};
 // ----------------------------------------- 
 
@@ -50,40 +55,38 @@ enum class Menus : u32
 {
 	main_menu = 0,
 	campaigns_menu,
-	event_editor
+	
+	EVENT_EDITOR_BEGIN,
+		EE_all_events,
+		EE_participants,
+		EE_text,
+		EE_consequences,
+	EVENT_EDITOR_END,
 };
-
-
-enum class Event_Editor_Menus : u32
-{
-	all_events = 0,
-	participants,
-	text,
-	consequences
-};
-
 
 struct Global_Data
 {
-	Action menu_actions[GUI_Menu_Actions::COUNT] = {};
+	Action_Context action_context = Action_Context();
 	
 	Menus active_menu = Menus::main_menu;
-	Event_Editor_Menus active_editor_menu = Event_Editor_Menus::all_events;
 	
 	Events_Container event_container;
 	
 	u32 active_event_index = 0;
+	u32 event_idx_to_delete = 0;
 	
 	String new_campaign_name;
 	Dynamic_Array<String>* on_disk_campaign_names = 0;
+	
+	bool force_quit_popup = false;
 };
 static Global_Data s_global_data = Global_Data();
 
 
-static inline void Close_Pupup()
+static inline void Close_Popup()
 {
 	s_popup_func = 0;
-	GUI_Context::active_context_id = s_gui._context_id;
+	GUI_Activate_Context(&s_gui_banner);
 }
 
 
@@ -109,7 +112,7 @@ static inline v2f Get_Title_Bar_Row_Placement(
 static inline void Set_Popup_Function(void(*popup_function)())
 {
 	GUI_Reset_Context(&s_gui_pop_up);
-	GUI_Context::active_context_id = s_gui_pop_up._context_id;
+	GUI_Activate_Context(&s_gui_pop_up);
 	s_popup_func = popup_function;
 }
 
@@ -121,26 +124,30 @@ static inline void Init_GUI()
 	
 	// globals:
 	Action* htkeys = s_hotkeys;
-	htkeys[Global_Hotkeys::toggle_fullscreen]/*---*/= Make_Action(Key_Code::F11, Button::NONE);
-	htkeys[Global_Hotkeys::open_quit_popup]/*-----*/= Make_Action(Key_Code::ESC, Button::NONE);
+	htkeys[Global_Hotkeys::toggle_fullscreen]/*---*/= Make_Action(Key_Code::F11, Button::START);
+	htkeys[Global_Hotkeys::open_quit_popup]/*-----*/= Make_Action(Key_Code::ESC, Button::BUT_Y);
 	
 	// editor:
-	htkeys[Editor_Hotkeys::active_pannel_toggle]/**/= Make_Action(Key_Code::TAB, Button::NONE);
+	htkeys[Editor_Hotkeys::active_pannel_toggle]/**/= Make_Action(Key_Code::TAB, Button::BUT_X);
 	htkeys[Editor_Hotkeys::jump_to_all_events]/*--*/= Make_Action(Key_Code::F1,  Button::NONE);
 	htkeys[Editor_Hotkeys::jump_to_participants]/**/= Make_Action(Key_Code::F2,  Button::NONE);
 	htkeys[Editor_Hotkeys::jump_to_event_text]/*--*/= Make_Action(Key_Code::F3,  Button::NONE);
 	htkeys[Editor_Hotkeys::jump_to_consequences]/**/= Make_Action(Key_Code::F4,  Button::NONE);
-	htkeys[Editor_Hotkeys::save]/*----------------*/= Make_Action(Key_Code::F5,  Button::NONE);
+	htkeys[Editor_Hotkeys::save]/*----------------*/= Make_Action(Key_Code::F5,  Button::L_THUMB);
+	htkeys[Editor_Hotkeys::jump_left]/*************/= Make_Action(Key_Code::F6,  Button::L_SHLD);
+	htkeys[Editor_Hotkeys::jump_right]/*----------*/= Make_Action(Key_Code::F7,  Button::R_SHLD);
 	// ------------
 	
-	
+	GUI_Context::platform = &s_platform;
 	s_gui = GUI_Create_Context();
 	s_gui_banner = GUI_Create_Context();
 	s_gui_pop_up = GUI_Create_Context();
 	
+	GUI_Activate_Context(&s_gui_banner);
+	
 	s_gui_pop_up.flags |= GUI_Context_Flags::enable_dynamic_sliders;
 	
-	GUI_Set_Default_Menu_Actions(&s_global_data.menu_actions[0]);
+	GUI_Set_Default_Menu_Actions();
 
 	GUI_DEFAULT_TEXT_SCALE = v2f{2, 2};
 	
@@ -248,25 +255,37 @@ void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
 
 Do_GUI_Frame_With_Banner(banner_func, menu_func);
 */
+static constexpr u32 DEFAULT_BANNER_HEIGHT = 200;
 static void Do_GUI_Frame_With_Banner(
 	void(*banner_func)(GUI_Context*), 
 	void(*menu_func)(GUI_Context*), 
-	u32 banner_height = 200)
+	u32 banner_height = DEFAULT_BANNER_HEIGHT,
+	bool enable_default_active_menu_hotkey_behavior = true)
 {
 	Assert(banner_height);
 	Assert(banner_func);
 	Assert(menu_func);
 	
-	if(s_hotkeys[Editor_Hotkeys::active_pannel_toggle].Is_Released())
+	if(enable_default_active_menu_hotkey_behavior)
 	{
-		if(GUI_Context::active_context_id == s_gui._context_id)
-			GUI_Context::active_context_id = s_gui_banner._context_id;
+		if(s_hotkeys[Editor_Hotkeys::active_pannel_toggle].Is_Released())
+		{
+			if(GUI_Is_Context_Active(&s_gui) && s_gui_banner.widget_count)
+				GUI_Activate_Context(&s_gui_banner);
+			
+			else if(GUI_Is_Context_Active(&s_gui_banner)  && s_gui.widget_count)
+				GUI_Activate_Context(&s_gui);
+		}
 		
-		else if(GUI_Context::active_context_id == s_gui_banner._context_id)
-			GUI_Context::active_context_id = s_gui._context_id;
+		if(GUI_Is_Context_Active(&s_gui) && s_gui.widget_count == 0 && s_gui_banner.widget_count)
+		{
+			GUI_Activate_Context(&s_gui_banner);
+		}
+		else if(GUI_Is_Context_Active(&s_gui_banner) && !s_gui_banner.widget_count && s_gui.widget_count)
+		{
+			GUI_Activate_Context(&s_gui);
+		}
 	}
-	
-	Action* actions = s_global_data.menu_actions;
 	
 	v2u banner_dim = s_canvas.dim;
 	banner_dim.y = Min(s_canvas.dim.y, banner_height);
@@ -284,7 +303,9 @@ static void Do_GUI_Frame_With_Banner(
 
 	GUI_Context* context = &s_gui_banner;
 	
-	GUI_Begin_Context(context, &s_platform, &banner_canvas, actions, &s_theme, banner_canvas_pos);
+	Action_Context* ac = &s_global_data.action_context;
+	
+	GUI_Begin_Context(context, &banner_canvas, ac, &s_theme, banner_canvas_pos);
 	{
 		banner_func(context);
 	}
@@ -304,7 +325,7 @@ static void Do_GUI_Frame_With_Banner(
 	
 	context = &s_gui;
 	
-	GUI_Begin_Context(context, &s_platform, &menu_canvas, actions, &s_theme);
+	GUI_Begin_Context(context, &menu_canvas, ac, &s_theme);
 	{
 		menu_func(context);
 	}
@@ -352,7 +373,7 @@ static void Do_Event_Editor_All_Events_Frame()
 		{
 			if(jump_into_new_event)
 			{
-				s_global_data.active_editor_menu = Event_Editor_Menus::participants;
+				s_global_data.active_menu = Menus::EE_participants;
 				s_global_data.active_event_index = s_global_data.event_container.day_event_count;			
 			}
 
@@ -392,7 +413,7 @@ static void Do_Event_Editor_All_Events_Frame()
 		{
 			if(jump_into_new_event)
 			{
-				s_global_data.active_editor_menu = Event_Editor_Menus::participants;
+				s_global_data.active_menu = Menus::EE_participants;
 				s_global_data.active_event_index = s_global_data.event_container.events->count;			
 			}
 			
@@ -423,14 +444,69 @@ static void Do_Event_Editor_All_Events_Frame()
 		{
 			Serialize_Campaign(s_global_data.event_container, &s_platform);
 		}
+		
+		if(GUI_Is_Context_Active(&s_gui_banner) &&
+			s_hotkeys[Editor_Hotkeys::active_pannel_toggle].Is_Released() && 
+			s_global_data.event_container.events->count)
+		{
+			GUI_Activate_Context(&s_gui);
+		}
 	}; // ----------------------------------------------------------------------------------------
 	
 	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
-		if(s_global_data.active_editor_menu != Event_Editor_Menus::all_events)
+		static GUI_Context gui_event_list_day = GUI_Create_Context();
+		static GUI_Context gui_event_list_night = GUI_Create_Context();
+		
+		u32 day_event_count = s_global_data.event_container.day_event_count;
+		u32 night_event_count = s_global_data.event_container.events->count - day_event_count;
+		
+		// --- Active context and hotkey ------------------------------------------------------------
 		{
-			return;
+			if(s_hotkeys[Editor_Hotkeys::active_pannel_toggle].Is_Released() &&
+				Bit_Not_Set(s_gui_banner.flags, GUI_Context_Flags::hard_ignore_selection))
+			{
+				if(GUI_Is_Context_Active(&gui_event_list_day))
+				{
+					if(night_event_count > 0)
+						GUI_Activate_Context(&gui_event_list_night);
+					else
+						GUI_Activate_Context(&s_gui_banner);
+				}
+				else if(GUI_Is_Context_Active(&gui_event_list_night))
+					GUI_Activate_Context(&s_gui_banner);
+			}
+			
+			if(!s_global_data.event_container.events->count && (
+				GUI_Is_Context_Active(&gui_event_list_day) || 
+				GUI_Is_Context_Active(&gui_event_list_night)))
+			{
+				GUI_Activate_Context(&s_gui_banner);
+			}
+			
+			else if(GUI_Is_Context_Active(&gui_event_list_day) && !day_event_count)
+			{
+				GUI_Activate_Context(&gui_event_list_night);
+			}
+			
+			else if(GUI_Is_Context_Active(&gui_event_list_night) && !night_event_count)
+			{
+				GUI_Activate_Context(&gui_event_list_day);
+			}
+
+			else if(GUI_Is_Context_Active(&s_gui))			
+			{
+				if(day_event_count == 0)
+					GUI_Activate_Context(&gui_event_list_night);
+				
+				else
+					GUI_Activate_Context(&gui_event_list_day);
+			}			
 		}
+		// ------------------------------------------------------------------------------------------
+		
+		if(s_global_data.active_menu != Menus::EE_all_events)
+			return;
 		
 		u32 border_width = 30;
 		u32 border_width_x2 = border_width * 2;
@@ -446,7 +522,6 @@ static void Do_Event_Editor_All_Events_Frame()
 		
 		f32 left_edge 
 			= day_list_text_pos.x + f32(font->char_width * day_list_text_lenght * GUI_DEFAULT_TEXT_SCALE.x);
-		
 		
 		v2f night_list_text_pos = v2f{f32(canvas_half_width) + border_width, y_text_pos};
 		u32 bounds;
@@ -475,8 +550,6 @@ static void Do_Event_Editor_All_Events_Frame()
 			Canvas event_list_day_canvas = Create_Sub_Canvas(&s_canvas, sub_dim, day_list_buffer_offset);
 			Clear_Sub_Canvas(&event_list_day_canvas, s_list_bg_color);
 			
-			static GUI_Context gui_event_list_day = GUI_Create_Context();
-			
 			Inverse_Bit_Mask(&gui_event_list_day.flags,  GUI_Context_Flags::hard_ignore_selection);
 			u32 set_mask = GUI_Context_Flags::enable_dynamic_sliders;
 			set_mask |= (context->flags &  GUI_Context_Flags::hard_ignore_selection);
@@ -484,9 +557,8 @@ static void Do_Event_Editor_All_Events_Frame()
 			
 			GUI_Begin_Context(
 				&gui_event_list_day,
-				&s_platform,
 				&event_list_day_canvas,
-				(Action*)s_global_data.menu_actions,
+				&s_global_data.action_context,
 				&s_theme,
 				day_list_buffer_offset.As<i32>());
 			{
@@ -497,19 +569,11 @@ static void Do_Event_Editor_All_Events_Frame()
 				{
 					Event_State* e = begin + i;
 					
-					GUI_Placement rcp = gui_event_list_day.layout.last_element;
-					
 					// Destroy event
 					if(GUI_Do_Button(&gui_event_list_day, pos, &GUI_AUTO_FIT, "X"))
 					{
-						pos = 0;
-						gui_event_list_day.layout.last_element = rcp;
-						
-						if(i < s_global_data.event_container.day_event_count)
-							s_global_data.event_container.day_event_count -= 1;
-						
-						Delete_Event(s_global_data.event_container.events, &s_allocator, i--);
-						continue;
+						s_global_data.event_idx_to_delete = i;
+						Set_Popup_Function(Do_Event_Editor_Delete_Event_Popup);
 					}
 					pos = 0;
 					
@@ -519,7 +583,7 @@ static void Do_Event_Editor_All_Events_Frame()
 					
 					if(GUI_Do_Button(&gui_event_list_day, AUTO, &GUI_AUTO_FIT, e->name.buffer))
 					{
-						s_global_data.active_editor_menu = Event_Editor_Menus::participants;
+						s_global_data.active_menu = Menus::EE_participants;
 						s_global_data.active_event_index = i;
 					}
 					
@@ -536,8 +600,6 @@ static void Do_Event_Editor_All_Events_Frame()
 			Canvas event_list_night_canvas = Create_Sub_Canvas(&s_canvas, sub_dim, night_list_buffer_offset);
 			Clear_Sub_Canvas(&event_list_night_canvas, s_list_bg_color);
 			
-			static GUI_Context gui_event_list_night = GUI_Create_Context();
-			
 			Inverse_Bit_Mask(&gui_event_list_night.flags,  GUI_Context_Flags::hard_ignore_selection);
 			u32 set_mask = GUI_Context_Flags::enable_dynamic_sliders;
 			set_mask |= (context->flags &  GUI_Context_Flags::hard_ignore_selection);
@@ -545,9 +607,8 @@ static void Do_Event_Editor_All_Events_Frame()
 			
 			GUI_Begin_Context(
 				&gui_event_list_night,
-				&s_platform,
 				&event_list_night_canvas,
-				(Action*)s_global_data.menu_actions,
+				&s_global_data.action_context,
 				&s_theme,
 				night_list_buffer_offset.As<i32>());
 			{
@@ -559,18 +620,11 @@ static void Do_Event_Editor_All_Events_Frame()
 				{
 					Event_State* e = begin + i;
 					
-					GUI_Placement rcp = gui_event_list_night.layout.last_element;
-					
 					// Destroy event
 					if(GUI_Do_Button(&gui_event_list_night, pos, &GUI_AUTO_FIT, "X"))
 					{
-						pos = 0;
-						gui_event_list_night.layout.last_element = rcp;
-						if(i < s_global_data.event_container.day_event_count)
-							s_global_data.event_container.day_event_count -= 1;
-						
-						Delete_Event(s_global_data.event_container.events, &s_allocator, i--);
-						continue;
+						s_global_data.event_idx_to_delete = i;
+						Set_Popup_Function(Do_Event_Editor_Delete_Event_Popup);
 					}
 					pos = 0;
 					
@@ -580,7 +634,7 @@ static void Do_Event_Editor_All_Events_Frame()
 					
 					if(GUI_Do_Button(&gui_event_list_night, AUTO, &GUI_AUTO_FIT, e->name.buffer))
 					{
-						s_global_data.active_editor_menu = Event_Editor_Menus::participants;
+						s_global_data.active_menu = Menus::EE_participants;
 						s_global_data.active_event_index = i;
 					}
 					
@@ -592,12 +646,12 @@ static void Do_Event_Editor_All_Events_Frame()
 		}
 		
 		// Solves an edge case that would otherwise leave no active context.
-		if(s_global_data.active_editor_menu != Event_Editor_Menus::all_events)
-			GUI_Context::active_context_id = s_gui_banner._context_id;
+		if(s_global_data.active_menu != Menus::EE_all_events)
+			GUI_Activate_Context(&s_gui_banner);
 		
 	}; // ----------------------------------------------------------------------------------------
 	
-	Do_GUI_Frame_With_Banner(banner_func, menu_func);
+	Do_GUI_Frame_With_Banner(banner_func, menu_func, DEFAULT_BANNER_HEIGHT, false);
 }
 
 
@@ -605,13 +659,12 @@ static void Do_Event_Editor_Participants_Frame()
 {
 	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
-		
 		v2f title_scale = v2f{4.f, 4.f};
 		Font* font = &context->theme->font;
 		v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
 		if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
 		{
-			s_global_data.active_editor_menu = Event_Editor_Menus::all_events;
+			s_global_data.active_menu = Menus::EE_all_events;
 		}
 		
 		GUI_Push_Layout(context);
@@ -668,13 +721,13 @@ static void Do_Event_Editor_Participants_Frame()
 		v2f dim = v2f{w1, title_height};
 		if(GUI_Do_Button(context, &title_row_pos, &dim, go_to_event_text_text))
 		{
-			s_global_data.active_editor_menu = Event_Editor_Menus::text;
+			s_global_data.active_menu = Menus::EE_text;
 		}
 		
 		dim = v2f{w2, title_height};
 		if(GUI_Do_Button(context, AUTO, &dim, go_to_consequences_text))
 		{
-			s_global_data.active_editor_menu = Event_Editor_Menus::consequences;
+			s_global_data.active_menu = Menus::EE_consequences;
 		}
 		
 	}; // ----------------------------------------------------------------------------------------
@@ -997,6 +1050,11 @@ static void Do_Event_Editor_Participants_Frame()
 	}; // ----------------------------------------------------------------------------------------
 	
 	Do_GUI_Frame_With_Banner(banner_func, menu_func, 160);
+	
+	if(s_hotkeys[Editor_Hotkeys::jump_right].Is_Released())
+	{
+		s_global_data.active_menu = Menus::EE_text;
+	}	
 }
 
 
@@ -1011,7 +1069,7 @@ static void Do_Event_Editor_Text_Frame()
 		v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
 		if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
 		{
-			s_global_data.active_editor_menu = Event_Editor_Menus::all_events;
+			s_global_data.active_menu = Menus::EE_all_events;
 		}
 		
 		GUI_Push_Layout(context);
@@ -1052,13 +1110,13 @@ static void Do_Event_Editor_Text_Frame()
 		v2f dim = v2f{w1, title_height};
 		if(GUI_Do_Button(context, &title_row_pos, &dim, go_to_requirements_text))
 		{
-			s_global_data.active_editor_menu = Event_Editor_Menus::participants;
+			s_global_data.active_menu = Menus::EE_participants;
 		}
 		
 		dim = v2f{w2, title_height};
 		if(GUI_Do_Button(context, AUTO, &dim, go_to_consequences_text))
 		{
-			s_global_data.active_editor_menu = Event_Editor_Menus::consequences;
+			s_global_data.active_menu = Menus::EE_consequences;
 		}
 		
 	}; // ----------------------------------------------------------------------------------------
@@ -1078,6 +1136,16 @@ static void Do_Event_Editor_Text_Frame()
 	}; // ----------------------------------------------------------------------------------------
 
 	Do_GUI_Frame_With_Banner(banner_func, menu_func);
+	
+	if(s_hotkeys[Editor_Hotkeys::jump_right].Is_Released())
+	{
+		s_global_data.active_menu = Menus::EE_consequences;
+	}
+	
+	if(s_hotkeys[Editor_Hotkeys::jump_left].Is_Released())
+	{
+		s_global_data.active_menu = Menus::EE_participants;
+	}
 }
 
 
@@ -1090,7 +1158,7 @@ static void Do_Event_Editor_Consequences_Frame()
 		v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
 		if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
 		{
-			s_global_data.active_editor_menu = Event_Editor_Menus::all_events;
+			s_global_data.active_menu = Menus::EE_all_events;
 		}
 		
 		GUI_Push_Layout(context);
@@ -1134,13 +1202,13 @@ static void Do_Event_Editor_Consequences_Frame()
 		v2f dim = v2f{w1, title_height};
 		if(GUI_Do_Button(context, &title_row_pos, &dim, go_to_requirements_text))
 		{
-			s_global_data.active_editor_menu = Event_Editor_Menus::participants;
+			s_global_data.active_menu = Menus::EE_participants;
 		}
 		
 		dim = v2f{w2, title_height};
 		if(GUI_Do_Button(context, AUTO, &dim, go_to_event_text_text))
 		{
-			s_global_data.active_editor_menu = Event_Editor_Menus::text;
+			s_global_data.active_menu = Menus::EE_text;
 		}
 		
 	}; // ----------------------------------------------------------------------------------------
@@ -1496,6 +1564,11 @@ static void Do_Event_Editor_Consequences_Frame()
 	}; // ----------------------------------------------------------------------------------------
 
 	Do_GUI_Frame_With_Banner(banner_func, menu_func, 160);
+	
+	if(s_hotkeys[Editor_Hotkeys::jump_left].Is_Released())
+	{
+		s_global_data.active_menu = Menus::EE_text;
+	}
 }
 
 
@@ -1577,8 +1650,7 @@ static void Do_Event_Editor_Campaigns_Menu_Frame()
 					if(Load_Campaign(&ec, save_name, &s_allocator, &s_platform))
 					{
 						s_global_data.event_container = ec;
-						s_global_data.active_editor_menu = Event_Editor_Menus::all_events;
-						s_global_data.active_menu = Menus::event_editor;
+						s_global_data.active_menu = Menus::EE_all_events;
 					}
 				}
 			}
@@ -1596,16 +1668,15 @@ static void Do_Event_Editor_On_Exit_Popup()
 	
 	static v2f panel_dim = v2f{0.f, 0.f};
 	
+	BEGIN:
 	GUI_Begin_Context(
 		&s_gui_pop_up, 
-		&s_platform, 
 		&s_canvas, 
-		s_global_data.menu_actions, 
+		&s_global_data.action_context, 
 		&s_theme, 
 		v2i{0, 0}, 
 		GUI_Anchor::top);
 	
-	BEGIN:
 	bool panel_dim_set = panel_dim != v2f{0.f, 0.f};
 	
 	if(panel_dim_set)
@@ -1636,26 +1707,27 @@ static void Do_Event_Editor_On_Exit_Popup()
 	
 	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t1))
 	{
-		Close_Pupup();
+		Close_Popup();
 	}
 	
 	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t2))
 	{
 		Serialize_Campaign(s_global_data.event_container, &s_platform);
 		s_global_data.active_menu = Menus::campaigns_menu;
-		Close_Pupup();
+		Close_Popup();
 	}
 	
 	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t3))
 	{
 		s_global_data.active_menu = Menus::campaigns_menu;
-		Close_Pupup();
+		Close_Popup();
 	}
 	
 	if(!panel_dim_set)
 	{
 		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(&s_gui_pop_up);
 		panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
+		GUI_End_Context(&s_gui_pop_up);
 		goto BEGIN;
 	}
 	
@@ -1669,16 +1741,15 @@ static void Do_Event_Editor_Quit_Popup()
 	
 	static v2f panel_dim = v2f{0.f, 0.f};
 	
+	BEGIN:
 	GUI_Begin_Context(
-		&s_gui_pop_up, 
-		&s_platform, 
+		&s_gui_pop_up,
 		&s_canvas, 
-		s_global_data.menu_actions, 
+		&s_global_data.action_context, 
 		&s_theme, 
 		v2i{0, 0}, 
 		GUI_Anchor::top);
 	
-	BEGIN:
 	bool panel_dim_set = panel_dim != v2f{0.f, 0.f};
 	
 	if(panel_dim_set)
@@ -1709,7 +1780,7 @@ static void Do_Event_Editor_Quit_Popup()
 	
 	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t1))
 	{
-		Close_Pupup();
+		Close_Popup();
 	}
 	
 	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t2))
@@ -1727,6 +1798,7 @@ static void Do_Event_Editor_Quit_Popup()
 	{
 		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(&s_gui_pop_up);
 		panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
+		GUI_End_Context(&s_gui_pop_up);
 		goto BEGIN;
 	}
 	
@@ -1740,16 +1812,15 @@ static void Do_Main_Menu_Quit_Popup()
 	
 	static v2f panel_dim = v2f{0.f, 0.f};
 	
+	BEGIN:
 	GUI_Begin_Context(
-		&s_gui_pop_up, 
-		&s_platform, 
+		&s_gui_pop_up,
 		&s_canvas, 
-		s_global_data.menu_actions, 
-		&s_theme, 
+		&s_global_data.action_context, 
+		&s_theme,
 		v2i{0, 0}, 
 		GUI_Anchor::top);
 	
-	BEGIN:
 	bool panel_dim_set = panel_dim != v2f{0.f, 0.f};
 	
 	if(panel_dim_set)
@@ -1779,7 +1850,7 @@ static void Do_Main_Menu_Quit_Popup()
 	
 	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t1))
 	{
-		Close_Pupup();
+		Close_Popup();
 	}
 	
 	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t2))
@@ -1791,6 +1862,75 @@ static void Do_Main_Menu_Quit_Popup()
 	{
 		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(&s_gui_pop_up);
 		panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
+		GUI_End_Context(&s_gui_pop_up);
+		goto BEGIN;
+	}
+	
+	GUI_End_Context(&s_gui_pop_up);
+}
+
+
+static void Do_Event_Editor_Delete_Event_Popup()
+{
+	Dim_Entire_Screen(&s_canvas, 0.333f);
+	
+	static v2f panel_dim = v2f{0.f, 0.f};
+	
+	BEGIN:
+	GUI_Begin_Context(
+		&s_gui_pop_up,
+		&s_canvas, 
+		&s_global_data.action_context, 
+		&s_theme, 
+		v2i{0, 0}, 
+		GUI_Anchor::top);
+	
+	bool panel_dim_set = panel_dim != v2f{0.f, 0.f};
+	
+	if(panel_dim_set)
+	{
+		static GUI_Theme panel_theme = [](GUI_Theme* global_theme)
+		{ 
+			GUI_Theme result = *global_theme;
+			result.background_color = s_banner_background_color;
+			result.outline_color = global_theme->selected_color;
+			return result;
+		}(&s_theme);
+
+		s_gui_pop_up.theme = &panel_theme;
+		GUI_Do_Pannel(&s_gui_pop_up, &GUI_AUTO_MIDDLE, &panel_dim);
+		s_gui_pop_up.theme = &s_theme;
+	}
+	
+	static constexpr char* text = "Poistetaanko varmasti?";
+	GUI_Do_Text(&s_gui_pop_up, &GUI_AUTO_MIDDLE, text, {}, GUI_DEFAULT_TEXT_SCALE * 1.5f, true);		
+	
+	s_gui_pop_up.layout.build_direction = GUI_Build_Direction::down_center;
+	
+	static constexpr char* t1 = "Peruuta";
+	static constexpr char* t2 = "Poista";
+
+	v2f button_dim = GUI_Tight_Fit_Text(t1, &s_theme.font) + s_theme.padding;
+	
+	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t1))
+	{
+		Close_Popup();
+	}
+	
+	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t2))
+	{
+		if(s_global_data.event_idx_to_delete < s_global_data.event_container.day_event_count)
+			s_global_data.event_container.day_event_count -= 1;
+		
+		Delete_Event(s_global_data.event_container.events, &s_allocator, s_global_data.event_idx_to_delete);
+		Close_Popup();
+	}
+	
+	if(!panel_dim_set)
+	{
+		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(&s_gui_pop_up);
+		panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
+		GUI_End_Context(&s_gui_pop_up);
 		goto BEGIN;
 	}
 	
@@ -1804,16 +1944,15 @@ static void Do_Main_Menu_Name_New_Campaign_Popup()
 	
 	static v2f panel_dim = v2f{0.f, 0.f};
 	
+	BEGIN:
 	GUI_Begin_Context(
-		&s_gui_pop_up, 
-		&s_platform, 
+		&s_gui_pop_up,
 		&s_canvas, 
-		s_global_data.menu_actions, 
+		&s_global_data.action_context, 
 		&s_theme, 
 		v2i{0, 0}, 
 		GUI_Anchor::top);
 	
-	BEGIN:
 	bool panel_dim_set = panel_dim != v2f{0.f, 0.f};
 	
 	if(panel_dim_set)
@@ -1842,8 +1981,7 @@ static void Do_Main_Menu_Name_New_Campaign_Popup()
 	
 	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &last_element_dim, "Luo") || force_create)
 	{
-		s_global_data.active_editor_menu = Event_Editor_Menus::all_events;
-		s_global_data.active_menu = Menus::event_editor;
+		s_global_data.active_menu = Menus::EE_all_events;
 		Init_Event_Container_Takes_Name_Ownership(
 			&s_global_data.event_container, 
 			&s_allocator, 
@@ -1851,20 +1989,21 @@ static void Do_Main_Menu_Name_New_Campaign_Popup()
 		
 		Serialize_Campaign(s_global_data.event_container, &s_platform);
 		
-		Close_Pupup();
+		Close_Popup();
 	}
 	
 	s_gui_pop_up.layout.build_direction = GUI_Build_Direction::right_center;
 	
 	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &last_element_dim, "Peruuta"))
 	{
-		Close_Pupup();
+		Close_Popup();
 	}
 	
 	if(!panel_dim_set)
 	{
 		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(&s_gui_pop_up);
 		panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
+		GUI_End_Context(&s_gui_pop_up);
 		goto BEGIN;
 	}
 	
@@ -1880,12 +2019,11 @@ static void Do_Main_Menu_Frame()
 	
 	GUI_DEFAULT_TEXT_SCALE = v2f{3, 3};
 	
-	GUI_Context* context = &s_gui;
+	GUI_Context* context = &s_gui_banner;
 	GUI_Begin_Context(
-		context, 
-		&s_platform, 
+		context,
 		&s_canvas, 
-		(Action*)s_global_data.menu_actions, 
+		&s_global_data.action_context, 
 		&s_theme,
 		v2i{0, 0},
 		GUI_Anchor::top);
@@ -1911,6 +2049,7 @@ static void Do_Main_Menu_Frame()
 		"Lataa Peli",
 		"Avaa editori",
 		"Asetukset",
+		"Sulje"
 	};
 
 	v2f dim = GUI_Tight_Fit_Multi_Line_Text(
@@ -1951,35 +2090,41 @@ static void Do_Main_Menu_Frame()
 		
 	}
 	
+	// Close 
+	if(GUI_Do_Button(context, AUTO, AUTO, button_texts[i++]))
+	{
+		s_global_data.force_quit_popup = true;
+	}
+	
 	GUI_End_Context(context);
 	
 	GUI_DEFAULT_TEXT_SCALE = def_text_scale;
 }
 
 
-static void Run_Active_Menu(bool quit_app_pop_up)
+static void Run_Active_Menu(u32 app_flags)
 {
+	bool app_wants_to_exit = Is_Flag_Set(app_flags, (u32)App_Flags::wants_to_exit);
+	
 	Menus current_menu = s_global_data.active_menu;
 	
-	Update_Actions(&s_platform, s_hotkeys, s_hotkey_count);
-	if(s_hotkeys[Global_Hotkeys::toggle_fullscreen].Is_Released())
+	Update_Actions(&s_platform, s_hotkeys, s_hotkey_count, &s_global_data.action_context);
+	
+	if(s_hotkeys[Global_Hotkeys::toggle_fullscreen].Is_Pressed())
 	{
-		u32 app_flags = s_platform.Get_Flags();
 		bool fullsceen = Is_Flag_Set(app_flags, (u32)App_Flags::is_fullscreen) > 0;
 		s_platform.Set_Flag(App_Flags::is_fullscreen, !fullsceen);
 	}
 	
-	if(quit_app_pop_up || s_hotkeys[Global_Hotkeys::open_quit_popup].Is_Released())
+	if(app_wants_to_exit ||
+		s_global_data.force_quit_popup || 
+		s_hotkeys[Global_Hotkeys::open_quit_popup].Is_Pressed())
 	{
+		s_global_data.force_quit_popup = false;
 		s_platform.Set_Flag(App_Flags::wants_to_exit, false);
 		
 		switch(current_menu)
 		{
-			case Menus::event_editor:
-			{
-				Set_Popup_Function(Do_Event_Editor_Quit_Popup);
-			}break;
-			
 			case Menus::main_menu:
 			case Menus::campaigns_menu:
 			{	
@@ -1988,26 +2133,31 @@ static void Run_Active_Menu(bool quit_app_pop_up)
 			
 			default:
 			{
-				s_platform.Set_Flag(App_Flags::is_running, false);
+				if(u32(current_menu) > u32(Menus::EVENT_EDITOR_BEGIN) && 
+					u32(current_menu) < u32(Menus::EVENT_EDITOR_END))
+				{
+					Set_Popup_Function(Do_Event_Editor_Quit_Popup);
+				}
+				else
+				{
+					s_platform.Set_Flag(App_Flags::is_running, false);					
+				}
 			}
 		}
 	}
 	
-	Action* actions = s_global_data.menu_actions;
-	Update_Actions(&s_platform, actions, GUI_Menu_Actions::COUNT);
 	if(s_popup_func)
 	{
-		s_gui.flags 		|= GUI_Context_Flags::hard_ignore_selection;
-		s_gui_banner.flags 	|= GUI_Context_Flags::hard_ignore_selection;
-		
-		for(Action* action = actions; action < actions + GUI_Menu_Actions::COUNT; ++action)
-			action->disabled = true;
+		s_gui.flags |= GUI_Context_Flags::hard_ignore_selection;
+		s_gui_banner.flags |= GUI_Context_Flags::hard_ignore_selection;
 	}
 	else
 	{
 		Inverse_Bit_Mask(&s_gui.flags, GUI_Context_Flags::hard_ignore_selection);
 		Inverse_Bit_Mask(&s_gui_banner.flags, GUI_Context_Flags::hard_ignore_selection);
 	}
+	
+	GUI_Update_Actions();
 	
 	switch(current_menu)
 	{		
@@ -2021,73 +2171,69 @@ static void Run_Active_Menu(bool quit_app_pop_up)
 			Do_Event_Editor_Campaigns_Menu_Frame();
 		}break;
 		
-		case Menus::event_editor:
+		case Menus::EE_all_events:
 		{
-			if(s_global_data.active_editor_menu != Event_Editor_Menus::all_events)
-			{
-				if(s_hotkeys[Editor_Hotkeys::jump_to_participants].Is_Released())
-				{
-					s_global_data.active_editor_menu = Event_Editor_Menus::participants;
-				}
-				
-				if(s_hotkeys[Editor_Hotkeys::jump_to_event_text].Is_Released())
-				{
-					s_global_data.active_editor_menu = Event_Editor_Menus::text;
-				}
-				
-				if(s_hotkeys[Editor_Hotkeys::jump_to_consequences].Is_Released())
-				{
-					s_global_data.active_editor_menu = Event_Editor_Menus::consequences;
-				}
-				
-				if(s_hotkeys[Editor_Hotkeys::jump_to_all_events].Is_Released())
-				{
-					s_global_data.active_editor_menu = Event_Editor_Menus::all_events;
-				}
-			}
-			
-			if(s_hotkeys[Editor_Hotkeys::save].Is_Released())
-			{
-				Serialize_Campaign(s_global_data.event_container, &s_platform);
-			}
-			
-			switch(s_global_data.active_editor_menu)
-			{
-				case Event_Editor_Menus::all_events:
-				{
-					Do_Event_Editor_All_Events_Frame();
-				}break;
-				
-				case Event_Editor_Menus::participants:
-				{
-					Do_Event_Editor_Participants_Frame();
-				}break;
-				
-				case Event_Editor_Menus::text:
-				{
-					Do_Event_Editor_Text_Frame();
-				}break;
-				
-				case Event_Editor_Menus::consequences:
-				{
-					Do_Event_Editor_Consequences_Frame();
-				}break;
-			}
-			
+			Do_Event_Editor_All_Events_Frame();
+		}break;
+		
+		case Menus::EE_participants:
+		{
+			Do_Event_Editor_Participants_Frame();
+		}break;
+		
+		case Menus::EE_text:
+		{
+			Do_Event_Editor_Text_Frame();
+		}break;
+		
+		case Menus::EE_consequences:
+		{
+			Do_Event_Editor_Consequences_Frame();
 		}break;
 		
 		default:
 		{
-			Terminate;
+			Assert(false);
 		}
 	}
 	
 	if(s_popup_func)
 	{
-		for(Action* action = actions; action < actions + GUI_Menu_Actions::COUNT; ++action)
-			action->disabled = false;
-		
 		s_popup_func();
+	}
+	else	
+	{
+		if(u32(current_menu) > u32(Menus::EVENT_EDITOR_BEGIN) &&
+			u32(current_menu) < u32(Menus::EVENT_EDITOR_END))
+		{
+			if(s_hotkeys[Editor_Hotkeys::save].Is_Released())
+			{
+				Serialize_Campaign(s_global_data.event_container, &s_platform);
+			}
+			
+			if(s_global_data.active_menu != Menus::EE_all_events)
+			{
+				if(s_hotkeys[Editor_Hotkeys::jump_to_participants].Is_Released())
+				{
+					s_global_data.active_menu = Menus::EE_participants;
+				}
+				
+				if(s_hotkeys[Editor_Hotkeys::jump_to_event_text].Is_Released())
+				{
+					s_global_data.active_menu = Menus::EE_text;
+				}
+				
+				if(s_hotkeys[Editor_Hotkeys::jump_to_consequences].Is_Released())
+				{
+					s_global_data.active_menu = Menus::EE_consequences;
+				}
+				
+				if(s_hotkeys[Editor_Hotkeys::jump_to_all_events].Is_Released())
+				{
+					s_global_data.active_menu = Menus::EE_all_events;
+				}
+			}
+		}	
 	}
 	
 	// TODO: sub menu context reseting!
@@ -2096,7 +2242,7 @@ static void Run_Active_Menu(bool quit_app_pop_up)
 		GUI_Reset_Context(&s_gui);
 		GUI_Reset_Context(&s_gui_banner);
 		
-		GUI_Context::active_context_id = s_gui_banner._context_id;
+		GUI_Activate_Context(&s_gui_banner);
 		
 		// -- Cleanup on exiting a menu.
 		switch(current_menu)
@@ -2142,11 +2288,7 @@ static void Run_Active_Menu(bool quit_app_pop_up)
 						}
 					}
 				}
-			}break;
-			
-			case Menus::main_menu:
-			{
-				GUI_Context::active_context_id = s_gui._context_id;
+				
 			}break;
 		}
 	}

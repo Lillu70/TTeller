@@ -93,17 +93,15 @@ static inline void GUI_Pop_Layout(GUI_Context* context)
 }
 
 
-static inline void GUI_Set_Default_Menu_Actions(Action* actions)
+static inline void GUI_Set_Default_Menu_Actions()
 {
-	Assert(actions);
-	
-	*(actions + GUI_Menu_Actions::mouse) 	= Make_Action(Key_Code::MOUSE_LEFT, Button::NONE);
-	*(actions + GUI_Menu_Actions::up) 		= Make_Action(Key_Code::UP, Button::DPAD_UP);
-	*(actions + GUI_Menu_Actions::down) 	= Make_Action(Key_Code::DOWN, Button::DPAD_DOWN);
-	*(actions + GUI_Menu_Actions::left) 	= Make_Action(Key_Code::LEFT, Button::DPAD_LEFT);
-	*(actions + GUI_Menu_Actions::right) 	= Make_Action(Key_Code::RIGHT, Button::DPAD_RIGHT);
-	*(actions + GUI_Menu_Actions::enter) 	= Make_Action(Key_Code::ENTER, Button::BUT_A);
-	*(actions + GUI_Menu_Actions::back) 	= Make_Action(Key_Code::ESC, Button::BUT_X);
+	GUI_Context::actions[GUI_Menu_Actions::mouse]/**/= Make_Action(Key_Code::MOUSE_LEFT, Button::NONE);
+	GUI_Context::actions[GUI_Menu_Actions::up]/*****/= Make_Action(Key_Code::UP, Button::DPAD_UP);
+	GUI_Context::actions[GUI_Menu_Actions::down]/***/= Make_Action(Key_Code::DOWN, Button::DPAD_DOWN);
+	GUI_Context::actions[GUI_Menu_Actions::left]/***/= Make_Action(Key_Code::LEFT, Button::DPAD_LEFT);
+	GUI_Context::actions[GUI_Menu_Actions::right]/**/= Make_Action(Key_Code::RIGHT, Button::DPAD_RIGHT);
+	GUI_Context::actions[GUI_Menu_Actions::enter]/**/= Make_Action(Key_Code::ENTER, Button::BUT_A);
+	GUI_Context::actions[GUI_Menu_Actions::back]/***/= Make_Action(Key_Code::ESC, Button::BUT_Y);
 }
 
 
@@ -535,11 +533,38 @@ static inline void GUI_Reset_Context(GUI_Context* context)
 }
 
 
+static inline void GUI_Update_Actions()
+{
+	Assert(GUI_Context::platform);
+	
+	Update_Actions(
+		GUI_Context::platform, 
+		GUI_Context::actions, 
+		Array_Lenght(GUI_Context::actions), 
+		&GUI_Context::action_context);
+}
+
+
+static inline void GUI_Activate_Context(GUI_Context* context)
+{
+	Assert(context->_context_id);
+	GUI_Context::active_context_id = context->_context_id;
+}
+
+
+static inline bool GUI_Is_Context_Active(GUI_Context* context)
+{
+	Assert(context->_context_id);
+	bool result = GUI_Context::active_context_id == context->_context_id;
+	
+	return result;
+}
+
+
 static inline void GUI_Begin_Context(
 	GUI_Context* context,
-	Platform_Calltable* platform,
 	Canvas* canvas,
-	Action* actions,
+	Action_Context* external_action_context,
 	GUI_Theme* theme,
 	v2i canvas_pos = v2i{0, 0},
 	GUI_Anchor anchor = GUI_Anchor::top_left,
@@ -548,21 +573,20 @@ static inline void GUI_Begin_Context(
 {
 	Assert(canvas);
 	Assert(theme);
-	Assert(context->widget_count == 0);
 	Assert(!GUI_Is_Context_Ready(context));
-	Assert(platform);
-	Assert(actions);
+	Assert(external_action_context);
 	Assert(context->_context_id);
+	Assert(context->platform);
 	
 	context->layout = {};
 	
-	context->actions = actions;
-	context->platform = platform;
 	context->canvas = canvas;
 	context->theme = theme;
+	context->external_action_context = external_action_context;
 	
 	context->layout.build_direction = build_direction;
 	context->layout.anchor = anchor;
+	context->widget_count = 0;
 	
 	context->canvas_pos = canvas_pos;
 	context->layout.last_element.pos = context->anchor_base;
@@ -592,13 +616,13 @@ static inline void GUI_Begin_Context(
 		}
 		else if(Bit_Not_Set(context->flags, GUI_Make_Ignore_Selection_Mask()))
 		{
-			if(actions[GUI_Menu_Actions::up].Is_Pressed())
+			if(context->actions[GUI_Menu_Actions::up].Is_Pressed())
 			{
 				context->selected_index += -1 * ld;
 				GUI_Reset_Selection_State(context);
 			}
 			
-			if(actions[GUI_Menu_Actions::down].Is_Pressed())
+			if(context->actions[GUI_Menu_Actions::down].Is_Pressed())
 			{
 				context->selected_index += 1 * ld;
 				GUI_Reset_Selection_State(context);
@@ -1070,8 +1094,6 @@ static inline void GUI_End_Context(GUI_Context* context)
 			GUI_Context_Flags::maxout_vertical_slider;
 		
 		Inverse_Bit_Mask(&context->flags, reset_mask);
-		context->widget_count = 0;
-		context->canvas = 0;
 	}
 }
 
@@ -2255,6 +2277,8 @@ static bool GUI_Do_SL_Input_Field(
 		
 		if(state->is_active)
 		{
+			context->external_action_context->disable_for_one_frame = true;
+			
 			if(context->actions[GUI_Menu_Actions::back].Is_Pressed() || 
 				(!cursor_on_selection && mouse_pressed_down))
 			{
@@ -2688,6 +2712,8 @@ static void GUI_Do_ML_Input_Field(
 		
 		if(state->is_active)
 		{
+			context->external_action_context->disable_for_one_frame = true;
+			
 			// Handle input
 			bool mouse_pressed_down = context->actions[GUI_Menu_Actions::mouse].Is_Pressed();
 			bool mouse_is_down = context->actions[GUI_Menu_Actions::mouse].Is_Down();

@@ -48,16 +48,7 @@ void Update_App(f64 delta_time, bool* update_surface)
 	if(!s_canvas.buffer)
 		return;
 	 
-	bool wants_to_exit = Is_Flag_Set(app_flags, (u32)App_Flags::wants_to_exit);
-	
-	#if 0
-	
-	if(wants_to_exit)
-		s_platform.Set_Flag(App_Flags::is_running, false);
-
-	#endif
-
-	Run_Active_Menu(wants_to_exit);
+	Run_Active_Menu(app_flags);
 	
 	End_Timing_Block(internal_run_time);
 }

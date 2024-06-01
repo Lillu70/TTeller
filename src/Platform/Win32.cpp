@@ -11,11 +11,6 @@ typedef DWORD WINAPI x_input_get_state(DWORD dwUserIndex, XINPUT_STATE* state);
 static x_input_get_state* XInputGetState_;
 #define XInputGetState XInputGetState_
 
-typedef DWORD WINAPI x_input_set_state(DWORD dwUserIndex, XINPUT_VIBRATION* vibrarion);
-static x_input_set_state* XInputSetState_;
-#define XInputSetState XInputSetState_
-
-
 struct Window_Create_Info
 {
 	u32 window_width = 620 * 2; 
@@ -206,6 +201,17 @@ static void Win32_Init(
 		window_pos_y, 
 		window_title
 	};
+	
+	
+	// Try to load XInput
+	{ 
+		HMODULE XInput_lib;
+		if ((XInput_lib = LoadLibraryA("xinput1_4.dll")) || (XInput_lib = LoadLibraryA("xinput1_3.dll")))
+		{
+			XInputGetState = (x_input_get_state*)GetProcAddress(XInput_lib, "XInputGetState");
+		}
+	}
+	
 	
 	//Init time counters
 	{

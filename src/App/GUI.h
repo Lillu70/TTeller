@@ -226,13 +226,6 @@ struct GUI_Placement
 };
 
 
-struct GUI_Layout_Recovery_Point
-{
-	v2f last_element_pos;
-	v2f last_element_dim;
-};
-
-
 struct GUI_Layout
 {
 	GUI_Placement last_element;
@@ -244,16 +237,22 @@ struct GUI_Layout
 
 struct GUI_Context
 {
+	// Globals
+	static inline u32 active_context_id = 0;
+	static inline Action actions[GUI_Menu_Actions::COUNT];
+	static inline Action_Context action_context;
+	static inline Platform_Calltable* platform = 0;
+	// -------
+	
 	Canvas* canvas = 0;
-	Platform_Calltable* platform = 0;
-	Action* actions;
+	Action_Context* external_action_context;
 	Rect bounds_rel_anchor_base = {};
 	GUI_Theme* theme;
 	
 	u32 _context_id = 0;
 	u32 flags = 0;
 	i32 selected_index = 0;
-	i32 widget_count = 0; 
+	i32 widget_count = 0; // NOTE: Amount of selectable elements.
 	u32 selected_id = 0;
 	f32 dynamic_slider_girth = 15.f;
 	
@@ -277,8 +276,6 @@ struct GUI_Context
 	GUI_Defered_Render_Type defered_render = GUI_Defered_Render_Type::none;
 	
 	GUI_Element_State selection_state = {};
-	
-	static inline u32 active_context_id = 1;
 };
 
 
