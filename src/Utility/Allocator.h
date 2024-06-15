@@ -705,7 +705,7 @@ static inline void Init_Shell_From_Paged_General_Allocator(
 }
 
 
-#if 1
+#if 0
 // Don't think I want to include stdlib in this project, 
 // but this is here to test Allocator_Shell.
 
@@ -828,6 +828,15 @@ struct Linear_Allocator
 		return (T*)push(sizeof(T));
 	}
 };
+
+
+static Linear_Allocator Create_Linear_Allocator(void* memory, u32 capacity)
+{
+	Linear_Allocator result;
+	result.init(memory, capacity);
+	
+	return result;
+}
 
 
 static Linear_Allocator Clone_From_Linear_Allocator_Free_Space(Linear_Allocator* other)

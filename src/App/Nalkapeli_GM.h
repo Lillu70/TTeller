@@ -116,6 +116,9 @@ struct Event_Header
 struct Game_State
 {
 	void* memory;
+	char* name;
+	
+	void* req_data;
 	
 	char* mark_data;
 	Table mark_table;
@@ -160,9 +163,9 @@ struct Game_State
 
 /* MEMOERY DESCRIPTION
 	
-	| - mark data -> All referenced tags in a sequence.				; sizeof(all mark texts combined)
+	X - mark data -> All referenced tags in a sequence.				; sizeof(all mark texts combined)
 	
-	| - mark table -> Contains offsets to the beging of each mark.	; sizeof(u32 * mark count)
+	X - mark table -> Contains offsets to the beging of each mark.	; sizeof(u32 * mark count)
 	
 	| - req data -> All requirements grouped by event, then by 		; sizeof(Req_GM_Header * Event count + Global_Mark_Requirement_GM * count + Participation_Requirement_GM * count)
 		participant. First is stored a Req_GM_Header, it is

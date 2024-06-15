@@ -207,8 +207,12 @@ static void Do_Main_Menu_Frame()
 			&s_allocator,
 			&s_platform))
 		{
-			Terminate;
+			s_allocator.free(game_state.memory);
 		}
+		
+		game_name.free();
+		
+		Terminate;
 	}
 	
 	// Load game
