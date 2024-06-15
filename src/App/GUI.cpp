@@ -1596,8 +1596,10 @@ static bool GUI_Do_Button(
 		
 		if(text)
 		{
+			Color text_color = is_selected? outline_color : theme->widget_text_color;
+			
 			v2f text_p = GUI_Calc_Centered_Text_Position(text, text_scale, p.pos, &theme->font);
-			Draw_Text(context->canvas, (u8*)text, text_p, outline_color, &theme->font, text_scale);
+			Draw_Text(context->canvas, (u8*)text, text_p, text_color, &theme->font, text_scale);
 		}
 	}
 	
@@ -2573,7 +2575,7 @@ static bool GUI_Do_SL_Input_Field(
 				context->canvas, 
 				Create_String_View(str, view_offset, view_lenght),
 				text_p, 
-				theme->text_color, 
+				theme->widget_text_color, 
 				&theme->font, 
 				text_scale);
 		}
@@ -2663,7 +2665,6 @@ static void GUI_Do_ML_Input_Field(
 	text_p.y -= char_height;
 	
 	Color box_color = theme->background_color;
-	Color text_color = theme->text_color;
 	Color outline_color = theme->outline_color;
 	
 	u32 view_limit_x;
@@ -3458,7 +3459,7 @@ static void GUI_Do_ML_Input_Field(
 					}
 					
 					String_View view = {str_begin + line_start, exclusive_lenght + is_last_char};
-					Draw_Text(context->canvas, view, text_p, text_color, font, text_scale);
+					Draw_Text(context->canvas, view, text_p, theme->widget_text_color, font, text_scale);
 					
 					if(draw_cursor && line_num + 1 == cursor_line)
 					{

@@ -368,6 +368,33 @@ static void operator += (String& str, char c)
 }
 
 
+static bool C_STR_Compare(char* a, char* b)
+{
+	while(*a == *b++ && *a++ != 0);	
+	return (*(a - 1) == 0 && *(b - 1) == 0);
+}
+
+
+// TODO: Actually think about this.
+static bool String_View_Compare(String_View a, String_View b)
+{
+	if(a.lenght != b.lenght)
+		return false;
+	
+	char* aa = a.buffer;
+	char* bb = b.buffer;
+	
+	u32 c = 0;
+	while(*aa++ == *bb++)
+	{
+		if(++c == a.lenght)
+			return true;
+	}
+	
+	return false;
+}
+
+
 static bool String_Compare(String* a, String* b)
 {
 	if(a->lenght != b->lenght)

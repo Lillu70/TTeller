@@ -28,6 +28,7 @@ struct GUI_Theme
 	Color down_color = Make_Color(50, 50, 50);
 	Color outline_color = Make_Color(110, 110, 130);
 	Color text_color = WHITE;
+	Color widget_text_color = MAGENTA;
 	Color title_color = Make_Color(210, 210, 230);
 	Color write_cursor_color = BLACK;
 	Color write_cursor_limit_color = RED;

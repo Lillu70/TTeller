@@ -4,11 +4,10 @@
 #include "App.h"
 #include "Main_App.h"
 
-#include "GUI_Factory.cpp"
 
 
 void Init_App(Platform_Calltable platform_calltable)
-{
+{	
 	Init_Shell_From_Paged_General_Allocator(&s_allocator, &s_mem);
 	
 	s_platform = platform_calltable;

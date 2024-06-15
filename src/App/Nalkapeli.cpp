@@ -190,7 +190,7 @@ static void Delete_All_Events(Events_Container* event_container, Allocator_Shell
 
 static void Init_Participation_Requirement(
 	Participation_Requirement* req,
-	Participation_Requirement::Type type,
+	Participation_Requirement_Type type,
 	Allocator_Shell* allocator,
 	u32 mark_str_capacity = Participation_Requirement::initial_mark_capacity)
 {
@@ -199,8 +199,8 @@ static void Init_Participation_Requirement(
 	
 	switch(type)
 	{
-		case Participation_Requirement::Type::mark_personal:
-		case Participation_Requirement::Type::mark_item:
+		case Participation_Requirement_Type::mark_personal:
+		case Participation_Requirement_Type::mark_item:
 		{
 			Init_String(&req->mark, allocator, mark_str_capacity);
 			req->mark_exists = Exists_Statement::does_have;
@@ -213,7 +213,7 @@ static void Init_Participation_Requirement(
 
 static void Init_Event_Consequense(
 	Event_Consequens* con, 
-	Event_Consequens::Type type,
+	Event_Consequens_Type type,
 	Allocator_Shell* allocator,
 	u32 mark_str_capacity =  Participation_Requirement::initial_mark_capacity)
 {
@@ -224,18 +224,18 @@ static void Init_Event_Consequense(
 	
 	switch(type)
 	{
-		case Event_Consequens::Type::stat_change:
+		case Event_Consequens_Type::stat_change:
 		{
 			con->stat_change_amount = 1;
 		}break;
 		
-		case Event_Consequens::Type::death:
+		case Event_Consequens_Type::death:
 		{
 			init_capacity = 4;
 			
 		} // Fall through!
-		case Event_Consequens::Type::gains_mark:
-		case Event_Consequens::Type::loses_mark:
+		case Event_Consequens_Type::gains_mark:
+		case Event_Consequens_Type::loses_mark:
 		{
 			con->mark_duration = 0;
 			Init_String(&con->str, allocator, init_capacity);
@@ -419,21 +419,21 @@ static void Serialize_Campaign(
 			WRITE(p->reqs->count, u32);
 			for(Participation_Requirement* req = Begin(p->reqs); req < End(p->reqs); ++req)
 			{
-				WRITE(req->type, Participation_Requirement::Type);
+				WRITE(req->type, Participation_Requirement_Type);
 				
 				WRITE(req->numerical_relation, Numerical_Relation);
 				WRITE(req->relation_target, u16);
 				
 				switch(req->type)
 				{
-					case Participation_Requirement::Type::character_stat:
+					case Participation_Requirement_Type::character_stat:
 					{
 						WRITE(req->stat_type, Character_Stat::Stats);
 					
 					}break;
 					
-					case Participation_Requirement::Type::mark_item:
-					case Participation_Requirement::Type::mark_personal:
+					case Participation_Requirement_Type::mark_item:
+					case Participation_Requirement_Type::mark_personal:
 					{
 						WRITE(req->mark.lenght, u32);
 						if(req->mark.lenght)
@@ -454,10 +454,10 @@ static void Serialize_Campaign(
 			WRITE(p->cons->count, u32);
 			for(Event_Consequens* con = Begin(p->cons); con < End(p->cons); ++con)
 			{
-				WRITE(con->type, Event_Consequens::Type);
+				WRITE(con->type, Event_Consequens_Type);
 				switch(con->type)
 				{
-					case Event_Consequens::Type::death:
+					case Event_Consequens_Type::death:
 					{
 						if(con->items_are_inherited)
 						{
@@ -473,8 +473,8 @@ static void Serialize_Campaign(
 						}
 					}break;
 					
-					case Event_Consequens::Type::gains_mark:
-					case Event_Consequens::Type::loses_mark:
+					case Event_Consequens_Type::gains_mark:
+					case Event_Consequens_Type::loses_mark:
 					{
 						WRITE(con->mark_type, Mark_Type);
 						WRITE(con->mark_duration, i8);
@@ -486,7 +486,7 @@ static void Serialize_Campaign(
 						
 					}break;
 					
-					case Event_Consequens::Type::stat_change:
+					case Event_Consequens_Type::stat_change:
 					{
 						WRITE(con->stat_change_amount, i8);
 						WRITE(con->stat, Character_Stat::Stats);
@@ -501,9 +501,6 @@ static void Serialize_Campaign(
 			}
 		}
 	}
-	
-	#undef WRITE
-	#undef WRITE_BLOCK
 	
 	u32 buffer_size = serialization_lalloc.get_used_capacity();
 	if(buffer_size)
@@ -602,10 +599,10 @@ static inline void Load_Campaign_V2(
 				for(Participation_Requirement* req = begin; req < end; ++req)
 				{
 					*req = {};
-					req->type = READ(Participation_Requirement::Type);
+					req->type = READ(Participation_Requirement_Type);
 					switch(req->type)
 					{
-						case Participation_Requirement::Type::character_stat:
+						case Participation_Requirement_Type::character_stat:
 						{
 							req->numerical_relation = READ(Numerical_Relation);
 							req->relation_target = READ(u16);
@@ -625,8 +622,8 @@ static inline void Load_Campaign_V2(
 							req->stat_type = (Character_Stat::Stats)s.type;
 						}break;
 						
-						case Participation_Requirement::Type::mark_item:
-						case Participation_Requirement::Type::mark_personal:
+						case Participation_Requirement_Type::mark_item:
+						case Participation_Requirement_Type::mark_personal:
 						{
 							u32 mark_lenght = READ(u32);
 							if(mark_lenght)
@@ -663,10 +660,10 @@ static inline void Load_Campaign_V2(
 				for(Event_Consequens* con = begin; con < end; ++con)
 				{
 					*con = {};
-					con->type = READ(Event_Consequens::Type);
+					con->type = READ(Event_Consequens_Type);
 					switch(con->type)
 					{
-						case Event_Consequens::Type::death:
+						case Event_Consequens_Type::death:
 						{
 							u32 inherit_lenght = READ(u32);
 							if(inherit_lenght)
@@ -683,8 +680,8 @@ static inline void Load_Campaign_V2(
 							
 						}break;
 						
-						case Event_Consequens::Type::gains_mark:
-						case Event_Consequens::Type::loses_mark:
+						case Event_Consequens_Type::gains_mark:
+						case Event_Consequens_Type::loses_mark:
 						{
 							con->mark_type = READ(Mark_Type);
 							
@@ -701,7 +698,7 @@ static inline void Load_Campaign_V2(
 							
 						}break;
 						
-						case Event_Consequens::Type::stat_change:
+						case Event_Consequens_Type::stat_change:
 						{
 							con->stat_change_amount = READ(i8);
 							con->stat = (Character_Stat::Stats)READ(u16);
@@ -765,7 +762,7 @@ static inline void Load_Campaign_V3(
 			if(mark_lenght)
 			{
 				char* gmr_mark_buffer = READ_TEXT(mark_lenght);	
-				Init_String(&gmr->mark, allocator, gmr_mark_buffer, mark_lenght);					
+				Init_String(&gmr->mark, allocator, gmr_mark_buffer, mark_lenght);
 			}
 			else
 			{
@@ -830,20 +827,20 @@ static inline void Load_Campaign_V3(
 				for(Participation_Requirement* req = begin; req < end; ++req)
 				{
 					*req = {};
-					req->type = READ(Participation_Requirement::Type);
+					req->type = READ(Participation_Requirement_Type);
 					
 					req->numerical_relation = READ(Numerical_Relation);
 					req->relation_target = READ(u16);
 					
 					switch(req->type)
 					{
-						case Participation_Requirement::Type::character_stat:
+						case Participation_Requirement_Type::character_stat:
 						{
 							req->stat_type = READ(Character_Stat::Stats);
 						}break;
 						
-						case Participation_Requirement::Type::mark_item:
-						case Participation_Requirement::Type::mark_personal:
+						case Participation_Requirement_Type::mark_item:
+						case Participation_Requirement_Type::mark_personal:
 						{
 							u32 mark_lenght = READ(u32);
 							if(mark_lenght)
@@ -880,10 +877,10 @@ static inline void Load_Campaign_V3(
 				for(Event_Consequens* con = begin; con < end; ++con)
 				{
 					*con = {};
-					con->type = READ(Event_Consequens::Type);
+					con->type = READ(Event_Consequens_Type);
 					switch(con->type)
 					{
-						case Event_Consequens::Type::death:
+						case Event_Consequens_Type::death:
 						{
 							u32 inherit_lenght = READ(u32);
 							if(inherit_lenght)
@@ -900,8 +897,8 @@ static inline void Load_Campaign_V3(
 							
 						}break;
 						
-						case Event_Consequens::Type::gains_mark:
-						case Event_Consequens::Type::loses_mark:
+						case Event_Consequens_Type::gains_mark:
+						case Event_Consequens_Type::loses_mark:
 						{
 							con->mark_type = READ(Mark_Type);
 							con->mark_duration = READ(i8);
@@ -919,7 +916,7 @@ static inline void Load_Campaign_V3(
 							
 						}break;
 						
-						case Event_Consequens::Type::stat_change:
+						case Event_Consequens_Type::stat_change:
 						{
 							con->stat_change_amount = READ(i8);
 							con->stat = READ(Character_Stat::Stats);
@@ -992,7 +989,4 @@ static bool Load_Campaign(
 	
 	full_path.free();
 	return load_successful;
-	
-	#undef READ
-	#undef READ_TEXT
 }

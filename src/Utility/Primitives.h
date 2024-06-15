@@ -36,6 +36,7 @@ static constexpr u64 U64_MAX = 0xFFFFFFFFFFFFFFFF;
 static constexpr u32 U32_MAX = 0xFFFFFFFF;
 static constexpr i32 I32_MAX = 2147483647;
 static constexpr u16 U16_MAX = 0xFFFF;
+static constexpr u8 U8_MAX = 0xFF;
 static constexpr u32 X_AXIS = 0;
 static constexpr u32 Y_AXIS = 1;
 

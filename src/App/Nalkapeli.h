@@ -103,20 +103,20 @@ struct Global_Mark_Consequence
 };
 
 
+enum class Participation_Requirement_Type : u8
+{
+	character_stat = 0,
+	mark_item,
+	mark_personal,
+	COUNT
+};
+
+
 struct Participation_Requirement
 {
-	static inline const char* type_names[] = 
-		{"Ominaisuus", "Esine Merkki", "Hahmo Merkki"};
+	static inline const char* type_names[] = {"Ominaisuus", "Esine Merkki", "Hahmo Merkki"};
 	
-	enum class Type : u8
-	{
-		character_stat = 0,
-		mark_item,
-		mark_personal,
-		COUNT
-	};
-	
-	Type type;
+	Participation_Requirement_Type type;
 	Exists_Statement mark_exists;
 	Numerical_Relation numerical_relation = Numerical_Relation::greater_than_equals;
 	
@@ -131,6 +131,16 @@ struct Participation_Requirement
 };
 
 
+enum class Event_Consequens_Type : u8
+{
+	death = 0,
+	stat_change,
+	gains_mark,
+	loses_mark,
+	COUNT
+};
+
+
 struct Event_Consequens
 {
 	static inline const char* type_names[] = 
@@ -141,15 +151,7 @@ struct Event_Consequens
 		"Menett\xE4\xE4 merkin"
 	};
 	
-	enum class Type : u8
-	{
-		death = 0,
-		stat_change,
-		gains_mark,
-		loses_mark,
-		COUNT
-	};
-	Type type = Type::death;
+	Event_Consequens_Type type = Event_Consequens_Type::death;
 	
 	Mark_Type mark_type = Mark_Type::item;
 	bool items_are_inherited = true;

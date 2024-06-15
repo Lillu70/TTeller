@@ -30,10 +30,15 @@
 #include "Nalkapeli.h"
 #include "Nalkapeli.cpp"
 
+#include "Nalkapeli_GM.h"
+#include "Nalkapeli_GM.cpp"
 
 static Platform_Calltable s_platform;
-
 static Allocator_Shell s_allocator;
 static Paged_General_Allocator s_mem;
-
 static Canvas s_canvas;
+
+#include "Menu_Core.h"
+#include "Main_Menus.cpp"
+#include "Editor_Menus.cpp"
+#include "Menu_Core.cpp"
