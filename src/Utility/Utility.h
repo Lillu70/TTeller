@@ -62,7 +62,11 @@ static inline void Mem_Zero(void* mem, u32 byte_count)
 }
 
 
-static void Remove_Element_From_Packed_Array(void* array, u32* array_count, u32 element_size, u32 remove_idx)
+static void Remove_Element_From_Packed_Array(
+	void* array, 
+	u32* array_count, 
+	u32 element_size, 
+	u32 remove_idx)
 {
 	Assert(remove_idx < *array_count);
 	Assert(*array_count > 0);

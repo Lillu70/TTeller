@@ -8,10 +8,33 @@
 	This is done to make iteration fast. Especially important for requirements.
 */
 
+enum Languange : u8
+{
+	Finnish,
+	English
+};
+
+
+struct Game_Participant_Localized_FI
+{
+	String full_name;
+	String variant_name_1;
+	String variant_name_2;
+};
+
+
+struct Game_Participant
+{
+	u8 mind;
+	u8 body;
+	
+	Dynamic_Array<u32>* marks;
+};
+
 
 struct Req_GM_Header
 {
-	u32 global_reg_count;
+	u32 global_req_count;
 	u32 req_count;
 	u32 participant_count;
 };
@@ -116,24 +139,20 @@ struct Event_Header
 struct Game_State
 {
 	void* memory;
-	char* name;
-	
-	void* req_data;
 	
 	char* mark_data;
 	Table mark_table;
 	
+	Req_GM_Header* req_data;
 	Table req_table_day;
 	Table req_table_night;
 	
+	Event_Header* events_data;
 	Table event_table_day;
 	Table event_table_night;
 	
-	u32 event_count_day;
-	Event_Header* events_day;
-	
-	u32 event_count_night;
-	Event_Header* events_night;
+	Dynamic_Array<Game_Participant>* participants;
+	Dynamic_Array<Game_Participant_Localized_FI>* participant_names;
 };
 
 
@@ -151,7 +170,7 @@ struct Game_State
 
 */
 
-/* ON ISSUE OF MARKS
+/* ON ISSUE OF MARKS <--- Solved with a hash table
 	
 	We don't want to create an entry in the mark table for each occurance of a mark, 
 	but instead each unique one. Then the ids have to be properly mapped.
@@ -179,8 +198,8 @@ struct Game_State
 	| - req table night -> Containts offsets to the Req_GM_Headers	; sizeof(u32 * event_count_night)
 		indexed by event.
 	
-	| - event data -> All Events_Headers global- and participant	; sizeof(Event_Header * Event count + event_text_lenght + event_name_lenght + Global_Mark_Consequence_GM * count + Event_Consequens_GM * count)
-		consequences. Event name- and text.
+	| - events data -> All Events_Headers global- and participant	; sizeof(Event_Header * Event count + event_text_lenght + event_name_lenght + Global_Mark_Consequence_GM * count + Event_Consequens_GM * count)
+		consequences. Event name- and text are listed first.
 	
 	| - event table day -> Containts offsets to Event_Headers.		; sizeof(u32 * day event count)
 

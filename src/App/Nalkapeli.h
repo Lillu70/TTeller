@@ -123,8 +123,7 @@ struct Participation_Requirement
 	Character_Stat::Stats stat_type;
 	
 	u16 relation_target = 1;
-	
-	// Mark
+
 	String mark;
 	
 	static constexpr u32 initial_mark_capacity = 12;

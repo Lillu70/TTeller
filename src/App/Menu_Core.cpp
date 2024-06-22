@@ -27,6 +27,7 @@ static void Run_Active_Menu(u32 app_flags)
 		{
 			case Menus::main_menu:
 			case Menus::campaigns_menu:
+			case Menus::GM_players:
 			{	
 				Set_Popup_Function(Do_Main_Menu_Quit_Popup);
 			}break;
@@ -40,7 +41,7 @@ static void Run_Active_Menu(u32 app_flags)
 				}
 				else
 				{
-					s_platform.Set_Flag(App_Flags::is_running, false);					
+					s_platform.Set_Flag(App_Flags::is_running, false);
 				}
 			}
 		}
@@ -91,6 +92,49 @@ static void Run_Active_Menu(u32 app_flags)
 			Do_Event_Editor_Consequences_Frame();
 		}break;
 		
+		case Menus::select_campaign_to_play_menu:
+		{
+			s_global_data.active_menu = Menus::GM_players;
+			
+			#if 1
+			
+			String game_name = Create_String(&s_allocator, "Kampanjatesti");
+			
+			Events_Container editor_format_campagin;
+			
+			if(Load_Campaign(
+				&editor_format_campagin,
+				&game_name,
+				&s_allocator,
+				&s_platform))
+			{
+				Game_State game_state;
+				
+				if(Convert_Editor_Campaign_Into_Game_Format(
+					&game_state,
+					&editor_format_campagin,
+					&s_allocator))
+				{
+					if(s_game_state.memory)
+						Delete_Game(&s_game_state, &s_allocator);
+					
+					s_game_state = game_state;
+				}
+
+				Delete_All_Events(&editor_format_campagin, &s_allocator);
+			}
+			
+			game_name.free();
+			
+			#endif
+			
+		}break;
+		
+		case Menus::GM_players:
+		{
+			Do_New_Game_Players();
+		}break;
+		
 		default:
 		{
 			Assert(false);
@@ -108,7 +152,7 @@ static void Run_Active_Menu(u32 app_flags)
 		{
 			if(s_hotkeys[Editor_Hotkeys::save].Is_Released())
 			{
-				Serialize_Campaign(s_global_data.event_container, &s_platform);
+				Serialize_Campaign(s_editor_state.event_container, &s_platform);
 			}
 			
 			if(s_global_data.active_menu != Menus::EE_all_events)
@@ -166,7 +210,7 @@ static void Run_Active_Menu(u32 app_flags)
 		{
 			case Menus::campaigns_menu:
 			{
-				Delete_All_Events(&s_global_data.event_container, &s_allocator);
+				Delete_All_Events(&s_editor_state.event_container, &s_allocator);
 				
 				s_global_data.on_disk_campaign_names = s_platform.Search_Directory_For_Maching_Names(
 					campaign_folder_wildcard_path, 

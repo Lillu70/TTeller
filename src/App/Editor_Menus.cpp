@@ -20,7 +20,7 @@ static void Do_Event_Editor_All_Events_Frame()
 		
 		context->layout.build_direction = GUI_Build_Direction::right_center;
 		
-		char* title_text = s_global_data.event_container.campaign_name.buffer;
+		char* title_text = s_editor_state.event_container.campaign_name.buffer;
 		GUI_Do_Text(context, AUTO, title_text, {}, title_scale, true);
 		
 		f32 title_height = context->layout.last_element.dim.y;
@@ -47,37 +47,37 @@ static void Do_Event_Editor_All_Events_Frame()
 			if(jump_into_new_event)
 			{
 				s_global_data.active_menu = Menus::EE_participants;
-				s_global_data.active_event_index = s_global_data.event_container.day_event_count;			
+				s_editor_state.active_event_index = s_editor_state.event_container.day_event_count;			
 			}
 
 			String unique_name = Generate_Unique_Name(
-				Begin(s_global_data.event_container.events), 
-				s_global_data.event_container.day_event_count,
+				Begin(s_editor_state.event_container.events), 
+				s_editor_state.event_container.day_event_count,
 				&s_allocator);
 			
-			u32 temp_count = s_global_data.event_container.events->count;
+			u32 temp_count = s_editor_state.event_container.events->count;
 			
 			// NOTE: Just to grow the array if needed. 
 			// the actual memory contents is irrelevant at this point in time.
-			Push(&s_global_data.event_container.events, &s_allocator);
+			Push(&s_editor_state.event_container.events, &s_allocator);
 			
-			Event_State* buffer = Begin(s_global_data.event_container.events);
+			Event_State* buffer = Begin(s_editor_state.event_container.events);
 			
 			// Checks if there are any night events.
-			if(temp_count - s_global_data.event_container.day_event_count > 0)
+			if(temp_count - s_editor_state.event_container.day_event_count > 0)
 			{
 				Insert_Element_Into_Packed_Array(
 					buffer,
 					buffer + temp_count,
 					&temp_count,
 					sizeof(*buffer),
-					s_global_data.event_container.day_event_count);				
+					s_editor_state.event_container.day_event_count);				
 			}
 			
-			Event_State* event = buffer + s_global_data.event_container.day_event_count;
+			Event_State* event = buffer + s_editor_state.event_container.day_event_count;
 			Init_Event_Takes_Name_Ownership(event, &s_allocator, &unique_name);
 			
-			s_global_data.event_container.day_event_count += 1;
+			s_editor_state.event_container.day_event_count += 1;
 		}
 		
 		context->layout.build_direction = GUI_Build_Direction::right_center;
@@ -87,15 +87,15 @@ static void Do_Event_Editor_All_Events_Frame()
 			if(jump_into_new_event)
 			{
 				s_global_data.active_menu = Menus::EE_participants;
-				s_global_data.active_event_index = s_global_data.event_container.events->count;			
+				s_editor_state.active_event_index = s_editor_state.event_container.events->count;			
 			}
 			
 			String unique_name = Generate_Unique_Name(
-				Begin(s_global_data.event_container.events) + s_global_data.event_container.day_event_count, 
-				s_global_data.event_container.events->count - s_global_data.event_container.day_event_count,
+				Begin(s_editor_state.event_container.events) + s_editor_state.event_container.day_event_count, 
+				s_editor_state.event_container.events->count - s_editor_state.event_container.day_event_count,
 				&s_allocator);
 			
-			Event_State* event = Push(&s_global_data.event_container.events, &s_allocator);
+			Event_State* event = Push(&s_editor_state.event_container.events, &s_allocator);
 			Init_Event_Takes_Name_Ownership(event, &s_allocator, &unique_name);
 		}
 		
@@ -115,12 +115,12 @@ static void Do_Event_Editor_All_Events_Frame()
 		// Save button.
 		if(GUI_Do_Button(context, &title_row_pos, &dim, save_text))
 		{
-			Serialize_Campaign(s_global_data.event_container, &s_platform);
+			Serialize_Campaign(s_editor_state.event_container, &s_platform);
 		}
 		
 		if(GUI_Is_Context_Active(&s_gui_banner) &&
 			s_hotkeys[Editor_Hotkeys::active_pannel_toggle].Is_Released() && 
-			s_global_data.event_container.events->count)
+			s_editor_state.event_container.events->count)
 		{
 			GUI_Activate_Context(&s_gui);
 		}
@@ -131,8 +131,8 @@ static void Do_Event_Editor_All_Events_Frame()
 		static GUI_Context gui_event_list_day = GUI_Create_Context();
 		static GUI_Context gui_event_list_night = GUI_Create_Context();
 		
-		u32 day_event_count = s_global_data.event_container.day_event_count;
-		u32 night_event_count = s_global_data.event_container.events->count - day_event_count;
+		u32 day_event_count = s_editor_state.event_container.day_event_count;
+		u32 night_event_count = s_editor_state.event_container.events->count - day_event_count;
 		
 		// --- Active context and hotkey ------------------------------------------------------------
 		{
@@ -150,7 +150,7 @@ static void Do_Event_Editor_All_Events_Frame()
 					GUI_Activate_Context(&s_gui_banner);
 			}
 			
-			if(!s_global_data.event_container.events->count && (
+			if(!s_editor_state.event_container.events->count && (
 				GUI_Is_Context_Active(&gui_event_list_day) || 
 				GUI_Is_Context_Active(&gui_event_list_night)))
 			{
@@ -235,17 +235,17 @@ static void Do_Event_Editor_All_Events_Frame()
 				&s_theme,
 				day_list_buffer_offset.As<i32>());
 			{
-				Event_State* begin = Begin(s_global_data.event_container.events);
+				Event_State* begin = Begin(s_editor_state.event_container.events);
 				
 				v2f* pos = &GUI_AUTO_TOP_LEFT;
-				for(u32 i = 0; i < s_global_data.event_container.day_event_count; ++i)
+				for(u32 i = 0; i < s_editor_state.event_container.day_event_count; ++i)
 				{
 					Event_State* e = begin + i;
 					
 					// Destroy event
 					if(GUI_Do_Button(&gui_event_list_day, pos, &GUI_AUTO_FIT, "X"))
 					{
-						s_global_data.event_idx_to_delete = i;
+						s_editor_state.event_idx_to_delete = i;
 						Set_Popup_Function(Do_Event_Editor_Delete_Event_Popup);
 					}
 					pos = 0;
@@ -257,7 +257,7 @@ static void Do_Event_Editor_All_Events_Frame()
 					if(GUI_Do_Button(&gui_event_list_day, AUTO, &GUI_AUTO_FIT, e->name.buffer))
 					{
 						s_global_data.active_menu = Menus::EE_participants;
-						s_global_data.active_event_index = i;
+						s_editor_state.active_event_index = i;
 					}
 					
 					GUI_Pop_Layout(&gui_event_list_day);
@@ -285,18 +285,18 @@ static void Do_Event_Editor_All_Events_Frame()
 				&s_theme,
 				night_list_buffer_offset.As<i32>());
 			{
-				Event_State* begin = Begin(s_global_data.event_container.events);
+				Event_State* begin = Begin(s_editor_state.event_container.events);
 				
 				v2f* pos = &GUI_AUTO_TOP_LEFT;
-				for(u32 i = s_global_data.event_container.day_event_count; 
-					i < s_global_data.event_container.events->count; ++i)
+				for(u32 i = s_editor_state.event_container.day_event_count; 
+					i < s_editor_state.event_container.events->count; ++i)
 				{
 					Event_State* e = begin + i;
 					
 					// Destroy event
 					if(GUI_Do_Button(&gui_event_list_night, pos, &GUI_AUTO_FIT, "X"))
 					{
-						s_global_data.event_idx_to_delete = i;
+						s_editor_state.event_idx_to_delete = i;
 						Set_Popup_Function(Do_Event_Editor_Delete_Event_Popup);
 					}
 					pos = 0;
@@ -308,7 +308,7 @@ static void Do_Event_Editor_All_Events_Frame()
 					if(GUI_Do_Button(&gui_event_list_night, AUTO, &GUI_AUTO_FIT, e->name.buffer))
 					{
 						s_global_data.active_menu = Menus::EE_participants;
-						s_global_data.active_event_index = i;
+						s_editor_state.active_event_index = i;
 					}
 					
 					GUI_Pop_Layout(&gui_event_list_night);
@@ -352,7 +352,7 @@ static void Do_Event_Editor_Participants_Frame()
 		
 		GUI_Do_Spacing(context, v2f{0, s_post_title_y_spacing});
 		
-		Event_State* event = Begin(s_global_data.event_container.events) + s_global_data.active_event_index;
+		Event_State* event = Begin(s_editor_state.event_container.events) + s_editor_state.active_event_index;
 		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lis\xE4\xE4 uusi osallistuja"))
 		{
 			s_gui.flags |= GUI_Context_Flags::maxout_horizontal_slider;
@@ -408,7 +408,7 @@ static void Do_Event_Editor_Participants_Frame()
 	
 	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
-		Event_State* event = Begin(s_global_data.event_container.events) + s_global_data.active_event_index;
+		Event_State* event = Begin(s_editor_state.event_container.events) + s_editor_state.active_event_index;
 	
 		static constexpr f32 collumn_min_width = 300;
 		f32 padding = context->theme->padding;
@@ -735,7 +735,7 @@ static void Do_Event_Editor_Text_Frame()
 {
 	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
-		Event_State* event = Begin(s_global_data.event_container.events) + s_global_data.active_event_index;
+		Event_State* event = Begin(s_editor_state.event_container.events) + s_editor_state.active_event_index;
 		
 		v2f title_scale = v2f{4.f, 4.f};
 		Font* font = &context->theme->font;
@@ -758,7 +758,7 @@ static void Do_Event_Editor_Text_Frame()
 		GUI_Do_Spacing(context, v2f{0, s_post_title_y_spacing});
 		{
 			char* event_name_text = 
-				(s_global_data.active_event_index < s_global_data.event_container.day_event_count)?
+				(s_editor_state.active_event_index < s_editor_state.event_container.day_event_count)?
 				"Tapahtuman (p\xE4iv\xE4) nimi:" : "Tapahtuman (y\xF6) nimi:";
 			GUI_Do_Text(context, AUTO, event_name_text);
 			
@@ -800,7 +800,7 @@ static void Do_Event_Editor_Text_Frame()
 		if(dim.x >= 0 && dim.y >= 0)
 		{
 			Event_State* event 
-				= Begin(s_global_data.event_container.events) + s_global_data.active_event_index;
+				= Begin(s_editor_state.event_container.events) + s_editor_state.active_event_index;
 			
 			context->layout.anchor = GUI_Anchor::center;
 			GUI_Do_ML_Input_Field(context, &GUI_AUTO_MIDDLE, &dim, &event->event_text, 0);
@@ -850,7 +850,7 @@ static void Do_Event_Editor_Consequences_Frame()
 			if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lis\xE4\xE4 yleis seuraamus"))
 			{
 				Event_State* event 
-					= Begin(s_global_data.event_container.events) + s_global_data.active_event_index;
+					= Begin(s_editor_state.event_container.events) + s_editor_state.active_event_index;
 				
 				Global_Mark_Consequence* gmc = Push(&event->global_mark_cons, &s_allocator);
 				*gmc = {};
@@ -898,7 +898,7 @@ static void Do_Event_Editor_Consequences_Frame()
 		
 		v2f* start_pos_ptr = &GUI_AUTO_TOP_LEFT;
 		
-		Event_State* event = Begin(s_global_data.event_container.events) + s_global_data.active_event_index;
+		Event_State* event = Begin(s_editor_state.event_container.events) + s_editor_state.active_event_index;
 		
 		if(event->global_mark_cons->count)
 		{
@@ -1322,7 +1322,7 @@ static void Do_Event_Editor_Campaigns_Menu_Frame()
 					Events_Container ec;
 					if(Load_Campaign(&ec, save_name, &s_allocator, &s_platform))
 					{
-						s_global_data.event_container = ec;
+						s_editor_state.event_container = ec;
 						s_global_data.active_menu = Menus::EE_all_events;
 					}
 				}
@@ -1385,7 +1385,7 @@ static void Do_Event_Editor_On_Exit_Popup()
 	
 	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t2))
 	{
-		Serialize_Campaign(s_global_data.event_container, &s_platform);
+		Serialize_Campaign(s_editor_state.event_container, &s_platform);
 		s_global_data.active_menu = Menus::campaigns_menu;
 		Close_Popup();
 	}
@@ -1458,7 +1458,7 @@ static void Do_Event_Editor_Quit_Popup()
 	
 	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t2))
 	{
-		Serialize_Campaign(s_global_data.event_container, &s_platform);
+		Serialize_Campaign(s_editor_state.event_container, &s_platform);
 		s_platform.Set_Flag(App_Flags::is_running, false);
 	}
 	
@@ -1527,10 +1527,10 @@ static void Do_Event_Editor_Delete_Event_Popup()
 	
 	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t2))
 	{
-		if(s_global_data.event_idx_to_delete < s_global_data.event_container.day_event_count)
-			s_global_data.event_container.day_event_count -= 1;
+		if(s_editor_state.event_idx_to_delete < s_editor_state.event_container.day_event_count)
+			s_editor_state.event_container.day_event_count -= 1;
 		
-		Delete_Event(s_global_data.event_container.events, &s_allocator, s_global_data.event_idx_to_delete);
+		Delete_Event(s_editor_state.event_container.events, &s_allocator, s_editor_state.event_idx_to_delete);
 		Close_Popup();
 	}
 	

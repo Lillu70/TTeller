@@ -52,6 +52,7 @@ enum class Menus : u32
 {
 	main_menu = 0,
 	campaigns_menu,
+	select_campaign_to_play_menu,
 	
 	EVENT_EDITOR_BEGIN,
 		EE_all_events,
@@ -59,7 +60,22 @@ enum class Menus : u32
 		EE_text,
 		EE_consequences,
 	EVENT_EDITOR_END,
+	
+	GAME_MODE_BEGIN,
+		GM_players,
+		GM_event_display,
+	GAME_MODE_END
 };
+
+
+struct Editor_State
+{
+	Events_Container event_container;
+	
+	u32 active_event_index = 0;
+	u32 event_idx_to_delete = 0;
+};
+static Editor_State s_editor_state;
 
 
 struct Global_Data
@@ -67,11 +83,6 @@ struct Global_Data
 	Action_Context action_context = Action_Context();
 	
 	Menus active_menu = Menus::main_menu;
-	
-	Events_Container event_container;
-	
-	u32 active_event_index = 0;
-	u32 event_idx_to_delete = 0;
 	
 	String new_campaign_name;
 	Dynamic_Array<String>* on_disk_campaign_names = 0;
@@ -81,7 +92,7 @@ struct Global_Data
 static Global_Data s_global_data = Global_Data();
 
 
-#pragma once
+static Game_State s_game_state = {};
 
 
 static inline void Close_Popup()

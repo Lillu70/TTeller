@@ -744,7 +744,7 @@ struct Linear_Allocator
 	
 	u32 inline get_free_capacity()
 	{
-		u32 result = u32(capacity - (next_free - memory));
+		u32 result = capacity - u32(next_free - memory);
 		return result;
 	}
 	
@@ -759,6 +759,7 @@ struct Linear_Allocator
 	void init(void* _memory, u32 _capacity)
 	{
 		Assert(_capacity);
+		Assert(_memory);
 		
 		memory = (u8*)_memory;
 		next_free = memory;
@@ -780,6 +781,9 @@ struct Linear_Allocator
 		}
 		
 		void* _memory = platform->Allocate_Memory(_capacity, &_capacity);
+		
+		Assert(_memory);
+		
 		init(_memory, _capacity);
 		
 		owns_memory = true;
@@ -796,12 +800,20 @@ struct Linear_Allocator
 	void* push(u32 size)
 	{
 		Assert(memory);
-		
-		Assert(get_free_capacity() >= size);
-		push_count += 1;
-		u8* result = next_free;
-		next_free += size;
-		return result;
+		if(size)
+		{
+			Assert(get_free_capacity() >= size);
+			
+			push_count += 1;
+			u8* result = next_free;
+			next_free += size;
+			
+			return result;
+		}
+		else
+		{
+			return 0;
+		}
 	}
 	
 	
@@ -811,7 +823,7 @@ struct Linear_Allocator
 		
 		u8* result = 0;
 		
-		if(get_free_capacity() >= size)
+		if(get_free_capacity() >= size && size)
 		{
 			push_count += 1;
 			result = next_free;

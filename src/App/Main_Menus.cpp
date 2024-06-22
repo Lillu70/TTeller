@@ -112,11 +112,11 @@ static void Do_Main_Menu_Name_New_Campaign_Popup()
 	{
 		s_global_data.active_menu = Menus::EE_all_events;
 		Init_Event_Container_Takes_Name_Ownership(
-			&s_global_data.event_container, 
+			&s_editor_state.event_container, 
 			&s_allocator, 
 			&s_global_data.new_campaign_name);
 		
-		Serialize_Campaign(s_global_data.event_container, &s_platform);
+		Serialize_Campaign(s_editor_state.event_container, &s_platform);
 		
 		Close_Popup();
 	}
@@ -198,21 +198,7 @@ static void Do_Main_Menu_Frame()
 	// New game
 	if(GUI_Do_Button(context, AUTO, AUTO, button_texts[i++]))
 	{
-		Game_State game_state;
-		String game_name = Create_String(&s_allocator, "Kampanjatesti");
-		
-		if(Load_Campaign_Into_Game_State(
-			&game_state,
-			&game_name,
-			&s_allocator,
-			&s_platform))
-		{
-			s_allocator.free(game_state.memory);
-		}
-		
-		game_name.free();
-		
-		Terminate;
+		s_global_data.active_menu = Menus::select_campaign_to_play_menu;
 	}
 	
 	// Load game
@@ -242,4 +228,112 @@ static void Do_Main_Menu_Frame()
 	GUI_End_Context(context);
 	
 	GUI_DEFAULT_TEXT_SCALE = def_text_scale;
+}
+
+
+static void Do_New_Game_Players()
+{
+	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
+	{
+		v2f title_scale = v2f{4.f, 4.f};
+		Font* font = &context->theme->font;
+		v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
+		if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
+		{
+			s_global_data.active_menu = Menus::main_menu;
+		}
+		
+		GUI_Push_Layout(context);
+		
+		context->layout.build_direction = GUI_Build_Direction::right_center;
+		
+		GUI_Do_Text(context, AUTO, "Kampanjan pelaajat", {}, title_scale, true);
+		
+		GUI_Pop_Layout(context);
+		
+		GUI_Do_Spacing(context, v2f{0, s_post_title_y_spacing});
+		
+		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lis\xE4\xE4 pelaaja"))
+		{
+			Create_Participant_Name_FI(&s_game_state, &s_allocator);
+		}
+		
+		context->layout.build_direction = GUI_Build_Direction::right_center;
+		
+		
+		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Ohje"))
+		{
+		}
+		
+		
+	}; // ----------------------------------------------------------------------------------------
+
+	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
+	{
+		Dynamic_Array<Game_Participant_Localized_FI>* names = s_game_state.participant_names;
+		
+		static constexpr f32 collumn_min_width = 300;
+
+		v2f* pos = &GUI_AUTO_TOP_LEFT;
+		f32 text_box_width = collumn_min_width - 50;
+		
+		context->layout.build_direction = GUI_Build_Direction::right_top;
+		
+		u32 i = 0;
+		for(auto n = Begin(names); n < End(names); ++n, ++i)
+		{
+			GUI_Placement rcp = context->layout.last_element;
+			
+			if(GUI_Do_Button(context, pos, &GUI_AUTO_FIT, "X"))
+			{
+				Hollow_Participant_Name_FI(n);
+				Remove_Element_From_Packed_Array(Begin(names), &names->count, sizeof(*n), i);
+				
+				if(!i)
+					pos = &GUI_AUTO_TOP_LEFT;
+				
+				context->layout.last_element = rcp;
+				
+				n -= 1;
+				i -= 1;
+				continue;
+			}
+			
+			pos = 0;
+			
+			f32 collumn_start = GUI_Get_Collumn_Start(context, X_AXIS);
+			
+			GUI_Push_Layout(context);
+			context->layout.build_direction = GUI_Build_Direction::right_center;
+			
+			GUI_Do_Text(context, AUTO, "Pelaaja");
+			
+			GUI_Pop_Layout(context);
+			
+			
+			GUI_Push_Layout(context);
+			context->layout.build_direction = GUI_Build_Direction::down_left;
+			
+			GUI_Do_Text(context, AUTO, "Nimi:");
+			GUI_Do_SL_Input_Field(context, AUTO, &text_box_width, &n->full_name);
+			
+			GUI_Do_Text(context, AUTO, "Muoto 1:");
+			GUI_Do_SL_Input_Field(context, AUTO, &text_box_width, &n->variant_name_1);
+			
+			GUI_Do_Text(context, AUTO, "Muoto 2:");
+			GUI_Do_SL_Input_Field(context, AUTO, &text_box_width, &n->variant_name_2);
+			
+			GUI_Do_Text(context, AUTO, "Kuva:");
+			
+			v2f picture_dim = v2f{text_box_width, text_box_width};
+			GUI_Do_Pannel(context, AUTO, &picture_dim);
+			
+			GUI_Pop_Layout(context);
+				
+			GUI_End_Collumn(context, collumn_min_width, collumn_start, X_AXIS);
+		}
+		
+	}; // ----------------------------------------------------------------------------------------
+
+	Do_GUI_Frame_With_Banner(banner_func, menu_func, 160);
 }
