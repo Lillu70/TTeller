@@ -18,7 +18,7 @@ static thread_local v2f GUI_AUTO_MIDDLE 		= v2f{0, 0};
 
 static thread_local v2f GUI_DEFAULT_TEXT_SCALE 	= v2f{2, 2};
 
-static thread_local f32 GUI_MOUSE_SCROLL_SPEED 	= 50;
+static thread_local u32 GUI_NO_CHARACTER_LIMIT 	= 0;
 
 
 struct GUI_Theme
@@ -255,6 +255,7 @@ struct GUI_Context
 	i32 selected_index = 0;
 	i32 widget_count = 0; // NOTE: Amount of selectable elements.
 	u32 selected_id = 0;
+	f32 mouse_scroll_speed = 50.f;
 	f32 dynamic_slider_girth = 15.f;
 	
 	i32 last_widget_count = 0;

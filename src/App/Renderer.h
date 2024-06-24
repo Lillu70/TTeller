@@ -1,6 +1,14 @@
 
 # pragma once
 
+
+struct Image
+{
+	u8* buffer;
+	v2i dim;
+};
+
+
 struct Font
 {
 	u32 char_width = 0;
@@ -12,8 +20,8 @@ struct Font
 
 struct Canvas
 {
-	v2u dim = {};
 	u32* buffer = 0;
+	v2u dim = {};
 	u32 row_stride = 0;
 };
 
@@ -108,3 +116,10 @@ static void Draw_Glyph(
 	Color color,
 	char character,
 	Font* font);
+
+
+static void Draw_Image(Canvas* canvas, Image* img, v2f scale);
+
+static void Draw_Image(Canvas* canvas, Image* img);
+
+static void Draw_Image(Canvas* canvas, Image* img, Rect rect);

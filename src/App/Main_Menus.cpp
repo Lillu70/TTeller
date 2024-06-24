@@ -7,8 +7,6 @@ static void Do_Main_Menu_Quit_Popup()
 {
 	Dim_Entire_Screen(&s_canvas, 0.333f);
 	
-	static v2f panel_dim = v2f{0.f, 0.f};
-	
 	BEGIN:
 	GUI_Begin_Context(
 		&s_gui_pop_up,
@@ -18,20 +16,12 @@ static void Do_Main_Menu_Quit_Popup()
 		v2i{0, 0}, 
 		GUI_Anchor::top);
 	
-	bool panel_dim_set = panel_dim != v2f{0.f, 0.f};
+	bool panel_dim_set = s_global_data.popup_panel_dim != v2f{0.f, 0.f};
 	
 	if(panel_dim_set)
 	{
-		static GUI_Theme panel_theme = [](GUI_Theme* global_theme)
-		{ 
-			GUI_Theme result = *global_theme;
-			result.background_color = s_banner_background_color;
-			result.outline_color = global_theme->selected_color;
-			return result;
-		}(&s_theme);
-
-		s_gui_pop_up.theme = &panel_theme;
-		GUI_Do_Pannel(&s_gui_pop_up, &GUI_AUTO_MIDDLE, &panel_dim);
+		s_gui_pop_up.theme = &s_global_data.popup_panel_theme;
+		GUI_Do_Panel(&s_gui_pop_up, &GUI_AUTO_MIDDLE, &s_global_data.popup_panel_dim);
 		s_gui_pop_up.theme = &s_theme;
 	}
 	
@@ -58,7 +48,7 @@ static void Do_Main_Menu_Quit_Popup()
 	if(!panel_dim_set)
 	{
 		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(&s_gui_pop_up);
-		panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
+		s_global_data.popup_panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
 		GUI_End_Context(&s_gui_pop_up);
 		goto BEGIN;
 	}
@@ -71,8 +61,6 @@ static void Do_Main_Menu_Name_New_Campaign_Popup()
 {
 	Dim_Entire_Screen(&s_canvas, 0.333f);
 	
-	static v2f panel_dim = v2f{0.f, 0.f};
-	
 	BEGIN:
 	GUI_Begin_Context(
 		&s_gui_pop_up,
@@ -82,20 +70,12 @@ static void Do_Main_Menu_Name_New_Campaign_Popup()
 		v2i{0, 0}, 
 		GUI_Anchor::top);
 	
-	bool panel_dim_set = panel_dim != v2f{0.f, 0.f};
+	bool panel_dim_set = s_global_data.popup_panel_dim != v2f{0.f, 0.f};
 	
 	if(panel_dim_set)
 	{
-		static GUI_Theme panel_theme = [](GUI_Theme* global_theme)
-		{ 
-			GUI_Theme result = *global_theme;
-			result.background_color = s_banner_background_color;
-			result.outline_color = global_theme->selected_color;
-			return result;
-		}(&s_theme);
-
-		s_gui_pop_up.theme = &panel_theme;
-		GUI_Do_Pannel(&s_gui_pop_up, &GUI_AUTO_MIDDLE, &panel_dim);
+		s_gui_pop_up.theme = &s_global_data.popup_panel_theme;
+		GUI_Do_Panel(&s_gui_pop_up, &GUI_AUTO_MIDDLE, &s_global_data.popup_panel_dim);
 		s_gui_pop_up.theme = &s_theme;
 	}
 	
@@ -131,7 +111,7 @@ static void Do_Main_Menu_Name_New_Campaign_Popup()
 	if(!panel_dim_set)
 	{
 		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(&s_gui_pop_up);
-		panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
+		s_global_data.popup_panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
 		GUI_End_Context(&s_gui_pop_up);
 		goto BEGIN;
 	}
@@ -231,6 +211,60 @@ static void Do_Main_Menu_Frame()
 }
 
 
+static void Do_Create_Player_FI_Instruction_Popup()
+{
+	void(*test)(GUI_Context*) = [](GUI_Context* context)
+	{
+		static String instruction_text = {};
+		if(!instruction_text.buffer)
+		{
+			Init_String(&instruction_text, &s_allocator, 
+			"Here is another video inspired by the Deus Ex series!\n"
+			"I hope you all enjoy it.\n"
+			"I love making music like this that has more tense rhythmic elements,\n"
+			"as it\'s closer to a lot of the music I compose for my full time work.\n"
+			"This track feels like the music,\n"
+			"that plays when you are stealthily sneaking around hostile territory,\n"
+			"possibly to hack into a system or quietly take down a target.\n" 
+			"I hope it helps you feel energized and productive!\n"
+			"Please help my channel by sharing, liking, commenting and subscribing!\n"
+			"\n\nSee you in the next one");
+		}
+		
+		v2f title_scale = GUI_DEFAULT_TEXT_SCALE * 1.5f;
+		
+		static constexpr char* title_text = "Pelihahmon luonti ohjeet";
+		v2f d = GUI_Tight_Fit_Text(title_text, &context->theme->font, title_scale);
+		v2f b = v2f{d.y, d.y};
+		
+		context->layout.anchor = GUI_Anchor::center;
+		
+		v2f dim = v2f{d.x + context->theme->padding + b.x, 400.f};
+		GUI_Do_ML_Input_Field(
+			context, 
+			&GUI_AUTO_MIDDLE, 
+			&dim, 
+			&instruction_text,
+			GUI_NO_CHARACTER_LIMIT,
+			GUI_DEFAULT_TEXT_SCALE,
+			GUI_Character_Check_View_Only);
+		
+		context->layout.build_direction = GUI_Build_Direction::up_left;
+		GUI_Do_Title_Text(context, AUTO, title_text, title_scale);
+		
+		context->layout.build_direction = GUI_Build_Direction::right_center;
+		if(GUI_Do_Button(context, AUTO, &b, "X"))
+			Close_Popup();
+		
+		context->layout.build_direction = GUI_Build_Direction::down_center;
+		
+	};
+	
+	Do_Popup_GUI_Frame(test);
+	
+}
+
+
 static void Do_New_Game_Players()
 {
 	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
@@ -255,7 +289,8 @@ static void Do_New_Game_Players()
 		
 		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lis\xE4\xE4 pelaaja"))
 		{
-			Create_Participant_Name_FI(&s_game_state, &s_allocator);
+			Create_Player_Name_FI(&s_game_state, &s_allocator);
+			*Push(&s_game_state.player_images, &s_allocator) = {};
 		}
 		
 		context->layout.build_direction = GUI_Build_Direction::right_center;
@@ -263,6 +298,7 @@ static void Do_New_Game_Players()
 		
 		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Ohje"))
 		{
+			Set_Popup_Function(Do_Create_Player_FI_Instruction_Popup);
 		}
 		
 		
@@ -270,7 +306,8 @@ static void Do_New_Game_Players()
 
 	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
-		Dynamic_Array<Game_Participant_Localized_FI>* names = s_game_state.participant_names;
+		Dynamic_Array<Game_Player_Name_FI>* names = s_game_state.player_names;
+		Image* images = Begin(s_game_state.player_images);
 		
 		static constexpr f32 collumn_min_width = 300;
 
@@ -282,12 +319,23 @@ static void Do_New_Game_Players()
 		u32 i = 0;
 		for(auto n = Begin(names); n < End(names); ++n, ++i)
 		{
+			Assert(i < s_game_state.player_images->count);			
+			Image* img = images + i;
+			
 			GUI_Placement rcp = context->layout.last_element;
 			
 			if(GUI_Do_Button(context, pos, &GUI_AUTO_FIT, "X"))
 			{
-				Hollow_Participant_Name_FI(n);
+				Assert(names->count == s_game_state.player_images->count);
+				
+				Hollow_Player_Name_FI(n);
 				Remove_Element_From_Packed_Array(Begin(names), &names->count, sizeof(*n), i);
+				
+				if(img->buffer)
+					s_allocator.free(img->buffer);
+				
+				u32* img_count = &s_game_state.player_images->count;
+				Remove_Element_From_Packed_Array(images, img_count, sizeof(*img), i);
 				
 				if(!i)
 					pos = &GUI_AUTO_TOP_LEFT;
@@ -310,23 +358,67 @@ static void Do_New_Game_Players()
 			
 			GUI_Pop_Layout(context);
 			
-			
 			GUI_Push_Layout(context);
 			context->layout.build_direction = GUI_Build_Direction::down_left;
 			
 			GUI_Do_Text(context, AUTO, "Nimi:");
-			GUI_Do_SL_Input_Field(context, AUTO, &text_box_width, &n->full_name);
+			if(GUI_Do_SL_Input_Field(context, AUTO, &text_box_width, &n->full_name))
+				context->selected_index += 1;
 			
 			GUI_Do_Text(context, AUTO, "Muoto 1:");
-			GUI_Do_SL_Input_Field(context, AUTO, &text_box_width, &n->variant_name_1);
+			if(GUI_Do_SL_Input_Field(context, AUTO, &text_box_width, &n->variant_name_1))
+				context->selected_index += 1;
 			
 			GUI_Do_Text(context, AUTO, "Muoto 2:");
 			GUI_Do_SL_Input_Field(context, AUTO, &text_box_width, &n->variant_name_2);
 			
+			v2f test_button_dim = v2f{text_box_width, context->layout.last_element.dim.y};
+			if(GUI_Do_Button(context, AUTO, &test_button_dim, "Testaa muodot"))
+			{
+				
+			}
+			
 			GUI_Do_Text(context, AUTO, "Kuva:");
 			
+			
+			if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lataa kuva"))
+			{
+				char* path = (i % 2)? "image2.png" : "image.jpg";
+				u32 buffer_size = 0;
+				if(s_platform.Get_File_Size((const char*)path, &buffer_size))
+				{
+					u8* buffer = (u8*)s_allocator.push(buffer_size);
+					if(s_platform.Read_File(path, buffer, buffer_size))
+					{
+						i32 out_x;
+						i32 out_y;
+						i32 out_c;
+						
+						u8* img_buffer = (u8*)stbi_load_from_memory(
+							buffer, 
+							buffer_size, 
+							&out_x, 
+							&out_y, 
+							&out_c, 
+							4);
+						
+						if(img_buffer)
+						{
+							if(img->buffer)
+								s_allocator.free(img->buffer);
+							
+							img->buffer = img_buffer;
+							img->dim = v2i{out_x, out_y};
+						}
+					}						
+				}
+			}
+			
 			v2f picture_dim = v2f{text_box_width, text_box_width};
-			GUI_Do_Pannel(context, AUTO, &picture_dim);
+			GUI_Do_Panel(context, AUTO, &picture_dim);
+			
+			if(img->buffer)
+				Draw_Image(context->canvas, img, Expand_Rect(context->layout.last_element.rect, -10));
 			
 			GUI_Pop_Layout(context);
 				

@@ -891,27 +891,32 @@ static void Dim_Entire_Screen(Canvas* canvas, f32 s)
 	for(u32* pxl = canvas->buffer; pxl < canvas->buffer + pixel_count; pxl += 4)
 	{
 		__m128i wpck_pxl = _mm_load_si128((__m128i*)pxl);
-
+		
+		// Unpack colors (shift then mask)
 		__m128i wc1 = _mm_and_si128(wpck_pxl, wide_mask_255);
 		__m128i wc2 = _mm_and_si128(_mm_srli_epi32(wpck_pxl, 8), wide_mask_255);
 		__m128i wc3 = _mm_and_si128(_mm_srli_epi32(wpck_pxl, 16), wide_mask_255);
 		__m128i wc4 = _mm_and_si128(_mm_srli_epi32(wpck_pxl, 24), wide_mask_255);
 		
+		// Convert to f32
 		__m128 wc1_ps = _mm_cvtepi32_ps(wc1);
 		__m128 wc2_ps = _mm_cvtepi32_ps(wc2);
 		__m128 wc3_ps = _mm_cvtepi32_ps(wc3);
 		__m128 wc4_ps = _mm_cvtepi32_ps(wc4);
 		
+		// The multiply
 		wc1_ps = _mm_mul_ps(wc1_ps, wscale);
 		wc2_ps = _mm_mul_ps(wc2_ps, wscale);
 		wc3_ps = _mm_mul_ps(wc3_ps, wscale);
 		wc4_ps = _mm_mul_ps(wc4_ps, wscale);
 		
+		// Convert to i32 with truncation
 		wc1 = _mm_cvttps_epi32(wc1_ps);
 		wc2 = _mm_cvttps_epi32(wc2_ps);
 		wc3 = _mm_cvttps_epi32(wc3_ps);
 		wc4 = _mm_cvttps_epi32(wc4_ps);
 		
+		// Pack colors (shift)
 		wc2 = _mm_slli_epi32(wc2, 8);
 		wc3 = _mm_slli_epi32(wc3, 16);
 		wc4 = _mm_slli_epi32(wc4, 24);
@@ -945,4 +950,69 @@ static void Dim_Entire_Screen(Canvas* canvas, f32 s)
 	#endif
 	
 	End_Timing_Block(scale_pixel);
+}
+
+
+static void Draw_Image(Canvas* canvas, Image* img)
+{
+	Assert(img->buffer);
+	Assert(img->dim.x && img->dim.y);
+
+	for(i32 y = 0; y < img->dim.y; ++y)
+	{	
+		for(i32 x = 0; x < img->dim.x; ++x)
+		{
+			u8* data = img->buffer + ((y * img->dim.x + x) * 4);
+			u8 r = *(data + 0);
+			u8 g = *(data + 1);
+			u8 b = *(data + 2);
+			u8 a = *(data + 3);
+			
+			Color c = Make_Color(r, g, b, a);
+			Set_Pixel(canvas, v2i{x, img->dim.y - (y + 1)}, c);
+		}
+	}
+}
+
+
+static void Draw_Image(Canvas* canvas, Image* img, Rect rect)
+{
+	Rect draw_rect = rect;
+	if(!Verify_Rect_(canvas, &draw_rect))
+		return;
+	
+	i32 min_x, min_y, max_x, max_y;
+	min_x = (i32)Ceil(draw_rect.min.x);
+	min_y = (i32)Ceil(draw_rect.min.y);
+	max_x = (i32)Floor(draw_rect.max.x);
+	max_y = (i32)Floor(draw_rect.max.y);
+	
+	f32 w, h;
+	w = (rect.max.x - rect.min.x);
+	h = (rect.max.y - rect.min.y);
+	
+	i32 ux, uy;
+	ux = (i32)Round(rect.min.x - draw_rect.min.x);
+	uy = (i32)Round(rect.min.y - draw_rect.min.y);
+	
+	for(i32 y = min_y; y < max_y; ++y)
+	{
+		for(i32 x = min_x; x < max_x; ++x)
+		{
+			f32 fsx = f32((x - ux) - min_x) / w; 
+			f32 fsy = 1 - f32((y - uy) - min_y) / h;
+			
+			i32 isx = i32(Round((img->dim.x - 1) * fsx));
+			i32 isy = i32(Round((img->dim.y - 1) * fsy));
+			
+			u8* data = img->buffer + ((isy * img->dim.x + isx) * 4);
+			u8 r = *(data + 0);
+			u8 g = *(data + 1);
+			u8 b = *(data + 2);
+			u8 a = *(data + 3);
+			
+			Color c = Make_Color(r, g, b, a);
+			Set_Pixel_HZ(canvas, v2i{x, y}, c);
+		}
+	}
 }

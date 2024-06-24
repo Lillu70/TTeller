@@ -553,11 +553,13 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 	Assert(!event_table_day.get_free_capacity());
 	Assert(!event_table_night.get_free_capacity());
 	
-	game_state->participant_names 
-		= Create_Dynamic_Array<Game_Participant_Localized_FI>(allocator, u32(6));
+	game_state->language = Language::finnish;
 	
-	game_state->participants = Create_Dynamic_Array<Game_Participant>(allocator, u32(6));
+	game_state->player_names 
+		= Create_Dynamic_Array<Game_Player_Name_FI>(allocator, u32(6));
 	
+	game_state->players = Create_Dynamic_Array<Game_Player>(allocator, u32(6));
+	game_state->player_images = Create_Dynamic_Array<Image>(allocator, u32(6));
 	
 	return result;
 }
@@ -589,7 +591,7 @@ static Event_Consequens_GM* End_Con_Array(Participant_Header* participant_header
 }
 
 
-static void Hollow_Participant_Name_FI(Game_Participant_Localized_FI* player)
+static void Hollow_Player_Name_FI(Game_Player_Name_FI* player)
 {
 	Assert(player);
 
@@ -602,24 +604,31 @@ static void Hollow_Participant_Name_FI(Game_Participant_Localized_FI* player)
 static void Delete_Game(Game_State* gm, Allocator_Shell* allocator)
 {
 	allocator->free(gm->memory);
-	allocator->free(gm->participants);
+	allocator->free(gm->players);
 	
-	if(gm->participant_names)
+	for(Image* i = Begin(gm->player_images); i < End(gm->player_images); ++i)
 	{
-		for(auto n = Begin(gm->participant_names); n < End(gm->participant_names); ++n)
-			Hollow_Participant_Name_FI(n);
+		if(i->buffer)
+			allocator->free(i->buffer);
 	}
-	allocator->free(gm->participant_names);
+	allocator->free(gm->player_images);
+	
+	if(gm->player_names)
+	{
+		for(auto n = Begin(gm->player_names); n < End(gm->player_names); ++n)
+			Hollow_Player_Name_FI(n);
+	}
+	allocator->free(gm->player_names);
 }
 
 
-static void Create_Participant_Name_FI(Game_State* gm, Allocator_Shell* allocator)
+static void Create_Player_Name_FI(Game_State* gm, Allocator_Shell* allocator)
 {
 	Assert(gm);
 	Assert(gm->memory);
-	Assert(gm->participant_names);
+	Assert(gm->player_names);
 
-	Game_Participant_Localized_FI* name = Push(&gm->participant_names, allocator);
+	Game_Player_Name_FI* name = Push(&gm->player_names, allocator);
 	
 	Init_String(&name->full_name, allocator, u32(0));
 	Init_String(&name->variant_name_1, allocator, u32(0));

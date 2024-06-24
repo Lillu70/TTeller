@@ -507,7 +507,7 @@ static void Do_Event_Editor_Participants_Frame()
 			
 			Rect bounds = GUI_Get_Bounds_In_Pixel_Space(context);
 			v2f pannel_dim = v2f{10, bounds.max.y - bounds.min.y};
-			GUI_Do_Pannel(context, AUTO, &pannel_dim);
+			GUI_Do_Panel(context, AUTO, &pannel_dim);
 		}		
 		
 		// -- participants --
@@ -968,7 +968,7 @@ static void Do_Event_Editor_Consequences_Frame()
 			
 			Rect bounds = GUI_Get_Bounds_In_Pixel_Space(context);
 			v2f pannel_dim = v2f{10, bounds.max.y - bounds.min.y};
-			GUI_Do_Pannel(context, AUTO, &pannel_dim);
+			GUI_Do_Panel(context, AUTO, &pannel_dim);
 		}
 		
 		GUI_Do_Text(context, start_pos_ptr, "Osallistujat:");
@@ -1339,8 +1339,6 @@ static void Do_Event_Editor_On_Exit_Popup()
 {
 	Dim_Entire_Screen(&s_canvas, 0.333f);
 	
-	static v2f panel_dim = v2f{0.f, 0.f};
-	
 	BEGIN:
 	GUI_Begin_Context(
 		&s_gui_pop_up, 
@@ -1350,20 +1348,12 @@ static void Do_Event_Editor_On_Exit_Popup()
 		v2i{0, 0}, 
 		GUI_Anchor::top);
 	
-	bool panel_dim_set = panel_dim != v2f{0.f, 0.f};
+	bool panel_dim_set = s_global_data.popup_panel_dim != v2f{0.f, 0.f};
 	
 	if(panel_dim_set)
 	{
-		static GUI_Theme panel_theme = [](GUI_Theme* global_theme)
-		{ 
-			GUI_Theme result = *global_theme;
-			result.background_color = s_banner_background_color;
-			result.outline_color = global_theme->selected_color;
-			return result;
-		}(&s_theme);
-
-		s_gui_pop_up.theme = &panel_theme;
-		GUI_Do_Pannel(&s_gui_pop_up, &GUI_AUTO_MIDDLE, &panel_dim);
+		s_gui_pop_up.theme = &s_global_data.popup_panel_theme;
+		GUI_Do_Panel(&s_gui_pop_up, &GUI_AUTO_MIDDLE, &s_global_data.popup_panel_dim);
 		s_gui_pop_up.theme = &s_theme;
 	}
 	
@@ -1399,7 +1389,7 @@ static void Do_Event_Editor_On_Exit_Popup()
 	if(!panel_dim_set)
 	{
 		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(&s_gui_pop_up);
-		panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
+		s_global_data.popup_panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
 		GUI_End_Context(&s_gui_pop_up);
 		goto BEGIN;
 	}
@@ -1411,9 +1401,7 @@ static void Do_Event_Editor_On_Exit_Popup()
 static void Do_Event_Editor_Quit_Popup()
 {
 	Dim_Entire_Screen(&s_canvas, 0.333f);
-	
-	static v2f panel_dim = v2f{0.f, 0.f};
-	
+
 	BEGIN:
 	GUI_Begin_Context(
 		&s_gui_pop_up,
@@ -1423,20 +1411,12 @@ static void Do_Event_Editor_Quit_Popup()
 		v2i{0, 0}, 
 		GUI_Anchor::top);
 	
-	bool panel_dim_set = panel_dim != v2f{0.f, 0.f};
+	bool panel_dim_set = s_global_data.popup_panel_dim != v2f{0.f, 0.f};
 	
 	if(panel_dim_set)
 	{
-		static GUI_Theme panel_theme = [](GUI_Theme* global_theme)
-		{ 
-			GUI_Theme result = *global_theme;
-			result.background_color = s_banner_background_color;
-			result.outline_color = global_theme->selected_color;
-			return result;
-		}(&s_theme);
-
-		s_gui_pop_up.theme = &panel_theme;
-		GUI_Do_Pannel(&s_gui_pop_up, &GUI_AUTO_MIDDLE, &panel_dim);
+		s_gui_pop_up.theme = &s_global_data.popup_panel_theme;
+		GUI_Do_Panel(&s_gui_pop_up, &GUI_AUTO_MIDDLE, &s_global_data.popup_panel_dim);
 		s_gui_pop_up.theme = &s_theme;
 	}
 	
@@ -1470,7 +1450,7 @@ static void Do_Event_Editor_Quit_Popup()
 	if(!panel_dim_set)
 	{
 		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(&s_gui_pop_up);
-		panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
+		s_global_data.popup_panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
 		GUI_End_Context(&s_gui_pop_up);
 		goto BEGIN;
 	}
@@ -1481,9 +1461,7 @@ static void Do_Event_Editor_Quit_Popup()
 static void Do_Event_Editor_Delete_Event_Popup()
 {
 	Dim_Entire_Screen(&s_canvas, 0.333f);
-	
-	static v2f panel_dim = v2f{0.f, 0.f};
-	
+
 	BEGIN:
 	GUI_Begin_Context(
 		&s_gui_pop_up,
@@ -1493,20 +1471,12 @@ static void Do_Event_Editor_Delete_Event_Popup()
 		v2i{0, 0}, 
 		GUI_Anchor::top);
 	
-	bool panel_dim_set = panel_dim != v2f{0.f, 0.f};
+	bool panel_dim_set = s_global_data.popup_panel_dim != v2f{0.f, 0.f};
 	
 	if(panel_dim_set)
 	{
-		static GUI_Theme panel_theme = [](GUI_Theme* global_theme)
-		{ 
-			GUI_Theme result = *global_theme;
-			result.background_color = s_banner_background_color;
-			result.outline_color = global_theme->selected_color;
-			return result;
-		}(&s_theme);
-
-		s_gui_pop_up.theme = &panel_theme;
-		GUI_Do_Pannel(&s_gui_pop_up, &GUI_AUTO_MIDDLE, &panel_dim);
+		s_gui_pop_up.theme = &s_global_data.popup_panel_theme;
+		GUI_Do_Panel(&s_gui_pop_up, &GUI_AUTO_MIDDLE, &s_global_data.popup_panel_dim);
 		s_gui_pop_up.theme = &s_theme;
 	}
 	
@@ -1537,7 +1507,7 @@ static void Do_Event_Editor_Delete_Event_Popup()
 	if(!panel_dim_set)
 	{
 		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(&s_gui_pop_up);
-		panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
+		s_global_data.popup_panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
 		GUI_End_Context(&s_gui_pop_up);
 		goto BEGIN;
 	}

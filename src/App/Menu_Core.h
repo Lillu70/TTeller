@@ -87,6 +87,11 @@ struct Global_Data
 	String new_campaign_name;
 	Dynamic_Array<String>* on_disk_campaign_names = 0;
 	
+	GUI_Theme popup_panel_theme;
+	v2f popup_panel_dim = v2f{0.f, 0.f};
+	
+	Rect popup_panel_rect = {};
+	
 	bool force_quit_popup = false;
 };
 static Global_Data s_global_data = Global_Data();
@@ -123,6 +128,8 @@ static inline v2f Get_Title_Bar_Row_Placement(
 
 static inline void Set_Popup_Function(void(*popup_function)())
 {
+	s_global_data.popup_panel_dim = v2f{0.f, 0.f};
+	
 	GUI_Reset_Context(&s_gui_pop_up);
 	GUI_Activate_Context(&s_gui_pop_up);
 	s_popup_func = popup_function;
@@ -221,11 +228,48 @@ static void Do_GUI_Frame_With_Banner(
 }
 
 
+static void Do_Popup_GUI_Frame(void(*popup_func)(GUI_Context*), f32 dim_factor = 0.333f)
+{
+	Assert(popup_func);
+	
+	Dim_Entire_Screen(&s_canvas, dim_factor);
+
+	BEGIN:
+	GUI_Begin_Context(
+		&s_gui_pop_up,
+		&s_canvas, 
+		&s_global_data.action_context, 
+		&s_theme, 
+		v2i{0, 0}, 
+		GUI_Anchor::top);
+	
+	bool panel_prop_set = (
+		s_global_data.popup_panel_rect.min != v2f{0, 0} &&
+		s_global_data.popup_panel_rect.max != v2f{0, 0});
+	
+	if(panel_prop_set)
+	{
+		s_gui_pop_up.theme = &s_global_data.popup_panel_theme;
+		GUI_Do_Panel(&s_gui_pop_up, s_global_data.popup_panel_rect);
+		s_gui_pop_up.theme = &s_theme;
+	}
+	
+	popup_func(&s_gui_pop_up);
+	
+	if(!panel_prop_set)
+	{
+		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(&s_gui_pop_up);
+		s_global_data.popup_panel_rect = Expand_Rect(bounds, s_gui_pop_up.theme->padding);
+		GUI_End_Context(&s_gui_pop_up);
+		goto BEGIN;
+	}
+	
+	GUI_End_Context(&s_gui_pop_up);
+}
+
+
 static inline void Init_GUI()
 {
-	// CONSIDER: Move hotkey init someplace elsewhere.
-	// Hotkey setup
-	
 	// globals:
 	Action* htkeys = s_hotkeys;
 	htkeys[Global_Hotkeys::toggle_fullscreen]/*---*/= Make_Action(Key_Code::F11, Button::START);
@@ -281,6 +325,15 @@ static inline void Init_GUI()
 	s_theme.font.data_buffer_sc = (u8*)&s_terminus_font_special_characters[0];
 	s_theme.font.char_width = s_terminus_font_char_width;
 	s_theme.font.char_height = s_terminus_font_char_height;
+
+	s_global_data.popup_panel_theme = [](GUI_Theme* global_theme)
+	{ 
+		GUI_Theme result = *global_theme;
+		result.background_color = s_banner_background_color;
+		result.outline_color = global_theme->selected_color;
+		return result;
+	}(&s_theme);
+	
 }
 
 

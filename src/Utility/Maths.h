@@ -280,6 +280,23 @@ static inline bool Is_Point_Inside_Rect(v2f p, Rect rect)
 	bool result = p.x >= rect.min.x && p.y >= rect.min.y && p.x < rect.max.x && p.y < rect.max.y;	
 	return result;
 }
+
+
+static inline v2f Get_Rect_Dimensions(Rect rect)
+{
+	v2f result = v2f{rect.max.x - rect.min.x, rect.max.y - rect.min.y};
+	
+	return result;
+}
+ 
+ 
+static inline Rect Expand_Rect(Rect rect, f32 expand_factor)
+{
+	Rect result = Rect{rect.min - expand_factor, rect.max + expand_factor};
+	Assert(Is_Rect_Valid(result));
+	
+	return result;
+}
  
  
 static inline f32 Clamp_To_Barycentric(f32 real)

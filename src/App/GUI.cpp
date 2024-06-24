@@ -9,6 +9,12 @@ static bool GUI_Character_Check_Numbers_Only(char* c)
 }
 
 
+static bool GUI_Character_Check_View_Only(char* c)
+{
+	return false;
+}
+
+
 static inline u32 GUI_Make_Ignore_Selection_Mask()
 {
 	u32 result = GUI_Context_Flags::soft_ignore_selection | GUI_Context_Flags::hard_ignore_selection;
@@ -919,7 +925,7 @@ static inline void GUI_End_Context(GUI_Context* context)
 					GUI_Cardinal_Direction::up_down);
 				
 				f32 local_scroll_v = (!shift_down)? mouse_scroll : 0;
-				f32 scroll_delta = local_scroll_v / canvas_height * GUI_MOUSE_SCROLL_SPEED;
+				f32 scroll_delta = local_scroll_v / canvas_height * context->mouse_scroll_speed;
 				slider_value -= scroll_delta;
 				
 				if(context->flags & GUI_Context_Flags::maxout_vertical_slider)
@@ -987,7 +993,7 @@ static inline void GUI_End_Context(GUI_Context* context)
 					GUI_Cardinal_Direction::left_right);
 				
 				f32 local_scroll_v = (shift_down)? mouse_scroll : 0;
-				f32 scroll_delta = local_scroll_v / canvas_width * GUI_MOUSE_SCROLL_SPEED;
+				f32 scroll_delta = local_scroll_v / canvas_width * context->mouse_scroll_speed;
 				slider_value -= scroll_delta;
 				
 				if(context->flags & GUI_Context_Flags::maxout_horizontal_slider)
@@ -1511,7 +1517,16 @@ static void GUI_Do_Text(
 }
 
 
-static void GUI_Do_Pannel(
+static inline void GUI_Do_Title_Text(
+	GUI_Context* context, 
+	v2f* pos, char* text, 
+	v2f text_scale = GUI_DEFAULT_TEXT_SCALE)
+{
+	GUI_Do_Text(context, pos, text, {}, text_scale, true);
+}
+
+
+static void GUI_Do_Panel(
 	GUI_Context* context,
 	v2f* pos,
 	v2f* dim)
@@ -1532,6 +1547,24 @@ static void GUI_Do_Pannel(
 			context->theme->outline_thickness, 
 			context->theme->outline_color);
 	}
+}
+
+
+static void GUI_Do_Panel(GUI_Context* context, Rect rect)
+{
+	v2f dim = Get_Rect_Dimensions(rect);
+	v2f pos = rect.min + dim * 0.5f;
+	
+	GUI_Anchor a = context->layout.anchor;
+	context->layout.anchor = GUI_Anchor::center;
+	
+	//NOTE: Calling the regular override that calls GUI_Get_Placement seems silly since,
+	// we already have a rect,
+	// BUT it does additional book keeping (for auto layout stuff) so by-passing it,
+	// would be more trouble than it's worth.
+	GUI_Do_Panel(context, &pos, &dim);
+	
+	context->layout.anchor = a;
 }
 
 
@@ -2858,7 +2891,7 @@ static void GUI_Do_ML_Input_Field(
 							desired_row_jumps = -line_start_buffer_len;	
 					}
 				}
-				else if(state->cursor_is_active)
+				else if(state->cursor_is_active && character_check != GUI_Character_Check_View_Only)
 				{
 					GUI_Input_Field_Insert_Characters(
 						context->platform, 

@@ -8,14 +8,15 @@
 	This is done to make iteration fast. Especially important for requirements.
 */
 
-enum Languange : u8
+enum Language : u8
 {
-	Finnish,
-	English
+	finnish,
+	english,
+	COUNT
 };
 
 
-struct Game_Participant_Localized_FI
+struct Game_Player_Name_FI
 {
 	String full_name;
 	String variant_name_1;
@@ -23,7 +24,7 @@ struct Game_Participant_Localized_FI
 };
 
 
-struct Game_Participant
+struct Game_Player
 {
 	u8 mind;
 	u8 body;
@@ -151,8 +152,15 @@ struct Game_State
 	Table event_table_day;
 	Table event_table_night;
 	
-	Dynamic_Array<Game_Participant>* participants;
-	Dynamic_Array<Game_Participant_Localized_FI>* participant_names;
+	
+	Dynamic_Array<Game_Player>* players;
+	Dynamic_Array<Image>* player_images;
+	
+	Language language;
+	union
+	{
+		Dynamic_Array<Game_Player_Name_FI>* player_names;
+	};
 };
 
 

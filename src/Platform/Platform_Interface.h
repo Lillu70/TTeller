@@ -39,6 +39,7 @@ struct Pixel_Buffer
 };
 
 
+// TODO: Make these lowercase -- ugh huge work.
 struct Platform_Calltable
 {
 	u32  (*Get_Window_Width)() = 0;
@@ -75,9 +76,9 @@ struct Platform_Calltable
 	
 	bool (*Write_File)(const char* path, u8* buffer, u32 buffer_size) = 0;
 	
-	bool (*Get_File_Size)(const char*, u32*) = 0;
+	bool (*Get_File_Size)(const char* path, u32* out_file_size) = 0;
 	
-	bool (*Read_File)(const char*, u8*, u32) = 0;
+	bool (*Read_File)(const char* path, u8* buffer, u32 buffer_size) = 0;
 	
 	Create_Directory_Result::T (*Create_Directory)(char* path) = 0;
 	
