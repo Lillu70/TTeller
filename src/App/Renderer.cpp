@@ -224,7 +224,8 @@ static void Clear_Sub_Canvas(Canvas* canvas, Color color)
 
 static inline void Blend_Pixel_With_Color(Canvas* canvas, v2i p, v3f color, f32 fraction)
 {
-	v3f buffer_color = Unpack_Color(Get_Pixel_HZ(canvas, p));
+	Color buffer_color_packed = Get_Pixel_HZ(canvas, p);
+	v3f buffer_color = Unpack_Color(buffer_color_packed);
 	v3f final_color = Lerp(buffer_color, color, fraction);
 	
 	Color c = Make_Color((u8)final_color.r, (u8)final_color.g, (u8)final_color.b);
@@ -968,8 +969,18 @@ static void Draw_Image(Canvas* canvas, Image* img)
 			u8 b = *(data + 2);
 			u8 a = *(data + 3);
 			
-			Color c = Make_Color(r, g, b, a);
-			Set_Pixel(canvas, v2i{x, img->dim.y - (y + 1)}, c);
+			Color cp = Make_Color(r, g, b, a);
+			if(a < 255)
+			{
+				v3f c = Unpack_Color(cp);
+				f32 f = f32(a) / 255.f;
+				
+				Blend_Pixel_With_Color(canvas, v2i{x, y}, c, f);				
+			}
+			else
+			{
+				Set_Pixel_HZ(canvas, v2i{x, y}, cp);
+			}
 		}
 	}
 }
@@ -1011,8 +1022,18 @@ static void Draw_Image(Canvas* canvas, Image* img, Rect rect)
 			u8 b = *(data + 2);
 			u8 a = *(data + 3);
 			
-			Color c = Make_Color(r, g, b, a);
-			Set_Pixel_HZ(canvas, v2i{x, y}, c);
+			Color cp = Make_Color(r, g, b, a);
+			if(a < 255)
+			{
+				v3f c = Unpack_Color(cp);
+				f32 f = f32(a) / 255.f;
+				
+				Blend_Pixel_With_Color(canvas, v2i{x, y}, c, f);				
+			}
+			else
+			{
+				Set_Pixel_HZ(canvas, v2i{x, y}, cp);
+			}
 		}
 	}
 }
