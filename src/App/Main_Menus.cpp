@@ -379,46 +379,64 @@ static void Do_New_Game_Players()
 			}
 			
 			GUI_Do_Text(context, AUTO, "Kuva:");
-			
-			
-			if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lataa kuva"))
+
+			v2f picture_dim = v2f{text_box_width, text_box_width};
+			if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Valitse kuva"))
 			{
-				char* path = (i % 2)? "image2.png" : "image.jpg";
-				u32 buffer_size = 0;
-				if(s_platform.Get_File_Size((const char*)path, &buffer_size))
+				char* path_buffer[260];
+				char* path = (char*)path_buffer;
+				
+				if(s_platform.Open_Select_File_Dialog(path, Array_Lenght(path_buffer)))
 				{
-					u8* buffer = (u8*)s_allocator.push(buffer_size);
-					if(s_platform.Read_File(path, buffer, buffer_size))
+					u32 buffer_size = 0;
+					if(s_platform.Get_File_Size((const char*)path, &buffer_size))
 					{
-						i32 out_x;
-						i32 out_y;
-						i32 out_c;
-						
-						u8* img_buffer = (u8*)stbi_load_from_memory(
-							buffer, 
-							buffer_size, 
-							&out_x, 
-							&out_y, 
-							&out_c, 
-							4);
-						
-						if(img_buffer)
+						u8* buffer = (u8*)s_allocator.push(buffer_size);
+						if(s_platform.Read_File(path, buffer, buffer_size))
 						{
-							if(img->buffer)
-								s_allocator.free(img->buffer);
+							i32 out_x;
+							i32 out_y;
+							i32 out_c;
 							
-							img->buffer = img_buffer;
-							img->dim = v2i{out_x, out_y};
+							u8* img_buffer = (u8*)stbi_load_from_memory(
+								buffer, 
+								buffer_size, 
+								&out_x, 
+								&out_y, 
+								&out_c, 
+								4);
+							
+							if(img_buffer)
+							{
+								if(img->buffer)
+									s_allocator.free(img->buffer);
+								
+								img->buffer = img_buffer;
+								img->dim = v2i{out_x, out_y};
+							}
 						}
-					}						
+					}
 				}
 			}
 			
-			v2f picture_dim = v2f{text_box_width, text_box_width};
+			GUI_Push_Layout(context);
+			
+			context->layout.build_direction = GUI_Build_Direction::right_center;
+			if(img->buffer && GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "X"))
+			{
+				s_allocator.free(img->buffer);
+				img->buffer = 0;
+			}
+			
+			GUI_Pop_Layout(context);
+			
 			GUI_Do_Panel(context, AUTO, &picture_dim);
 			
 			if(img->buffer)
-				Draw_Image(context->canvas, img, Expand_Rect(context->layout.last_element.rect, -10));
+			{
+				Rect r = Expand_Rect(context->layout.last_element.rect, f32(s_theme.outline_thickness) * -1);
+				Draw_Image(context->canvas, img, r);
+			}
 			
 			GUI_Pop_Layout(context);
 				

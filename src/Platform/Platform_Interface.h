@@ -91,4 +91,7 @@ struct Platform_Calltable
 	void* (*Allocate_Memory)(u32 amount, u32* out_amount) = 0;
 	
 	void  (*Free_Memory)(void* memory) = 0;
+	
+	bool (*Open_Select_File_Dialog)(char* result_buffer, u32 result_buffer_size) = 0;
+	
 };

@@ -54,6 +54,8 @@ static inline void Set_Pixel_Idx_HZ(Canvas* canvas, u32 idx, Color color);
 
 static inline void Blend_Pixel_With_Color(Canvas* canvas, v2i p, v3f color, f32 fraction);
 
+static inline void Blend_Pixel_With_Color(Canvas* canvas, v2i p, v3f color, f32 fraction, u8 alpha);
+
 
 static inline Color Get_Pixel_HZ(Canvas* canvas, v2i p);
 

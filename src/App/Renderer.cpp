@@ -233,6 +233,17 @@ static inline void Blend_Pixel_With_Color(Canvas* canvas, v2i p, v3f color, f32 
 }
 
 
+static inline void Blend_Pixel_With_Color(Canvas* canvas, v2i p, v3f color, f32 fraction, u8 alpha)
+{
+	Color buffer_color_packed = Get_Pixel_HZ(canvas, p);
+	v3f buffer_color = Unpack_Color(buffer_color_packed);
+	v3f final_color = Lerp(buffer_color, color, fraction);
+	
+	Color c = Make_Color((u8)final_color.r, (u8)final_color.g, (u8)final_color.b, alpha);
+	Set_Pixel_HZ(canvas, p, c);
+}
+
+
 static inline void Draw_Rect_Ribbon(
 	Canvas* canvas, 
 	Rect rect, 
@@ -975,7 +986,7 @@ static void Draw_Image(Canvas* canvas, Image* img)
 				v3f c = Unpack_Color(cp);
 				f32 f = f32(a) / 255.f;
 				
-				Blend_Pixel_With_Color(canvas, v2i{x, y}, c, f);				
+				Blend_Pixel_With_Color(canvas, v2i{x, y}, c, f, a);				
 			}
 			else
 			{
@@ -1028,7 +1039,7 @@ static void Draw_Image(Canvas* canvas, Image* img, Rect rect)
 				v3f c = Unpack_Color(cp);
 				f32 f = f32(a) / 255.f;
 				
-				Blend_Pixel_With_Color(canvas, v2i{x, y}, c, f);				
+				Blend_Pixel_With_Color(canvas, v2i{x, y}, c, f, a);
 			}
 			else
 			{

@@ -835,6 +835,48 @@ static Dynamic_Array<String>* Win32_Search_Directory_For_Maching_Names(
 }
 
 
+static bool Win32_Open_Select_File_Dialog(
+	char* result_buffer, 
+	u32 result_buffer_size
+	)
+{
+	Mem_Zero(result_buffer, result_buffer_size);
+	
+	OPENFILENAMEA of = {};
+	of.lStructSize 		 = sizeof (OPENFILENAME); 	
+	of.hwndOwner 		 = 0;						
+	of.hInstance 		 = 0;						
+	of.lpstrFilter 		 = "Kuvia\0*.png;*.jpg;*.bmp\0";
+	of.lpstrCustomFilter = 0;
+	of.nMaxCustFilter 	 = 0;
+	of.nFilterIndex 	 = 0;
+	of.lpstrFile 		 = (char*)result_buffer; 		
+	of.nMaxFile 		 = result_buffer_size;
+	of.lpstrFileTitle 	 = 0;
+	of.nMaxFileTitle 	 = 0;
+	of.lpstrInitialDir 	 = 0;
+	of.lpstrTitle 		 = "Valitse hahmolle kuva"; 
+	of.Flags 			 = 0;
+	of.nFileOffset 		 = 0;
+	of.nFileExtension 	 = 0;
+	of.lpstrDefExt 		 = 0;
+	of.lCustData 		 = 0;
+	of.lpfnHook 		 = 0;
+	of.lpTemplateName 	 = 0;
+	//of.lpEditInfo 	 = 0;
+	//of.lpstrPrompt 	 = 0;
+	//of.*pvReserved 	 = 0;
+	of.FlagsEx 			 = 0;
+	of.dwReserved 		 = 0;
+	
+	
+	LPOPENFILENAMEA dialog = &of;
+	BOOL result = GetOpenFileNameA(dialog);
+	
+	return result;
+}
+
+
 static Platform_Calltable Win32_Get_Calltable()
 {
 	Platform_Calltable ct = {};
@@ -863,6 +905,7 @@ static Platform_Calltable Win32_Get_Calltable()
 	ct.Allocate_Memory = Win32_Allocate_Memory;
 	ct.Free_Memory = Win32_Free_Memory;
 	ct.Search_Directory_For_Maching_Names = Win32_Search_Directory_For_Maching_Names;
+	ct.Open_Select_File_Dialog = Win32_Open_Select_File_Dialog;
 	
 	return ct;
 }

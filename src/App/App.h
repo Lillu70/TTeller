@@ -33,11 +33,14 @@ static inline void* REALLY_BAD_REALLOC(void* p, u32 newsz)
 	}
 	return s_allocator.push(newsz);
 }
+
+
 static inline  void REALLY_BAD_FREE(void* p)
 {
-	if(p)
+	if(p) 
 		s_allocator.free(p);
 }
+
 
 #define STBI_FAILURE_USERMSG
 #define STBI_NO_HDR
