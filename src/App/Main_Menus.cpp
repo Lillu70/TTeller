@@ -2,7 +2,6 @@
 #pragma once
 
 
-
 static void Do_Main_Menu_Quit_Popup()
 {
 	Dim_Entire_Screen(&s_canvas, 0.333f);
@@ -275,6 +274,10 @@ static void Do_New_Game_Players()
 		if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
 		{
 			s_global_data.active_menu = Menus::main_menu;
+			
+			if(s_game_state.memory)
+				Delete_Game(&s_game_state, &s_allocator);
+			
 		}
 		
 		GUI_Push_Layout(context);
@@ -291,6 +294,8 @@ static void Do_New_Game_Players()
 		{
 			Create_Player_Name_FI(&s_game_state, &s_allocator);
 			*Push(&s_game_state.player_images, &s_allocator) = {};
+			
+			s_gui.flags |= GUI_Context_Flags::maxout_horizontal_slider;
 		}
 		
 		context->layout.build_direction = GUI_Build_Direction::right_center;
@@ -306,8 +311,11 @@ static void Do_New_Game_Players()
 
 	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
+		if(!s_game_state.memory)
+			return;
+		
 		Dynamic_Array<Game_Player_Name_FI>* names = s_game_state.player_names;
-		Image* images = Begin(s_game_state.player_images);
+		Player_Image* player_images = Begin(s_game_state.player_images);
 		
 		static constexpr f32 collumn_min_width = 300;
 
@@ -320,7 +328,8 @@ static void Do_New_Game_Players()
 		for(auto n = Begin(names); n < End(names); ++n, ++i)
 		{
 			Assert(i < s_game_state.player_images->count);			
-			Image* img = images + i;
+			Player_Image* player_image = player_images + i; 
+			Image* img = &(player_image)->image;
 			
 			GUI_Placement rcp = context->layout.last_element;
 			
@@ -335,7 +344,7 @@ static void Do_New_Game_Players()
 					s_allocator.free(img->buffer);
 				
 				u32* img_count = &s_game_state.player_images->count;
-				Remove_Element_From_Packed_Array(images, img_count, sizeof(*img), i);
+				Remove_Element_From_Packed_Array(player_images, img_count, sizeof(*player_images), i);
 				
 				if(!i)
 					pos = &GUI_AUTO_TOP_LEFT;
@@ -383,38 +392,64 @@ static void Do_New_Game_Players()
 			v2f picture_dim = v2f{text_box_width, text_box_width};
 			if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Valitse kuva"))
 			{
-				char* path_buffer[260];
-				char* path = (char*)path_buffer;
+				char path[260];
 				
-				if(s_platform.Open_Select_File_Dialog(path, Array_Lenght(path_buffer)))
+				if(s_platform.Open_Select_File_Dialog(path, Array_Lenght(path)))
 				{
 					u32 buffer_size = 0;
 					if(s_platform.Get_File_Size((const char*)path, &buffer_size))
 					{
-						u8* buffer = (u8*)s_allocator.push(buffer_size);
-						if(s_platform.Read_File(path, buffer, buffer_size))
+						u8* file_buffer = (u8*)s_allocator.push(buffer_size);
+						if(s_platform.Read_File(path, file_buffer, buffer_size))
 						{
 							i32 out_x;
 							i32 out_y;
 							i32 out_c;
 							
 							u8* img_buffer = (u8*)stbi_load_from_memory(
-								buffer, 
+								file_buffer, 
 								buffer_size, 
 								&out_x, 
 								&out_y, 
 								&out_c, 
-								4);
+								sizeof(Color));
 							
 							if(img_buffer)
 							{
 								if(img->buffer)
+								{
+									Assert(player_image->file_path.buffer);
+									
+									player_image->file_path.free();
 									s_allocator.free(img->buffer);
+								}
 								
-								img->buffer = img_buffer;
-								img->dim = v2i{out_x, out_y};
+								{
+									Image loaded_img = {img_buffer, v2i{out_x, out_y}};
+									#if 1
+									{
+										img->dim = picture_dim.As<i32>();
+										u32 sm_size = img->dim.x * img->dim.y * sizeof(Color);
+										
+										img->buffer = (u8*)s_allocator.push(sm_size);
+									
+										Resize_Image(img, &loaded_img);
+										s_allocator.free(loaded_img.buffer);
+									}
+									#else
+									{
+										*img = loaded_img;										
+									}
+									#endif
+									
+									Convert_From_RGB_To_Color(img);
+								}
+								
+								Init_String(&player_image->file_path, &s_allocator, path);
 							}
 						}
+						
+						s_allocator.free(file_buffer);
 					}
 				}
 			}
@@ -424,7 +459,10 @@ static void Do_New_Game_Players()
 			context->layout.build_direction = GUI_Build_Direction::right_center;
 			if(img->buffer && GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "X"))
 			{
+				Assert(player_image->file_path.buffer);
+				
 				s_allocator.free(img->buffer);
+				player_image->file_path.free();
 				img->buffer = 0;
 			}
 			

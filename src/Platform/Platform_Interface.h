@@ -94,4 +94,6 @@ struct Platform_Calltable
 	
 	bool (*Open_Select_File_Dialog)(char* result_buffer, u32 result_buffer_size) = 0;
 	
+	bool (*Get_Executable_Path)(char* result_buffer, u32 result_buffer_size) = 0;
+	
 };

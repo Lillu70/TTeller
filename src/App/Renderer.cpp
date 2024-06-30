@@ -1019,32 +1019,76 @@ static void Draw_Image(Canvas* canvas, Image* img, Rect rect)
 	
 	for(i32 y = min_y; y < max_y; ++y)
 	{
+		f32 fsy = 1 - f32((y - uy) - min_y) / h;
+		i32 isy = i32(Round((img->dim.y - 1) * fsy));
+		
 		for(i32 x = min_x; x < max_x; ++x)
 		{
-			f32 fsx = f32((x - ux) - min_x) / w; 
-			f32 fsy = 1 - f32((y - uy) - min_y) / h;
-			
+			f32 fsx = f32((x - ux) - min_x) / w; 			
 			i32 isx = i32(Round((img->dim.x - 1) * fsx));
-			i32 isy = i32(Round((img->dim.y - 1) * fsy));
 			
-			u8* data = img->buffer + ((isy * img->dim.x + isx) * 4);
-			u8 r = *(data + 0);
-			u8 g = *(data + 1);
-			u8 b = *(data + 2);
-			u8 a = *(data + 3);
+			Color c = *((Color*)(img->buffer + ((isy * img->dim.x + isx) * 4)));
 			
-			Color cp = Make_Color(r, g, b, a);
-			if(a < 255)
+			if(c.a < 250)
 			{
-				v3f c = Unpack_Color(cp);
-				f32 f = f32(a) / 255.f;
-				
-				Blend_Pixel_With_Color(canvas, v2i{x, y}, c, f, a);
+				v3f uc = Unpack_Color(c);
+				f32 f = f32(c.a) / 255.f;
+				Blend_Pixel_With_Color(canvas, v2i{x, y}, uc, f);	
 			}
 			else
 			{
-				Set_Pixel_HZ(canvas, v2i{x, y}, cp);
+				Set_Pixel_HZ(canvas, v2i{x, y}, c);
 			}
 		}
+	}
+}
+
+
+static void Resize_Image(Image* dest, Image* src)
+{
+	Assert(src->buffer);
+	Assert(dest->buffer);
+	Assert(dest->dim.x && dest->dim.y);
+	
+	Color* dest_buffer = (Color*)dest->buffer;
+	for(i32 y = 0; y < dest->dim.y; ++y)
+	{		
+		f32 fy = f32(y) / dest->dim.y;
+		i32 sy = i32(fy * src->dim.y);
+		
+		for(i32 x = 0; x < dest->dim.x; ++x)
+		{
+			f32 fx = f32(x) / dest->dim.x;
+			i32 sx = i32(fx * src->dim.x);
+			
+			u8* b = src->buffer + ((sy * src->dim.x + sx) * sizeof(Color));
+			
+			Assert(b < src->buffer + (src->dim.x * src->dim.y * sizeof(Color)));
+			Assert((u8*)dest_buffer < dest->buffer + (dest->dim.x * dest->dim.y * sizeof(Color)));
+			
+			Color src_color = *(Color*)(b);
+			*(dest_buffer++) = src_color;
+			
+		}
+	}
+}
+
+
+static void Convert_From_RGB_To_Color(Image* img)
+{
+	i32 pixel_count = img->dim.x * img->dim.y;
+	
+	i32 color_size = sizeof(Color);
+	
+	for(i32 i = 0; i < pixel_count * color_size; i += color_size)
+	{
+		u8* data = img->buffer + i;
+		u8 r = *(data + 0);
+		u8 g = *(data + 1);
+		u8 b = *(data + 2);
+		u8 a = *(data + 3);
+		
+		Color c = Make_Color(r, g, b, a);
+		(*(Color*)data) = c;
 	}
 }

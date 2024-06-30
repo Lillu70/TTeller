@@ -840,6 +840,9 @@ static bool Win32_Open_Select_File_Dialog(
 	u32 result_buffer_size
 	)
 {
+	Assert(result_buffer);
+	Assert(result_buffer_size);
+	
 	Mem_Zero(result_buffer, result_buffer_size);
 	
 	OPENFILENAMEA of = {};
@@ -877,6 +880,27 @@ static bool Win32_Open_Select_File_Dialog(
 }
 
 
+static bool Win32_Get_Executable_Path(char* result_buffer, u32 result_buffer_size)
+{
+	Assert(result_buffer);
+	Assert(result_buffer_size);
+	
+	DWORD bits_written = GetModuleFileNameA(0, result_buffer, result_buffer_size);
+	
+	for(char* c = result_buffer + bits_written; c >= result_buffer; --c)
+	{
+		if(*c == '\\')
+		{
+			*(c + 1) = 0;
+			return true;
+		}
+	}
+	
+	result_buffer[0] = 0;
+	return false;
+}
+
+
 static Platform_Calltable Win32_Get_Calltable()
 {
 	Platform_Calltable ct = {};
@@ -906,6 +930,7 @@ static Platform_Calltable Win32_Get_Calltable()
 	ct.Free_Memory = Win32_Free_Memory;
 	ct.Search_Directory_For_Maching_Names = Win32_Search_Directory_For_Maching_Names;
 	ct.Open_Select_File_Dialog = Win32_Open_Select_File_Dialog;
+	ct.Get_Executable_Path = Win32_Get_Executable_Path;
 	
 	return ct;
 }

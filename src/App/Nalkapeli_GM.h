@@ -24,6 +24,13 @@ struct Game_Player_Name_FI
 };
 
 
+struct Player_Image
+{
+	String file_path;
+	Image image;
+};
+
+
 struct Game_Player
 {
 	u8 mind;
@@ -154,7 +161,7 @@ struct Game_State
 	
 	
 	Dynamic_Array<Game_Player>* players;
-	Dynamic_Array<Image>* player_images;
+	Dynamic_Array<Player_Image>* player_images;
 	
 	Language language;
 	union

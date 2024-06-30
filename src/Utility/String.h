@@ -221,6 +221,56 @@ static void Init_String(
 	String* str, 
 	Allocator_Shell* allocator, 
 	char* c_str1, 
+	char* c_str2, 
+	char* c_str3,
+	char* c_str4)
+{
+	Assert(allocator);
+	
+	u32 lenght1 = Null_Terminated_Buffer_Lenght(c_str1);
+	u32 lenght2 = Null_Terminated_Buffer_Lenght(c_str2);
+	u32 lenght3 = Null_Terminated_Buffer_Lenght(c_str3);
+	u32 lenght4 = Null_Terminated_Buffer_Lenght(c_str4);
+
+
+	str->lenght = lenght1 + lenght2 + lenght3 + lenght4;
+	str->alloc = allocator;
+	
+	String_Init_Alloc(str, str->lenght+ 1);
+	if(lenght1 > 0)
+		Mem_Copy(str->buffer, c_str1, lenght1);
+	
+	if(lenght2 > 0)
+		Mem_Copy(str->buffer + lenght1, c_str2, lenght2);
+	
+	if(lenght3 > 0)
+		Mem_Copy(str->buffer + lenght1 + lenght2, c_str3, lenght3);
+	
+	if(lenght4 > 0)
+		Mem_Copy(str->buffer + lenght1 + lenght2 + lenght3, c_str4, lenght4);
+	
+	str->buffer[str->lenght] = 0;
+}
+
+
+static inline String Create_String(
+	Allocator_Shell* allocator, 
+	char* c_str1, 
+	char* c_str2, 
+	char* c_str3,
+	char* c_str4)
+{
+	String result;
+	Init_String(&result, allocator, c_str1, c_str2, c_str3, c_str4);
+	
+	return result;
+}
+
+
+static void Init_String(
+	String* str, 
+	Allocator_Shell* allocator, 
+	char* c_str1, 
 	String* str2, 
 	char* c_str3)
 {
@@ -354,9 +404,12 @@ inline void String::erase(u32 from, u32 to)
 inline void String::free()
 {
 	if(buffer)
+	{
 		alloc->free(buffer);
-
-	buffer = 0;
+		buffer = 0;		
+	}
+	
+	alloc = 0;
 	lenght = 0;
 	capacity = 0;
 }
@@ -370,8 +423,10 @@ static void operator += (String& str, char c)
 
 static bool C_STR_Compare(char* a, char* b)
 {
-	while(*a == *b++ && *a++ != 0);	
-	return (*(a - 1) == 0 && *(b - 1) == 0);
+	while(*a == *b++ && *a++ != 0);
+	
+	bool result = (*(a - 1) == 0 && *(b - 1) == 0);
+	return result;
 }
 
 

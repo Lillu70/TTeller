@@ -314,10 +314,24 @@ static String Generate_Unique_Name(Event_State* events, u32 event_count, Allocat
 }
 
 
-static String Create_Campaign_Full_Path(String* source_name, Allocator_Shell* allocator)
+static String Create_Campaign_Full_Path(
+	String* source_name, 
+	Platform_Calltable* platform, 
+	Allocator_Shell* allocator)
 {
+	char exe_path[260];
+	u32 exe_path_lenght = platform->Get_Executable_Path(exe_path, Array_Lenght(exe_path));
+	
+	Assert(exe_path_lenght);
+	
 	String result;
-	Init_String(&result, allocator, campaigns_folder_path, source_name, campaign_file_extension);
+	Init_String(
+		&result, 
+		allocator,
+		exe_path,
+		campaigns_folder_path, 
+		source_name->buffer,
+		campaign_file_extension);
 	
 	return result;
 }
@@ -510,6 +524,7 @@ static void Serialize_Campaign(
 		
 		String full_path = Create_Campaign_Full_Path(
 			&event_container.campaign_name, 
+			platform,
 			event_container.campaign_name.alloc);
 		
 		bool success = platform->Write_File(
@@ -942,7 +957,7 @@ static bool Load_Campaign(
 	Allocator_Shell* allocator,
 	Platform_Calltable* platform)
 {
-	String full_path = Create_Campaign_Full_Path(name, allocator);
+	String full_path = Create_Campaign_Full_Path(name, platform, allocator);
 	
 	u32 buffer_size = 0;
 	bool load_successful = false;

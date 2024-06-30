@@ -65,6 +65,7 @@ static inline  void REALLY_BAD_FREE(void* p)
 #include "GUI.h"
 #include "GUI.cpp"
 
+
 #include "Nalkapeli.h"
 #include "Nalkapeli.cpp"
 
@@ -77,3 +78,5 @@ static Canvas s_canvas;
 #include "Menu_Core.h"
 #include "Main_Menus.cpp"
 #include "Editor_Menus.cpp"
+
+#include "Memory_Display.cpp"

@@ -559,7 +559,7 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 		= Create_Dynamic_Array<Game_Player_Name_FI>(allocator, u32(6));
 	
 	game_state->players = Create_Dynamic_Array<Game_Player>(allocator, u32(6));
-	game_state->player_images = Create_Dynamic_Array<Image>(allocator, u32(6));
+	game_state->player_images = Create_Dynamic_Array<Player_Image>(allocator, u32(6));
 	
 	return result;
 }
@@ -606,10 +606,13 @@ static void Delete_Game(Game_State* gm, Allocator_Shell* allocator)
 	allocator->free(gm->memory);
 	allocator->free(gm->players);
 	
-	for(Image* i = Begin(gm->player_images); i < End(gm->player_images); ++i)
+	for(Player_Image* i = Begin(gm->player_images); i < End(gm->player_images); ++i)
 	{
-		if(i->buffer)
-			allocator->free(i->buffer);
+		if(i->image.buffer)
+		{
+			allocator->free(i->image.buffer);
+			i->file_path.free();
+		}
 	}
 	allocator->free(gm->player_images);
 	
@@ -619,6 +622,8 @@ static void Delete_Game(Game_State* gm, Allocator_Shell* allocator)
 			Hollow_Player_Name_FI(n);
 	}
 	allocator->free(gm->player_names);
+	
+	*gm = {};
 }
 
 

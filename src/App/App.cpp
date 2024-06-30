@@ -129,6 +129,10 @@ static void Run_Active_Menu(u32 app_flags)
 
 				Delete_All_Events(&editor_format_campagin, &s_allocator);
 			}
+			else
+			{
+				Terminate;
+			}
 			
 			game_name.free();
 			
@@ -218,9 +222,17 @@ static void Run_Active_Menu(u32 app_flags)
 			{
 				Delete_All_Events(&s_editor_state.event_container, &s_allocator);
 				
+				char exe_path[260];
+				u32 exe_path_lenght = s_platform.Get_Executable_Path(exe_path, Array_Lenght(exe_path));
+				
+				String campaign_directory 
+					= Create_String(&s_allocator, exe_path, campaign_folder_wildcard_path);
+				
 				s_global_data.on_disk_campaign_names = s_platform.Search_Directory_For_Maching_Names(
-					campaign_folder_wildcard_path, 
+					campaign_directory.buffer, 
 					&s_allocator);
+				
+				campaign_directory.free();
 				
 				Dynamic_Array<String>* on_disk_names = s_global_data.on_disk_campaign_names;
 				if(on_disk_names)
@@ -241,6 +253,13 @@ static void Run_Active_Menu(u32 app_flags)
 				
 			}break;
 		}
+	}
+	
+	if(s_hotkeys[Global_Hotkeys::display_memory].Is_Down())
+	{
+		Canvas canvas = Create_Sub_Canvas(&s_canvas, v2u{s_canvas.dim.x, s_canvas.dim.y / 2});
+		
+		Draw_Memory_Display(&s_mem, &canvas);
 	}
 }
 

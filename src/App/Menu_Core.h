@@ -24,6 +24,7 @@ namespace Global_Hotkeys
 	{
 		toggle_fullscreen = 0,
 		open_quit_popup,
+		display_memory,
 		COUNT
 	};
 }
@@ -274,6 +275,7 @@ static inline void Init_GUI()
 	Action* htkeys = s_hotkeys;
 	htkeys[Global_Hotkeys::toggle_fullscreen]/*---*/= Make_Action(Key_Code::F11, Button::START);
 	htkeys[Global_Hotkeys::open_quit_popup]/*-----*/= Make_Action(Key_Code::ESC, Button::BUT_Y);
+	htkeys[Global_Hotkeys::display_memory]/*------*/= Make_Action(Key_Code::F8, Button::NONE);
 	
 	// editor:
 	htkeys[Editor_Hotkeys::active_pannel_toggle]/**/= Make_Action(Key_Code::TAB, Button::BUT_X);

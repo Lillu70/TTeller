@@ -587,7 +587,6 @@ struct Paged_General_Allocator
 	
 	void init(Platform_Calltable* _platform, u32 _page_count=255, u32 _default_page_size = MiB)
 	{
-		Assert(_default_page_size);
 		
 		default_page_size = _default_page_size;
 		platform = _platform;
@@ -660,6 +659,8 @@ struct Paged_General_Allocator
 	
 	void free(void* ptr)
 	{
+		Assert(ptr);
+		
 		free_call_count += 1;
 		
 		u32* source_page_idx = ((u32*)ptr) - 1;
