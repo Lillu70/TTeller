@@ -1,7 +1,6 @@
 
 # pragma once
 
-
 struct Image
 {
 	u8* buffer;

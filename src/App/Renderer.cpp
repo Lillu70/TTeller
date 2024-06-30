@@ -1019,7 +1019,7 @@ static void Draw_Image(Canvas* canvas, Image* img, Rect rect)
 	
 	for(i32 y = min_y; y < max_y; ++y)
 	{
-		f32 fsy = 1 - f32((y - uy) - min_y) / h;
+		f32 fsy = f32((y - uy) - min_y) / h;
 		i32 isy = i32(Round((img->dim.y - 1) * fsy));
 		
 		for(i32 x = min_x; x < max_x; ++x)
@@ -1035,7 +1035,7 @@ static void Draw_Image(Canvas* canvas, Image* img, Rect rect)
 				f32 f = f32(c.a) / 255.f;
 				Blend_Pixel_With_Color(canvas, v2i{x, y}, uc, f);	
 			}
-			else
+			else if(c.a > 5)
 			{
 				Set_Pixel_HZ(canvas, v2i{x, y}, c);
 			}
@@ -1090,5 +1090,23 @@ static void Convert_From_RGB_To_Color(Image* img)
 		
 		Color c = Make_Color(r, g, b, a);
 		(*(Color*)data) = c;
+	}
+}
+
+
+static void Convert_From_RGB_To_Color_And_Flip_Y(Image* img)
+{
+	for(i32 y = 0; y < (i32)Ceil(f32(img->dim.y) / 2.f); ++y)
+	{
+		for(i32 x = 0; x < img->dim.x; ++x)
+		{
+			Color* l1 = (Color*)img->buffer + (y * img->dim.x + x);
+			Color* l2 = (Color*)img->buffer + ((img->dim.y - 1 - y) * img->dim.x + x);
+			Color c1 = Make_Color(l1->b, l1->g, l1->r, l1->a);				
+			Color c2 = Make_Color(l2->b, l2->g, l2->r, l2->a);	
+			
+			*l1 = c2;
+			*l2 = c1;
+		}
 	}
 }

@@ -442,7 +442,7 @@ static void Do_New_Game_Players()
 									}
 									#endif
 									
-									Convert_From_RGB_To_Color(img);
+									Convert_From_RGB_To_Color_And_Flip_Y(img);
 								}
 								
 								Init_String(&player_image->file_path, &s_allocator, path);
