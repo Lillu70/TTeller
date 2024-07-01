@@ -335,7 +335,6 @@ static inline void Init_GUI()
 		result.outline_color = global_theme->selected_color;
 		return result;
 	}(&s_theme);
-	
 }
 
 

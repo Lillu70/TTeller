@@ -14,6 +14,17 @@ static inline Color Pack_Color(v3f color)
 }
 
 
+static inline Color Pack_Color(v4f color)
+{
+	color.r = Min(255.f, Max(color.r, 0.f));
+	color.g = Min(255.f, Max(color.g, 0.f));
+	color.b = Min(255.f, Max(color.b, 0.f));
+	color.a = Min(255.f, Max(color.a, 0.f));
+	
+	return Make_Color(u8(color.r), u8(color.g), u8(color.b), u8(color.a));
+}
+
+
 static inline v2f Get_Middle(Canvas* canvas)
 {
 	v2f result = v2u::Cast<f32>(canvas->dim) * 0.5f;
@@ -974,23 +985,17 @@ static void Draw_Image(Canvas* canvas, Image* img)
 	{	
 		for(i32 x = 0; x < img->dim.x; ++x)
 		{
-			u8* data = img->buffer + ((y * img->dim.x + x) * 4);
-			u8 r = *(data + 0);
-			u8 g = *(data + 1);
-			u8 b = *(data + 2);
-			u8 a = *(data + 3);
-			
-			Color cp = Make_Color(r, g, b, a);
-			if(a < 255)
+			Color c = *((Color*)img->buffer + ((y * img->dim.x + x)));
+
+			if(c.a < 250)
 			{
-				v3f c = Unpack_Color(cp);
-				f32 f = f32(a) / 255.f;
-				
-				Blend_Pixel_With_Color(canvas, v2i{x, y}, c, f, a);				
+				v3f uc = Unpack_Color(c);
+				f32 f = f32(c.a) / 255.f;
+				Blend_Pixel_With_Color(canvas, v2i{x, y}, uc, f);	
 			}
-			else
+			else if(c.a > 5)
 			{
-				Set_Pixel_HZ(canvas, v2i{x, y}, cp);
+				Set_Pixel_HZ(canvas, v2i{x, y}, c);
 			}
 		}
 	}
@@ -1107,6 +1112,90 @@ static void Convert_From_RGB_To_Color_And_Flip_Y(Image* img)
 			
 			*l1 = c2;
 			*l2 = c1;
+		}
+	}
+}
+
+
+static void Mult_Alpha_On_Image(Image* img, f32 m)
+{
+	i32 pixel_count = img->dim.x * img->dim.y;
+	
+	i32 color_size = sizeof(Color);
+	
+	for(i32 i = 0; i < pixel_count * color_size; i += color_size)
+	{
+		Color* c = (Color*)(img->buffer + i);
+		
+		f32 a = f32(c->a);
+		a *= m;
+		
+		c->a = u8(a);
+	}
+}
+
+
+static void Draw_Image2(Canvas* canvas, Image* img, Rect rect)
+{
+	Rect _rect = rect;
+	if(!Verify_Rect_(canvas, &_rect))
+		return;
+	
+	i32 xclip = i32(Ceil(_rect.min.x) - Ceil(rect.min.x));
+	i32 yclip = i32(Ceil(_rect.min.y) - Ceil(rect.min.y));
+	
+	f32 w = rect.max.x - rect.min.x;
+	f32 h = rect.max.y - rect.min.y;
+	
+	i32 x_min = (i32)Ceil(_rect.min.x);
+	i32 y_min = (i32)Ceil(_rect.min.y);
+	
+	i32 x_max = (i32)Floor(_rect.max.x);
+	i32 y_max = (i32)Floor(_rect.max.y);
+	
+	f32 fx = 1.f - (rect.min.x - f32(i32(rect.min.x)));
+	f32 fy = 1.f - (rect.min.y - f32(i32(rect.min.y)));
+	
+	if(fx == 1.f)
+		fx = 0;
+	
+	if(fy == 1.f)
+		fy = 0;
+	
+	for(i32 y = y_min; y < y_max; ++y)
+	{
+		for(i32 x = x_min; x < x_max; ++x)
+		{
+			i32 rx = x - x_min + xclip;
+			i32 ry = y - y_min + yclip;
+			
+			f32 u = (rx + fx) / w;
+			f32 v = (ry + fy) / h;
+
+			f32 sx = u * f32(img->dim.x - 1);
+			f32 sy = v * f32(img->dim.y - 1);
+			
+			Color* c1 = (Color*)img->buffer + i32(sy) * img->dim.x + i32(sx);
+			Color* c2 = c1 + 1;
+			Color* c3 = c1 + img->dim.x;
+			Color* c4 = c3 + 1;
+			
+			v4f c1_up = Unpack_Color_With_Alpha(*c1);
+			v4f c2_up = Unpack_Color_With_Alpha(*c2);
+			v4f c3_up = Unpack_Color_With_Alpha(*c3);
+			v4f c4_up = Unpack_Color_With_Alpha(*c4);
+			
+			f32 xblend = (sx - f32(i32(sx)));
+			f32 yblend = (sy - f32(i32(sy)));
+		 
+			v4f xb1 = Lerp(c1_up, c2_up, xblend);
+			v4f xb2 = Lerp(c3_up, c4_up, xblend);
+			v4f yb  = Lerp(xb1, xb2, yblend);
+			
+			v3f c = v3f{yb.r, yb.g, yb.b};
+			v2i p = v2i{x, y};
+			
+			Blend_Pixel_With_Color(canvas, p, c, yb.a / 255.f);
 		}
 	}
 }

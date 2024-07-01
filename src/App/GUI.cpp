@@ -580,7 +580,6 @@ static inline void GUI_Begin_Context(
 	Assert(canvas);
 	Assert(theme);
 	Assert(!GUI_Is_Context_Ready(context));
-	Assert(external_action_context);
 	Assert(context->_context_id);
 	Assert(context->platform);
 	
@@ -2312,7 +2311,8 @@ static bool GUI_Do_SL_Input_Field(
 		
 		if(state->is_active)
 		{
-			context->external_action_context->disable_for_one_frame = true;
+			if(context->external_action_context)
+				context->external_action_context->disable_for_one_frame = true;
 			
 			if(context->actions[GUI_Menu_Actions::back].Is_Pressed() || 
 				(!cursor_on_selection && mouse_pressed_down))
@@ -2746,7 +2746,8 @@ static void GUI_Do_ML_Input_Field(
 		
 		if(state->is_active)
 		{
-			context->external_action_context->disable_for_one_frame = true;
+			if(context->external_action_context)
+				context->external_action_context->disable_for_one_frame = true;
 			
 			// Handle input
 			bool mouse_pressed_down = context->actions[GUI_Menu_Actions::mouse].Is_Pressed();

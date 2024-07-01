@@ -124,3 +124,9 @@ static void Draw_Image(Canvas* canvas, Image* img, v2f scale);
 static void Draw_Image(Canvas* canvas, Image* img);
 
 static void Draw_Image(Canvas* canvas, Image* img, Rect rect);
+
+static void Convert_From_RGB_To_Color_And_Flip_Y(Image* img);
+
+static void Convert_From_RGB_To_Color(Image* img);
+
+static void Resize_Image(Image* dest, Image* src);
