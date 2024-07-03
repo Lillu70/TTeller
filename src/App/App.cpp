@@ -145,6 +145,11 @@ static void Run_Active_Menu(u32 app_flags)
 			Do_New_Game_Players();
 		}break;
 		
+		case Menus::GM_event_display:
+		{
+			Do_Event_Display_Frame();
+		}break;
+		
 		default:
 		{
 			Assert(false);
@@ -262,40 +267,42 @@ static void Run_Active_Menu(u32 app_flags)
 		Draw_Memory_Display(&s_mem, &canvas);
 	}
 	
-	#if 1
-	
-	static Image subpixel_img = {};
-	if(!subpixel_img.buffer)
-	{
-		char* path = "Allahu.png";
-		Load_Image(&subpixel_img, path, &s_platform);
-	}
-	f64 time = s_platform.Get_Time_Stamp();
-	
-	v2f pos, dim;
-	pos = Get_Middle(&s_canvas);
-	v2f base = v2f{100, 100};
-	#if 1
-	
-	pos.x += base.x * 7 * f32(sin(time / 5));
-	pos.y += base.y * 5 * f32(cos(time / 5));
-	dim = v2f{base.x * f32(cos(time) + 2.0), base.y * f32(sin(time) + 2.0)};
-	#else
-	static f64 first_time = s_platform.Get_Time_Stamp();
-	
-	pos += f32(time - first_time);
-	dim = base;
-	
-	#endif
-	
-	Rect rect = Create_Rect_Center(pos, dim);
-	
 	#if 0
-	Draw_Image(&s_canvas, &subpixel_img, rect);
-	#else
-	Draw_Image2(&s_canvas, &subpixel_img, rect);
-	#endif
-	
+	{
+		static Image subpixel_img = {};
+		if(!subpixel_img.buffer)
+		{
+			char* path = "Allahu.png";
+			Load_Image(&subpixel_img, path, &s_platform);
+		}
+		f64 time = s_platform.Get_Time_Stamp();
+		
+		v2f pos, dim;
+		pos = Get_Middle(&s_canvas);
+		v2f base = v2f{100, 100};
+		
+		#if 1
+			pos.x += base.x * 7 * f32(sin(time / 5));
+			pos.y += base.y * 5 * f32(cos(time / 5));
+			dim = v2f{base.x * f32(cos(time) + 2.0), base.y * f32(sin(time) + 2.0)};
+		
+		#else
+			static f64 first_time = s_platform.Get_Time_Stamp();
+		
+			pos += f32(time - first_time);
+			dim = base;
+		#endif
+		
+		Rect rect = Create_Rect_Center(pos, dim);
+		
+		#if 1
+			Draw_Image(&s_canvas, &subpixel_img, rect);
+		
+		#else
+			Draw_Image_Badly(&s_canvas, &subpixel_img, rect);
+		
+		#endif		
+	}
 	#endif
 }
 

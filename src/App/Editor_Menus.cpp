@@ -13,6 +13,7 @@ static void Do_Event_Editor_All_Events_Frame()
 		v2f title_scale = v2f{4.f, 4.f};
 		Font* font = &context->theme->font;
 		v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
+		
 		if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
 			Set_Popup_Function(Do_Event_Editor_On_Exit_Popup);
 		
@@ -21,7 +22,7 @@ static void Do_Event_Editor_All_Events_Frame()
 		context->layout.build_direction = GUI_Build_Direction::right_center;
 		
 		char* title_text = s_editor_state.event_container.campaign_name.buffer;
-		GUI_Do_Text(context, AUTO, title_text, {}, title_scale, true);
+		GUI_Do_Title_Text(context, AUTO, title_text, title_scale);
 		
 		f32 title_height = context->layout.last_element.dim.y;
 		f32 title_max_x = context->layout.last_element.rect.max.x - context->anchor_base.x;

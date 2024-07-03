@@ -1002,7 +1002,7 @@ static void Draw_Image(Canvas* canvas, Image* img)
 }
 
 
-static void Draw_Image(Canvas* canvas, Image* img, Rect rect)
+static void Draw_Image_Badly(Canvas* canvas, Image* img, Rect rect)
 {
 	Rect draw_rect = rect;
 	if(!Verify_Rect_(canvas, &draw_rect))
@@ -1135,7 +1135,7 @@ static void Mult_Alpha_On_Image(Image* img, f32 m)
 }
 
 
-static void Draw_Image2(Canvas* canvas, Image* img, Rect rect)
+static void Draw_Image(Canvas* canvas, Image* img, Rect rect)
 {
 	Rect _rect = rect;
 	if(!Verify_Rect_(canvas, &_rect))

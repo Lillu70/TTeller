@@ -47,5 +47,6 @@ static Canvas s_canvas;
 #include "Menu_Core.h"
 #include "Main_Menus.cpp"
 #include "Editor_Menus.cpp"
+#include "Game_Menus.cpp"
 
 #include "Memory_Display.cpp"
