@@ -337,8 +337,6 @@ static String Create_Campaign_Full_Path(
 }
 
 
-static Linear_Allocator serialization_lalloc = {};
-
 static void Serialize_Campaign(
 	Events_Container event_container,
 	Platform_Calltable* platform)
@@ -353,7 +351,7 @@ static void Serialize_Campaign(
 	
 	#define WRITE(X, type)\
 	{\
-		void* adrs = serialization_lalloc.safe_push(sizeof(type));\
+		void* adrs = s_serialization_lalloc.safe_push(sizeof(type));\
 		if(adrs != 0)\
 		{\
 			*(type*)adrs = X;\
@@ -366,7 +364,7 @@ static void Serialize_Campaign(
 	
 	#define WRITE_BLOCK(copy_buffer, copy_amount)\
 	{\
-		void* adrs = serialization_lalloc.safe_push(copy_amount);\
+		void* adrs = s_serialization_lalloc.safe_push(copy_amount);\
 		if(adrs != 0)\
 		{\
 			Mem_Copy((u8*)adrs, copy_buffer, copy_amount);\
@@ -379,7 +377,7 @@ static void Serialize_Campaign(
 	
 	Assert(event_container.campaign_name.buffer);
 	
-	serialization_lalloc.clear();
+	s_serialization_lalloc.clear();
 	
 	u32 version = 3;
 	WRITE(version, u32);
@@ -516,10 +514,10 @@ static void Serialize_Campaign(
 		}
 	}
 	
-	u32 buffer_size = serialization_lalloc.get_used_capacity();
+	u32 buffer_size = s_serialization_lalloc.get_used_capacity();
 	if(buffer_size)
 	{
-		// TODO: Use a part of the serialization_lalloc allocation for the full path buffer,
+		// TODO: Use a part of the s_serialization_lalloc allocation for the full path buffer,
 		// to avoid this allocation bussines.
 		
 		String full_path = Create_Campaign_Full_Path(
@@ -529,7 +527,7 @@ static void Serialize_Campaign(
 		
 		bool success = platform->Write_File(
 			full_path.buffer, 
-			(u8*)serialization_lalloc.memory, 
+			(u8*)s_serialization_lalloc.memory, 
 			buffer_size);
 		
 		Assert(success);
@@ -538,10 +536,9 @@ static void Serialize_Campaign(
 	return;
 	
 	OUT_OF_MEMORY:
-	Assert(serialization_lalloc.capacity);
+	Assert(s_serialization_lalloc.capacity);
 	
-	// TODO: Make sure this actually uses the memory given!
-	serialization_lalloc.init(platform, serialization_lalloc.capacity * 2);
+	s_serialization_lalloc.init(platform, s_serialization_lalloc.capacity * 2);
 	Serialize_Campaign(event_container, platform);
 }
 
@@ -963,12 +960,12 @@ static bool Load_Campaign(
 	bool load_successful = false;
 	if(platform->Get_File_Size(full_path.buffer, &buffer_size))
 	{
-		serialization_lalloc.clear();
+		s_serialization_lalloc.clear();
 		
-		if(serialization_lalloc.get_free_capacity() < buffer_size)
-			serialization_lalloc.init(platform, buffer_size);
+		if(s_serialization_lalloc.get_free_capacity() < buffer_size)
+			s_serialization_lalloc.init(platform, buffer_size);
 		
-		u8* buffer = (u8*)serialization_lalloc.push(buffer_size);
+		u8* buffer = (u8*)s_serialization_lalloc.push(buffer_size);
 		u32 read_head = 0;
 		
 		*container = {};

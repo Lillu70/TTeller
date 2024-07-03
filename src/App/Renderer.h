@@ -27,16 +27,20 @@ struct Canvas
 
 static inline v2f Get_Middle(Canvas* canvas);
 
-
 static inline v3f Unpack_Color(Color color);
+
 static inline v4f Unpack_Color_With_Alpha(Color color);
+
 static inline Color Pack_Color(v3f color);
 
+static inline Color Pack_Color(v4f color);
 
 static inline bool Init_Canvas(Canvas* canvas, u32* buffer, v2u dim);
 
 static inline Canvas Create_Sub_Canvas(Canvas* master_canvas, v2u dim);
+
 static inline Canvas Create_Sub_Canvas(Canvas* master_canvas, v2u dim, u32 buffer_offset);
+
 static inline Canvas Create_Sub_Canvas(Canvas* master_canvas, v2u dim, v2u buffer_offset);
 
 // Does bounds checking.
@@ -48,31 +52,24 @@ static inline void Set_Pixel(Canvas* canvas, v2i p, Color color);
 static inline u32 Get_Pixel_Idx_HZ(Canvas* canvas, v2i p);
 
 static inline void Set_Pixel_HZ(Canvas* canvas, v2i p, Color color);
-static inline void Set_Pixel_Idx_HZ(Canvas* canvas, u32 idx, Color color);
 
+static inline void Set_Pixel_Idx_HZ(Canvas* canvas, u32 idx, Color color);
 
 static inline void Blend_Pixel_With_Color(Canvas* canvas, v2i p, v3f color, f32 fraction);
 
 static inline void Blend_Pixel_With_Color(Canvas* canvas, v2i p, v3f color, f32 fraction, u8 alpha);
 
-
 static inline Color Get_Pixel_HZ(Canvas* canvas, v2i p);
-
 
 static void Clear_Canvas(Canvas* canvas, Color color);
 
-
 static void Clear_Sub_Canvas(Canvas* canvas, Color color);
-
 
 static void Dim_Entire_Screen(Canvas* canvas, f32 s);
 
-
 static void Draw_Vertical_Line(Canvas* canvas, v2f pos, f32 height, Color color);
 
-
 static void Draw_Filled_Rect(Canvas* canvas, Rect rect, Color fill_color);
-
 
 static void Draw_Filled_Rect_With_Outline(
 	Canvas* canvas, 

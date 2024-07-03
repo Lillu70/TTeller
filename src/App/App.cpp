@@ -268,42 +268,14 @@ static void Run_Active_Menu(u32 app_flags)
 	if(!subpixel_img.buffer)
 	{
 		char* path = "Allahu.png";
-		u32 buffer_size = 0;
-		if(s_platform.Get_File_Size((const char*)path, &buffer_size))
-		{
-			u8* file_buffer = (u8*)s_allocator.push(buffer_size);
-			if(s_platform.Read_File(path, file_buffer, buffer_size))
-			{
-				i32 out_x;
-				i32 out_y;
-				i32 out_c;
-				
-				u8* img_buffer = (u8*)stbi_load_from_memory(
-					file_buffer, 
-					buffer_size, 
-					&out_x, 
-					&out_y, 
-					&out_c, 
-					sizeof(Color));
-				
-				if(img_buffer)
-				{
-					subpixel_img.buffer = img_buffer;
-					subpixel_img.dim = v2i{out_x, out_y};
-					
-					Convert_From_RGB_To_Color_And_Flip_Y(&subpixel_img);
-				}
-			}
-			
-			s_allocator.free(file_buffer);
-		}
+		Load_Image(&subpixel_img, path, &s_platform);
 	}
 	f64 time = s_platform.Get_Time_Stamp();
 	
 	v2f pos, dim;
 	pos = Get_Middle(&s_canvas);
-	v2f base = v2f{300, 300};
-	#if 0
+	v2f base = v2f{100, 100};
+	#if 1
 	
 	pos.x += base.x * 7 * f32(sin(time / 5));
 	pos.y += base.y * 5 * f32(cos(time / 5));
@@ -318,7 +290,7 @@ static void Run_Active_Menu(u32 app_flags)
 	
 	Rect rect = Create_Rect_Center(pos, dim);
 	
-	#if 1
+	#if 0
 	Draw_Image(&s_canvas, &subpixel_img, rect);
 	#else
 	Draw_Image2(&s_canvas, &subpixel_img, rect);
@@ -335,7 +307,7 @@ void Init_App(Platform_Calltable platform_calltable)
 	s_platform = platform_calltable;
 	Generate_Folder_Hierarchy(&s_platform);
 	{
-		serialization_lalloc.init(&s_platform, MiB);
+		s_serialization_lalloc.init(&s_platform, MiB);
 		s_mem.init(&s_platform, 1);
 	}
 	

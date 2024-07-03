@@ -29,6 +29,7 @@ enum class __Time_Table_Names : u64
 	clear_canvas,
 	scale_pixel,
 	set_sub_canvas,
+	img2_pixel,
 	COUNT
 };
 

@@ -396,60 +396,34 @@ static void Do_New_Game_Players()
 				
 				if(s_platform.Open_Select_File_Dialog(path, Array_Lenght(path)))
 				{
-					u32 buffer_size = 0;
-					if(s_platform.Get_File_Size((const char*)path, &buffer_size))
+					Image loaded_img;
+					if(Load_Image_Raw(&loaded_img, path, &s_platform))
 					{
-						u8* file_buffer = (u8*)s_allocator.push(buffer_size);
-						if(s_platform.Read_File(path, file_buffer, buffer_size))
+						if(img->buffer)
 						{
-							i32 out_x;
-							i32 out_y;
-							i32 out_c;
+							Assert(player_image->file_path.buffer);
 							
-							u8* img_buffer = (u8*)stbi_load_from_memory(
-								file_buffer, 
-								buffer_size, 
-								&out_x, 
-								&out_y, 
-								&out_c, 
-								sizeof(Color));
-							
-							if(img_buffer)
-							{
-								if(img->buffer)
-								{
-									Assert(player_image->file_path.buffer);
-									
-									player_image->file_path.free();
-									s_allocator.free(img->buffer);
-								}
-								
-								{
-									Image loaded_img = {img_buffer, v2i{out_x, out_y}};
-									#if 1
-									{
-										img->dim = picture_dim.As<i32>();
-										u32 sm_size = img->dim.x * img->dim.y * sizeof(Color);
-										
-										img->buffer = (u8*)s_allocator.push(sm_size);
-									
-										Resize_Image(img, &loaded_img);
-										s_allocator.free(loaded_img.buffer);
-									}
-									#else
-									{
-										*img = loaded_img;										
-									}
-									#endif
-									
-									Convert_From_RGB_To_Color_And_Flip_Y(img);
-								}
-								
-								Init_String(&player_image->file_path, &s_allocator, path);
-							}
+							player_image->file_path.free();
+							s_allocator.free(img->buffer);
 						}
 						
-						s_allocator.free(file_buffer);
+						#if 1
+						img->dim = picture_dim.As<i32>();
+						u32 sm_size = img->dim.x * img->dim.y * sizeof(Color);
+						
+						img->buffer = (u8*)s_allocator.push(sm_size);
+					
+						Resize_Image(img, &loaded_img);
+						s_allocator.free(loaded_img.buffer);
+						#else
+						
+						*img = loaded_img;
+						
+						#endif
+						
+						Convert_From_RGB_To_Color_And_Flip_Y(img);
+						
+						Init_String(&player_image->file_path, &s_allocator, path);
 					}
 				}
 			}
@@ -473,7 +447,7 @@ static void Do_New_Game_Players()
 			if(img->buffer)
 			{
 				Rect r = Expand_Rect(context->layout.last_element.rect, f32(s_theme.outline_thickness) * -1);
-				Draw_Image(context->canvas, img, r);
+				Draw_Image2(context->canvas, img, r);
 			}
 			
 			GUI_Pop_Layout(context);

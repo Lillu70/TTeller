@@ -1166,6 +1166,8 @@ static void Draw_Image2(Canvas* canvas, Image* img, Rect rect)
 	{
 		for(i32 x = x_min; x < x_max; ++x)
 		{
+			Start_Scope_Timer(img2_pixel);
+			
 			i32 rx = x - x_min + xclip;
 			i32 ry = y - y_min + yclip;
 			
@@ -1192,10 +1194,17 @@ static void Draw_Image2(Canvas* canvas, Image* img, Rect rect)
 			v4f xb2 = Lerp(c3_up, c4_up, xblend);
 			v4f yb  = Lerp(xb1, xb2, yblend);
 			
-			v3f c = v3f{yb.r, yb.g, yb.b};
 			v2i p = v2i{x, y};
-			
-			Blend_Pixel_With_Color(canvas, p, c, yb.a / 255.f);
+			if(yb.a < 250.f)
+			{
+				f32 f = f32(yb.a) / 255.f;
+				Blend_Pixel_With_Color(canvas, p, yb.rgb, f);	
+			}
+			else if(yb.a > 5.f)
+			{
+				Color c = Pack_Color(yb);
+				Set_Pixel_HZ(canvas, p, c);
+			}
 		}
 	}
 }
