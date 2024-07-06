@@ -30,6 +30,7 @@ static void Run_Active_Menu(u32 app_flags)
 		switch(current_menu)
 		{
 			case Menus::main_menu:
+			case Menus::settings_menu:
 			case Menus::campaigns_menu:
 			case Menus::GM_players:
 			{	
@@ -148,6 +149,11 @@ static void Run_Active_Menu(u32 app_flags)
 		case Menus::GM_event_display:
 		{
 			Do_Event_Display_Frame();
+		}break;
+		
+		case Menus::settings_menu:
+		{
+			Do_Settings_Menu_Frame();
 		}break;
 		
 		default:
@@ -272,19 +278,19 @@ static void Run_Active_Menu(u32 app_flags)
 		static Image subpixel_img = {};
 		if(!subpixel_img.buffer)
 		{
-			char* path = "Allahu.png";
+			char* path = "Structured.png";
 			Load_Image(&subpixel_img, path, &s_platform);
 		}
 		f64 time = s_platform.Get_Time_Stamp();
 		
 		v2f pos, dim;
 		pos = Get_Middle(&s_canvas);
-		v2f base = v2f{100, 100};
+		v2f base = v2f{300, 100};
 		
-		#if 1
-			pos.x += base.x * 7 * f32(sin(time / 5));
-			pos.y += base.y * 5 * f32(cos(time / 5));
-			dim = v2f{base.x * f32(cos(time) + 2.0), base.y * f32(sin(time) + 2.0)};
+		#if 0
+			pos.x += base.x * 3 * f32(sin(time / 10));
+			pos.y += base.y * 3 * f32(cos(time / 10));
+			dim = v2f{base.x * f32(cos(time / 10) + 2.0), base.y * f32(sin(time / 10) + 2.0)};
 		
 		#else
 			static f64 first_time = s_platform.Get_Time_Stamp();

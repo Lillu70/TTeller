@@ -261,7 +261,7 @@ static void Do_New_Game_Players()
 			}
 			
 			GUI_Pop_Layout(context);
-				
+			
 			GUI_End_Collumn(context, collumn_min_width, collumn_start, X_AXIS);
 		}
 		

@@ -52,6 +52,7 @@ static Action s_hotkeys[s_hotkey_count] = {};
 enum class Menus : u32
 {
 	main_menu = 0,
+	settings_menu,
 	campaigns_menu,
 	select_campaign_to_play_menu,
 	

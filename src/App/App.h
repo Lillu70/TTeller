@@ -44,9 +44,9 @@ static Linear_Allocator s_serialization_lalloc = {};
 static Platform_Calltable s_platform;
 static Canvas s_canvas;
 
-#include "Menu_Core.h"
-#include "Main_Menus.cpp"
-#include "Editor_Menus.cpp"
-#include "Game_Menus.cpp"
+#include "Menus\Menu_Core.h"
+#include "Menus\Main_Menus.cpp"
+#include "Menus\Editor_Menus.cpp"
+#include "Menus\Game_Menus.cpp"
 
 #include "Memory_Display.cpp"

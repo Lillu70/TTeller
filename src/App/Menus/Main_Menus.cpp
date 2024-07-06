@@ -2,6 +2,33 @@
 #pragma once
 
 
+static void Do_Settings_Menu_Frame()
+{
+	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
+	{
+		v2f title_scale = v2f{4.f, 4.f};
+		Font* font = &context->theme->font;
+		v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
+		if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
+		{
+			s_global_data.active_menu = Menus::main_menu;
+		}
+		
+		context->layout.build_direction = GUI_Build_Direction::right_center;
+		
+		GUI_Do_Title_Text(context, AUTO, "Asetukset", title_scale);
+		
+	}; // ----------------------------------------------------------------------------------------
+
+	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
+	{
+		
+	}; // ----------------------------------------------------------------------------------------
+
+	Do_GUI_Frame_With_Banner(banner_func, menu_func, 100);
+}
+
+
 static void Do_Main_Menu_Quit_Popup()
 {
 	Dim_Entire_Screen(&s_canvas, 0.333f);
@@ -195,7 +222,7 @@ static void Do_Main_Menu_Frame()
 	// Settings
 	if(GUI_Do_Button(context, AUTO, AUTO, button_texts[i++]))
 	{
-		
+		s_global_data.active_menu = Menus::settings_menu;
 	}
 	
 	// Close 
