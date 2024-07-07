@@ -259,13 +259,7 @@ static void Do_New_Game_Players()
 			
 			GUI_Pop_Layout(context);
 			
-			GUI_Do_Panel(context, AUTO, &s_player_picture_dim);
-			
-			if(img->buffer)
-			{
-				Rect r = Expand_Rect(context->layout.last_element.rect, f32(s_theme.outline_thickness) * -1);
-				Draw_Image(context->canvas, img, r);
-			}
+			GUI_Do_Image_Panel(context, AUTO, &s_player_picture_dim, img);
 			
 			GUI_Pop_Layout(context);
 			
@@ -334,7 +328,9 @@ static void Do_Event_Display_Frame()
 			return;
 		
 		Assert(active_event->participant_count);
+		Player_Image* player_images = Begin(s_game_state.player_images);
 		
+		f32 collumn_start;
 		v2f* p = &GUI_AUTO_TOP_LEFT;
 		for(u32 i = 0; i < active_event->participant_count; ++i)
 		{
@@ -343,17 +339,47 @@ static void Do_Event_Display_Frame()
 				= Begin(s_game_state.player_names) + player_idx;
 			
 			GUI_Do_Text(context, p, player_name->full_name.buffer);
-			p = AUTO;
-			
-			GUI_Do_Panel(context, AUTO, &s_player_picture_dim);
-			
-			if(!i)
+			if(i == 0)
+			{
+				p = AUTO;
 				GUI_Push_Layout(context);
+				collumn_start = GUI_Get_Collumn_Start(context, X_AXIS);
+			}
+			
+			Player_Image* player_image = player_images + player_idx;
+			GUI_Do_Image_Panel(context, AUTO, &s_player_picture_dim, &player_image->image);	
 		}
 		
 		GUI_Pop_Layout(context);
+		GUI_End_Collumn(
+			context, 
+			s_player_creation_collumn_min_width, 
+			collumn_start, 
+			X_AXIS);
 		
+		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(context);
+		f32 h = bounds.max.y - bounds.min.y;
+		f32 w = bounds.max.x - bounds.min.x;
 		
+		f32 _ = context->layout.last_element.pos.x + context->layout.last_element.dim.x - context->anchor_base.x;
+		f32 text_box_width = f32(context->canvas->dim.x) - _ - f32(context->theme->padding) * 2 - 50;
+		v2f text_box_dim = v2f{text_box_width, h};
+		
+		String event_text = {};
+		event_text.buffer = active_event_header->event_text.buffer;
+		event_text.lenght = Null_Terminated_Buffer_Lenght(active_event_header->event_text.buffer);
+		
+
+		context->layout.build_direction = GUI_Build_Direction::right_top;
+		
+		GUI_Do_ML_Input_Field(
+			context, 
+			AUTO, 
+			&text_box_dim,
+			&event_text, 
+			0, 
+			GUI_DEFAULT_TEXT_SCALE,
+			GUI_Character_Check_View_Only);
 	}; // ----------------------------------------------------------------------------------------
 
 	Do_GUI_Frame_With_Banner(banner_func, menu_func, 200);

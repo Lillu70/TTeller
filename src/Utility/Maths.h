@@ -297,7 +297,16 @@ static inline Rect Expand_Rect(Rect rect, f32 expand_factor)
 	
 	return result;
 }
- 
+
+
+static inline Rect Shink_Rect(Rect rect, f32 shrink_factor)
+{
+	Rect result = Rect{rect.min + shrink_factor, rect.max - shrink_factor};
+	Assert(Is_Rect_Valid(result));
+	
+	return result;
+}
+
  
 static inline f32 Clamp_To_Barycentric(f32 real)
 {

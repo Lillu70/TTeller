@@ -1525,10 +1525,7 @@ static inline void GUI_Do_Title_Text(
 }
 
 
-static void GUI_Do_Panel(
-	GUI_Context* context,
-	v2f* pos,
-	v2f* dim)
+static void GUI_Do_Panel(GUI_Context* context, v2f* pos, v2f* dim)
 {
 	// --------------------------------------------------------------------------
 	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
@@ -1564,6 +1561,33 @@ static void GUI_Do_Panel(GUI_Context* context, Rect rect)
 	GUI_Do_Panel(context, &pos, &dim);
 	
 	context->layout.anchor = a;
+}
+
+
+static void GUI_Do_Image_Panel(GUI_Context* context, v2f* pos, v2f* dim, Image* img)
+{
+	// --------------------------------------------------------------------------
+	GUI_Placement p = GUI_Get_Placement(context, dim, pos);
+	if(!Is_Rect_Valid(p.rect))
+		return;
+	// --------------------------------------------------------------------------
+	
+	// Draw
+	if(Rects_Overlap(p.rect, context->canvas_rect))
+	{
+		Draw_Filled_Rect_With_Outline(
+			context->canvas, 
+			p.rect, 
+			context->theme->background_color,
+			context->theme->outline_thickness, 
+			context->theme->outline_color);
+		
+		if(img->buffer)
+		{
+			Rect img_rect = Shink_Rect(p.rect, f32(context->theme->outline_thickness));
+			Draw_Image(context->canvas, img, img_rect);			
+		}
+	}
 }
 
 

@@ -649,7 +649,7 @@ static void Delete_Game(Game_State* gm, Allocator_Shell* allocator)
 	
 	for(each(Event*, e, gm->active_events))
 		allocator->free(e->player_indices);
-	
+	allocator->free(gm->active_events);
 	*gm = {};
 }
 
@@ -950,6 +950,7 @@ static void Assign_Events_To_Participants(
 					// Commit!
 					
 					Event* e = Push(&game->active_events, allocator);
+					
 					Assert(event_to_test_idx < event_count);
 					
 					e->event_idx = event_to_test_idx;
