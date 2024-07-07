@@ -34,6 +34,7 @@ static Linear_Allocator s_serialization_lalloc = {};
 #include "GUI.h"
 #include "GUI.cpp"
 
+#include "Random_Machine.h"
 
 #include "Nalkapeli.h"
 #include "Nalkapeli.cpp"

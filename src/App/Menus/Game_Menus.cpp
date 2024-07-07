@@ -69,6 +69,7 @@ static void Do_New_Game_Players()
 			if(s_game_state.memory)
 				Delete_Game(&s_game_state, &s_allocator);
 			
+			return;
 		}
 		
 		GUI_Push_Layout(context);
@@ -111,10 +112,12 @@ static void Do_New_Game_Players()
 		v2f title_row_pos = Get_Title_Bar_Row_Placement(context, title_max_x, padding, buttons_width);
 		
 		v2f dim = v2f{w1, title_height};
-	
-		if(GUI_Do_Button(context, &title_row_pos, &dim, start_game_text))
+		
+		b32 player_count = s_game_state.player_names->count; 
+		if(player_count && GUI_Do_Button(context, &title_row_pos, &dim, start_game_text))
 		{
 			s_global_data.active_menu = Menus::GM_event_display;
+			Begin_Game(&s_game_state, &s_allocator);
 		}
 		
 	}; // ----------------------------------------------------------------------------------------
@@ -218,16 +221,16 @@ static void Do_New_Game_Players()
 						}
 						
 						#if 1
-						img->dim = picture_dim.As<i32>();
-						u32 sm_size = img->dim.x * img->dim.y * sizeof(Color);
+							img->dim = picture_dim.As<i32>();
+							u32 sm_size = img->dim.x * img->dim.y * sizeof(Color);
+							
+							img->buffer = (u8*)s_allocator.push(sm_size);
 						
-						img->buffer = (u8*)s_allocator.push(sm_size);
-					
-						Resize_Image(img, &loaded_img);
-						s_allocator.free(loaded_img.buffer);
+							Resize_Image(img, &loaded_img);
+							s_allocator.free(loaded_img.buffer);
 						#else
 						
-						*img = loaded_img;
+							*img = loaded_img;
 						
 						#endif
 						
@@ -273,6 +276,8 @@ static void Do_New_Game_Players()
 
 static void Do_Event_Display_Frame()
 {
+	Assert(s_game_state.player_count);
+	
 	Clear_Canvas(&s_canvas, s_background_color);
 	
 	GUI_Context* context = &s_gui_banner;
@@ -293,7 +298,17 @@ static void Do_Event_Display_Frame()
 	
 	if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Roll event"))
 	{
+		Dynamic_Array<Event>* round = Assign_Events_To_Participants(
+			&s_game_state, 
+			Event_List::day, 
+			&s_allocator);
 		
+		for(each(auto, test, round))
+		{
+			int a = 0;
+		}
+		
+		Free_Event_List(round, &s_allocator);
 	}
 	
 	END:

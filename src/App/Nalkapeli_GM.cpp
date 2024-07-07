@@ -473,9 +473,10 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 			req_header->participant_count = e->participents->count;
 			req_header->global_req_count = e->global_mark_reqs->count;
 			
-			for(auto gmr = Begin(e->global_mark_reqs); gmr < End(e->global_mark_reqs); ++gmr)
+			for(each(Global_Mark_Requirement*, gmr, e->global_mark_reqs))
+			{
 				*req_data.push<Global_Mark_Requirement_GM>() = Convert_To_GM(gmr, &marks);
-			
+			}
 			
 			Event_Header* event_header = events_data.push<Event_Header>();
 			
@@ -505,9 +506,16 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 			
 			event_size += event_header->global_con_count * sizeof(Global_Mark_Consequence_GM);
 			
+			#if 0
+			if(i == 7)
+			{
+				int a = 0;
+			}
+			#endif
+			
 			u32 req_count = 0;
 			u32 con_count = 0;
-			for(Participent* p = Begin(e->participents); p < End(e->participents); ++p)
+			for(each(Participent*, p, e->participents))
 			{
 				Participant_Header* req_parti_header = req_data.push<Participant_Header>();
 				
@@ -553,45 +561,47 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 	Assert(!event_table_day.get_free_capacity());
 	Assert(!event_table_night.get_free_capacity());
 	
+	game_state->player_count = 0;
 	game_state->language = Language::finnish;
 	
 	game_state->player_names 
 		= Create_Dynamic_Array<Game_Player_Name_FI>(allocator, u32(6));
 	
-	game_state->players = Create_Dynamic_Array<Game_Player>(allocator, u32(6));
 	game_state->player_images = Create_Dynamic_Array<Player_Image>(allocator, u32(6));
+	
+	game_state->global_marks = Create_Dynamic_Array<Mark_GM>(allocator, 4);
 	
 	return result;
 }
 
 
-static Participation_Requirement_GM* Begin_Req_Array(Participant_Header* participant_header)
+static inline Participation_Requirement_GM* Begin_Req_Array(Participant_Header* participant_header)
 {
 	return (Participation_Requirement_GM*)(participant_header + 1);
 }
 
 
 // Return a pointer pointing to first address after the end of the array.
-static Participation_Requirement_GM* End_Req_Array(Participant_Header* participant_header)
+static inline Participation_Requirement_GM* End_Req_Array(Participant_Header* participant_header)
 {
 	return (Participation_Requirement_GM*)(participant_header + 1) + participant_header->count;
 }
 
 
-static Event_Consequens_GM* Begin_Con_Array(Participant_Header* participant_header)
+static inline Event_Consequens_GM* Begin_Con_Array(Participant_Header* participant_header)
 {
 	return (Event_Consequens_GM*)(participant_header + 1);
 }
 
 
 // Return a pointer pointing to first address after the end of the array.
-static Event_Consequens_GM* End_Con_Array(Participant_Header* participant_header)
+static inline Event_Consequens_GM* End_Con_Array(Participant_Header* participant_header)
 {
 	return (Event_Consequens_GM*)(participant_header + 1) + participant_header->count;
 }
 
 
-static void Hollow_Player_Name_FI(Game_Player_Name_FI* player)
+static inline void Hollow_Player_Name_FI(Game_Player_Name_FI* player)
 {
 	Assert(player);
 
@@ -601,10 +611,17 @@ static void Hollow_Player_Name_FI(Game_Player_Name_FI* player)
 }
 
 
+static inline void Hollow_Game_Player(Game_Player* player, Allocator_Shell* allocator)
+{
+	Assert(player->marks);
+	allocator->free(player->marks);
+}
+
+
 static void Delete_Game(Game_State* gm, Allocator_Shell* allocator)
 {
 	allocator->free(gm->memory);
-	allocator->free(gm->players);
+	allocator->free(gm->global_marks);
 	
 	for(Player_Image* i = Begin(gm->player_images); i < End(gm->player_images); ++i)
 	{
@@ -615,13 +632,19 @@ static void Delete_Game(Game_State* gm, Allocator_Shell* allocator)
 		}
 	}
 	allocator->free(gm->player_images);
-	
-	if(gm->player_names)
-	{
-		for(auto n = Begin(gm->player_names); n < End(gm->player_names); ++n)
-			Hollow_Player_Name_FI(n);
-	}
+		
+	for(auto n = Begin(gm->player_names); n < End(gm->player_names); ++n)
+		Hollow_Player_Name_FI(n);
+
 	allocator->free(gm->player_names);
+	
+	if(gm->player_count)
+	{
+		for(u32 i = 0; i < gm->player_count; ++i)
+			Hollow_Game_Player(gm->players + i, allocator);
+		
+		allocator->free(gm->players);
+	}
 	
 	*gm = {};
 }
@@ -638,4 +661,337 @@ static void Create_Player_Name_FI(Game_State* gm, Allocator_Shell* allocator)
 	Init_String(&name->full_name, allocator, u32(0));
 	Init_String(&name->variant_name_1, allocator, u32(0));
 	Init_String(&name->variant_name_2, allocator, u32(0));
+}
+
+
+static void Begin_Game(Game_State* game, Allocator_Shell* allocator)
+{
+	Assert(!game->player_count);
+	Assert(!game->players);
+	Assert(game->player_images->count);
+	
+	// NOTE: Using the images array as that is language agnostic.
+	
+	game->player_count = game->player_images->count;
+	
+	u32 s = 
+		sizeof(*game->players) + 
+		sizeof(*game->player_assignement_table);
+	
+	u32 alloc_size 
+		= s * game->player_count;
+	
+	u32 event_count = Max(game->event_table_day.count, game->event_table_night.count);
+	alloc_size += sizeof(*game->event_assignement_table) * event_count;
+	
+	void* m = allocator->push(alloc_size);
+	game->players = (Game_Player*)m;
+	game->player_assignement_table = (u32*)(game->players + game->player_count);
+	
+	game->event_assignement_table_size = event_count;
+	game->event_assignement_table = game->player_assignement_table + game->player_count;
+	
+	
+	for(Game_Player* p = game->players; p < game->players + game->player_count; ++p)
+	{
+		for(u32 i = 0; i < Array_Lenght(p->stats); ++i)
+			p->stats[i] = Game_Player::starting_stat_value;
+		
+		p->marks = Create_Dynamic_Array<Mark_GM>(allocator, 4);
+	}
+}
+
+
+static inline void Free_Event_List(Dynamic_Array<Event>* events, Allocator_Shell* allocator)
+{
+	Assert(events);
+	
+	for(auto e = Begin(events); e < End(events); ++e)
+		allocator->free(e->player_indices);
+	
+	allocator->free(events);
+}
+
+
+static inline bool Numerical_Relation_Match(i8 value, i8 relation_target, Numerical_Relation relation)
+{
+	bool result = false;
+
+	switch(relation)
+	{
+		case Numerical_Relation::equal_to:
+		{
+			result = relation_target == value;
+		}break;
+		
+		case Numerical_Relation::greater_than:
+		{
+			result = relation_target > value;
+		}break;
+		
+		case Numerical_Relation::greater_than_equals:
+		{
+			result = relation_target >= value;
+		}break;
+		
+		case Numerical_Relation::less_than:
+		{
+			result = relation_target < value;
+		}break;
+		
+		case Numerical_Relation::less_than_equals:
+		{
+			result = relation_target <= value;
+		}break;
+	}
+	
+	return result;
+}
+
+
+static inline void Get_Mark_Info(
+	Dynamic_Array<Mark_GM>* marks, 
+	u32 search_mark_idx, 
+	Exists_Statement* out_exists, 
+	i8* out_duration)
+{
+	for(each(auto, mark, marks))
+	{
+		if(mark->idx == search_mark_idx)
+		{
+			*out_exists = Exists_Statement::does_have;
+			*out_duration = mark->duration;
+			return;
+		}
+	}
+	
+	*out_exists = Exists_Statement::does_not_have;
+	*out_duration = 0;
+}
+
+
+static inline bool Player_Satisfies_Requirement(Game_Player* player, Participation_Requirement_GM* req)
+{
+	bool result = false;
+	
+	switch(req->type)
+	{
+		case Participation_Requirement_Type::character_stat:
+		{
+			i8 stat = player->stats[u32(req->stat_type)];
+			result = Numerical_Relation_Match(stat, req->relation_target, req->numerical_relation);
+		}break;
+		
+		case Participation_Requirement_Type::mark_item:
+		case Participation_Requirement_Type::mark_personal:
+		{
+			Exists_Statement exists;
+			i8 duration;
+			Get_Mark_Info(player->marks, req->mark_idx, &exists, &duration);
+			
+			if(req->mark_exists != exists)
+			{
+				result = false;
+			}
+			else if(exists == Exists_Statement::does_have && req->relation_target > 0)
+			{
+				if(!Numerical_Relation_Match(
+					duration, 
+					req->relation_target, 
+					req->numerical_relation))
+				{
+					result = false;
+				}
+			}
+			else
+			{
+				result = true;
+			}
+			
+		}break;
+		
+		default:
+		{
+			Terminate;
+		};
+	}
+	
+	return result;
+}
+
+
+static Dynamic_Array<Event>* Assign_Events_To_Participants(
+	Game_State* game,
+	Event_List event_list,
+	Allocator_Shell* allocator)
+{
+	Dynamic_Array<Event>* result = Create_Dynamic_Array<Event>(allocator, game->player_count);
+	
+	Assert(game->player_count);
+	Assert(game->event_assignement_table_size);
+	
+	static Random_Machine rm = {};
+	
+	for(u32 i = 0; i < game->player_count; ++i)
+		game->player_assignement_table[i] = i;
+	
+	// shuffle player indexes.
+	for(u32 i = 0; i < game->player_count * 1.5; ++i)
+	{
+		u32 first = rm.random_u32(game->player_count);
+		u32 second = rm.random_u32(game->player_count);
+		
+		Swap(game->player_assignement_table + first, game->player_assignement_table + second);
+	}
+
+	// Fill the event table
+	u32 event_count = 
+		(event_list == Event_List::day)? game->event_table_day.count : game->event_table_night.count;
+		
+	for(u32 i = 0; i < event_count; ++i)
+		game->event_assignement_table[i] = i;
+	
+	u32* req_table_memory = (u32*)((event_list == Event_List::day)? 
+		game->req_table_day.memory : game->req_table_night.memory);
+	
+	
+	// Assign players
+	u32 unassigned_player_count = game->player_count;
+	while(unassigned_player_count)
+	{	
+		u32 untested_event_count = event_count;
+		for(;;)
+		{
+			u32 event_to_test_table_idx = rm.random_u32(untested_event_count);
+			u32 event_to_test_idx = game->event_assignement_table[event_to_test_table_idx];
+			
+			u32 offset =  *(req_table_memory + event_to_test_idx);
+			Req_GM_Header* req_header = (Req_GM_Header*)((u8*)game->req_data + offset);
+			
+			// Test event ------------
+			
+			// Test player count
+			if(unassigned_player_count < req_header->participant_count)
+				goto REJECTED;
+			
+			// Test global reqs
+			for(u32 i = 0; i < req_header->global_req_count; ++i)
+			{
+				auto global_req = (Global_Mark_Requirement_GM*)(req_header + 1) + i;
+				
+				Exists_Statement exists;
+				i8 duration;
+				Get_Mark_Info(game->global_marks, global_req->mark_idx, &exists, &duration);
+				
+				if(global_req->mark_exists != exists)
+				{
+					goto REJECTED;
+					break;
+				}
+				
+				if(exists == Exists_Statement::does_have && global_req->relation_target > 0)
+				{
+					if(!Numerical_Relation_Match(
+						duration, 
+						global_req->relation_target, 
+						global_req->numerical_relation))
+					{
+						goto REJECTED;
+					}
+				}
+			}
+			
+			// Test players against participant requirements.
+			u8* parti_req_memory =
+				((u8*)(req_header + 1)) + req_header->global_req_count * sizeof(Global_Mark_Requirement_GM);
+			
+			u32 filled_slot_count = 0;
+			u32 slots_size = sizeof(u32) * req_header->participant_count;
+			u32* slots = (u32*)allocator->push(slots_size);
+			Mem_Zero(slots, slots_size);
+			
+			bool commited = false;
+			for(u32 p = 0; p < unassigned_player_count; ++p)
+			{
+				u32 player_idx = game->player_assignement_table[p];
+				Game_Player* player = game->players + player_idx;
+				
+				Participant_Header* parti = (Participant_Header*)parti_req_memory;
+				for(u32 s = 0; s < req_header->participant_count; ++s)
+				{
+					if(!slots[s]) // NOTE: skip filled slots
+					{		
+						Participation_Requirement_GM* reqs_begin = Begin_Req_Array(parti);
+						Participation_Requirement_GM* reqs_end = reqs_begin + parti->count;
+						
+						bool satisfies_reqs = true;
+						
+						for(auto req = reqs_begin; req < reqs_end; ++req)
+						{
+							bool satisfies = Player_Satisfies_Requirement(player, req);
+							if(!satisfies)
+							{
+								satisfies_reqs = false;
+								break;
+							}
+						}
+						
+						if(satisfies_reqs)
+						{
+							slots[s] = p + 1;
+							filled_slot_count += 1;
+							break;
+						}
+					}
+					
+					u32 reqs_size = sizeof(Participation_Requirement_GM) * parti->count;
+					parti = (Participant_Header*)((u8*)parti + reqs_size + sizeof(Participant_Header));
+				}
+				
+				if(filled_slot_count == req_header->participant_count)
+				{
+					// Remove selected players from the pool.
+					for(u32 i = 0; i < req_header->participant_count; ++i)
+					{
+						u32 table_slot = slots[i] - 1;
+						u32 player_idx = game->player_assignement_table[table_slot];
+						slots[i] = player_idx;
+						
+						unassigned_player_count -= 1;
+						u32 last_entry = game->player_assignement_table[unassigned_player_count];
+						game->player_assignement_table[table_slot] = last_entry;
+						game->player_assignement_table[unassigned_player_count] = U32_MAX;
+					}
+					// Commit!
+					
+					Event* e = Push(&result, allocator);
+					e->event_idx = event_to_test_idx;
+					e->participant_count = filled_slot_count;
+					// NOTE: Takes owenership of the ptr!
+					e->player_indices = slots;
+					commited = true;
+					break;
+				}
+			}
+			
+			if(commited)
+				break;
+			
+			allocator->free(slots);
+			
+			{
+				REJECTED:
+				
+				// NOTE: Unordered remove from table.
+				untested_event_count -= 1;
+				
+				u32 last_table_entry = game->event_assignement_table[untested_event_count];
+				game->event_assignement_table[event_to_test_table_idx] = last_table_entry;
+				
+				Assert(untested_event_count);
+			}			
+		}
+	}	
+	
+	return result;
 }

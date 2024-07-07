@@ -8,7 +8,13 @@
 	This is done to make iteration fast. Especially important for requirements.
 */
 
-enum Language : u8
+enum class Event_List : u8
+{
+	day,
+	night
+};
+
+enum class Language : u8
 {
 	finnish,
 	english,
@@ -31,12 +37,28 @@ struct Player_Image
 };
 
 
+struct Mark_GM
+{
+	u32 idx;
+	i8 duration;
+};
+
+
 struct Game_Player
 {
-	u8 mind;
-	u8 body;
+	static constexpr i8 starting_stat_value = 3;
 	
-	Dynamic_Array<u32>* marks;
+	i8 stats[(u32)Character_Stat::Stats::COUNT];
+	
+	Dynamic_Array<Mark_GM>* marks;
+};
+
+
+struct Event
+{
+	u32 event_idx;
+	u32 participant_count;
+	u32* player_indices;
 };
 
 
@@ -146,7 +168,7 @@ struct Event_Header
 
 struct Game_State
 {
-	void* memory;
+	void* memory; // <-- Combined allocation
 	
 	char* mark_data;
 	Table mark_table;
@@ -158,9 +180,16 @@ struct Game_State
 	Event_Header* events_data;
 	Table event_table_day;
 	Table event_table_night;
+	// -------------------------------------
 	
+	u32 player_count;
+	Game_Player* players; // <-- Combined allocation
+	u32* player_assignement_table;
 	
-	Dynamic_Array<Game_Player>* players;
+	u32 event_assignement_table_size; // NOTE: this is to make multiple of same entry in the array easier for the rarity system.
+	u32* event_assignement_table;
+	// ---------------------------------------------
+	
 	Dynamic_Array<Player_Image>* player_images;
 	
 	Language language;
@@ -168,6 +197,8 @@ struct Game_State
 	{
 		Dynamic_Array<Game_Player_Name_FI>* player_names;
 	};
+	
+	Dynamic_Array<Mark_GM>* global_marks;
 };
 
 
@@ -207,8 +238,9 @@ struct Game_State
 		Participation_Requirement_GM's defined by the header and
 		seperated by Participant_Headers
 	
-	| - req table day -> Containts offsets to the Req_GM_Headers	; sizeof(u32 * event_count_day)
-		indexed by event.
+	| - req table day -> Containts byte offsets from 				; sizeof(u32 * event_count_day)
+		the req data ptr to the Req_GM_Headers indexed by event.
+		
 	
 	| - req table night -> Containts offsets to the Req_GM_Headers	; sizeof(u32 * event_count_night)
 		indexed by event.

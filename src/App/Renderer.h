@@ -1,13 +1,6 @@
 
 # pragma once
 
-struct Image
-{
-	u8* buffer;
-	v2i dim;
-};
-
-
 struct Font
 {
 	u32 char_width = 0;
@@ -17,8 +10,17 @@ struct Font
 };
 
 
+struct Image
+{
+	// TODO: Make this into Color*
+	u8* buffer;
+	v2i dim;
+};
+
+
 struct Canvas
 {
+	// TODO: Make this into Color*
 	u32* buffer = 0;
 	v2u dim = {};
 	u32 row_stride = 0;
@@ -116,11 +118,11 @@ static void Draw_Glyph(
 	Font* font);
 
 
-static void Draw_Image(Canvas* canvas, Image* img, v2f scale);
-
 static void Draw_Image(Canvas* canvas, Image* img);
 
 static void Draw_Image(Canvas* canvas, Image* img, Rect rect);
+
+static void Draw_Image_Badly(Canvas* canvas, Image* img, Rect rect);
 
 static void Convert_From_RGB_To_Color_And_Flip_Y(Image* img);
 

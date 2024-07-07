@@ -75,7 +75,8 @@ struct Character_Stat
 	enum class Stats : u8
 	{
 		body = 0,
-		mind
+		mind,
+		COUNT
 	};
 	
 	static inline const char* stat_names[] = 

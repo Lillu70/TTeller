@@ -261,6 +261,16 @@ static void Do_Event_Editor_All_Events_Frame()
 						s_editor_state.active_event_index = i;
 					}
 					
+					#if 1
+					
+					char index_text_buffer[12] = {0};
+					GUI_Do_Text(
+						&gui_event_list_day, 
+						AUTO, 
+						U32_To_Char_Buffer((u8*)&index_text_buffer, i));
+					
+					#endif
+					
 					GUI_Pop_Layout(&gui_event_list_day);
 				}
 				
@@ -311,6 +321,16 @@ static void Do_Event_Editor_All_Events_Frame()
 						s_global_data.active_menu = Menus::EE_participants;
 						s_editor_state.active_event_index = i;
 					}
+					
+					#if 1
+					
+					char index_text_buffer[12] = {0};
+					GUI_Do_Text(
+						&gui_event_list_night, 
+						AUTO, 
+						U32_To_Char_Buffer((u8*)&index_text_buffer, i));
+					
+					#endif
 					
 					GUI_Pop_Layout(&gui_event_list_night);
 				}

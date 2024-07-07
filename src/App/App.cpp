@@ -324,6 +324,7 @@ void Init_App(Platform_Calltable platform_calltable)
 		s_mem.init(&s_platform, 1);
 	}
 	
+	Random_Machine::seed = i32(s_platform.Get_Time_Stamp());
 	Init_GUI();
 }
 

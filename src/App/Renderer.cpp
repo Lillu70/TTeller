@@ -900,6 +900,8 @@ static void Draw_Vertical_Line(Canvas* canvas, v2f pos, f32 height, Color color)
 
 static void Dim_Entire_Screen(Canvas* canvas, f32 s)
 {
+	// NOTE: This requires the buffer memory to be 4 byte alligned.
+	
 	Assert(s >= 0 && s < 1);
 	Begin_Timing_Block(scale_pixel);
 	

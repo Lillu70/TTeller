@@ -1,6 +1,8 @@
 
 #pragma once
 
+#define each(T, X, A) T X = Begin(A); X < End(A); ++X
+
 template<typename T>
 struct Dynamic_Array
 {	
