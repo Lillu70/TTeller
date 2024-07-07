@@ -692,22 +692,22 @@ static inline bool Numerical_Relation_Match(i8 value, i8 relation_target, Numeri
 		
 		case Numerical_Relation::greater_than:
 		{
-			result = relation_target > value;
+			result = value > relation_target;
 		}break;
 		
 		case Numerical_Relation::greater_than_equals:
 		{
-			result = relation_target >= value;
+			result = value  >=  relation_target;
 		}break;
 		
 		case Numerical_Relation::less_than:
 		{
-			result = relation_target < value;
+			result = value < relation_target;
 		}break;
 		
 		case Numerical_Relation::less_than_equals:
 		{
-			result = relation_target <= value;
+			result = value <= relation_target;
 		}break;
 	}
 	
@@ -911,7 +911,7 @@ static void Assign_Events_To_Participants(
 						
 						if(satisfies_reqs)
 						{
-							slots[s] = p + 1;
+							slots[s] = player_idx + 1;
 							filled_slot_count += 1;
 							break;
 						}
@@ -926,16 +926,26 @@ static void Assign_Events_To_Participants(
 					// Remove selected players from the pool.
 					for(u32 i = 0; i < req_header->participant_count; ++i)
 					{
-						u32 table_slot = slots[i] - 1;
-						u32 player_idx = game->player_assignement_table[table_slot];
-						
-						Assert(player_idx < game->player_count);
+						u32 player_idx = slots[i] - 1;
 						slots[i] = player_idx;
 						
-						unassigned_player_count -= 1;
-						u32 last_entry = game->player_assignement_table[unassigned_player_count];
-						game->player_assignement_table[table_slot] = last_entry;
-						game->player_assignement_table[unassigned_player_count] = U32_MAX;
+						// Find player idx in the assignement table and nuke it.
+						bool player_found = false;
+						for(u32 a = 0; a < unassigned_player_count; ++a)
+						{
+							if(game->player_assignement_table[a] == player_idx)
+							{
+								unassigned_player_count -= 1;
+								u32 last_entry = game->player_assignement_table[unassigned_player_count];
+								game->player_assignement_table[a] = last_entry;
+								game->player_assignement_table[unassigned_player_count] = U32_MAX;
+								
+								player_found = true;
+							}
+						}
+						
+						Assert(player_found);
+						
 					}
 					// Commit!
 					
@@ -973,7 +983,7 @@ static void Assign_Events_To_Participants(
 	
 	Assert(game->active_events->count);
 	
-	int success = 0;
+	game->display_event_idx = 0;
 }
 
 
@@ -1012,6 +1022,5 @@ static void Begin_Game(Game_State* game, Allocator_Shell* allocator)
 		p->marks = Create_Dynamic_Array<Mark_GM>(allocator, 4);
 	}
 	
-	game->display_event_idx = 0;
 	Assign_Events_To_Participants(game, Event_List::day, allocator);
 }
