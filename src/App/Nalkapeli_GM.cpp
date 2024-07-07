@@ -570,6 +570,7 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 	game_state->player_images = Create_Dynamic_Array<Player_Image>(allocator, u32(6));
 	
 	game_state->global_marks = Create_Dynamic_Array<Mark_GM>(allocator, 4);
+	game_state->active_events = Create_Dynamic_Array<Event>(allocator, 4);
 	
 	return result;
 }
@@ -646,6 +647,9 @@ static void Delete_Game(Game_State* gm, Allocator_Shell* allocator)
 		allocator->free(gm->players);
 	}
 	
+	for(each(Event*, e, gm->active_events))
+		allocator->free(e->player_indices);
+	
 	*gm = {};
 }
 
@@ -661,44 +665,6 @@ static void Create_Player_Name_FI(Game_State* gm, Allocator_Shell* allocator)
 	Init_String(&name->full_name, allocator, u32(0));
 	Init_String(&name->variant_name_1, allocator, u32(0));
 	Init_String(&name->variant_name_2, allocator, u32(0));
-}
-
-
-static void Begin_Game(Game_State* game, Allocator_Shell* allocator)
-{
-	Assert(!game->player_count);
-	Assert(!game->players);
-	Assert(game->player_images->count);
-	
-	// NOTE: Using the images array as that is language agnostic.
-	
-	game->player_count = game->player_images->count;
-	
-	u32 s = 
-		sizeof(*game->players) + 
-		sizeof(*game->player_assignement_table);
-	
-	u32 alloc_size 
-		= s * game->player_count;
-	
-	u32 event_count = Max(game->event_table_day.count, game->event_table_night.count);
-	alloc_size += sizeof(*game->event_assignement_table) * event_count;
-	
-	void* m = allocator->push(alloc_size);
-	game->players = (Game_Player*)m;
-	game->player_assignement_table = (u32*)(game->players + game->player_count);
-	
-	game->event_assignement_table_size = event_count;
-	game->event_assignement_table = game->player_assignement_table + game->player_count;
-	
-	
-	for(Game_Player* p = game->players; p < game->players + game->player_count; ++p)
-	{
-		for(u32 i = 0; i < Array_Lenght(p->stats); ++i)
-			p->stats[i] = Game_Player::starting_stat_value;
-		
-		p->marks = Create_Dynamic_Array<Mark_GM>(allocator, 4);
-	}
 }
 
 
@@ -820,12 +786,19 @@ static inline bool Player_Satisfies_Requirement(Game_Player* player, Participati
 }
 
 
-static Dynamic_Array<Event>* Assign_Events_To_Participants(
+static void Assign_Events_To_Participants(
 	Game_State* game,
 	Event_List event_list,
 	Allocator_Shell* allocator)
 {
-	Dynamic_Array<Event>* result = Create_Dynamic_Array<Event>(allocator, game->player_count);
+	// Cleanup any previous events list data.
+	{
+		for(each(Event*, e, game->active_events))
+			allocator->free(e->player_indices);
+		
+		game->active_events->count = 0;
+	}
+	game->active_event_list = event_list;
 	
 	Assert(game->player_count);
 	Assert(game->event_assignement_table_size);
@@ -955,6 +928,8 @@ static Dynamic_Array<Event>* Assign_Events_To_Participants(
 					{
 						u32 table_slot = slots[i] - 1;
 						u32 player_idx = game->player_assignement_table[table_slot];
+						
+						Assert(player_idx < game->player_count);
 						slots[i] = player_idx;
 						
 						unassigned_player_count -= 1;
@@ -964,9 +939,12 @@ static Dynamic_Array<Event>* Assign_Events_To_Participants(
 					}
 					// Commit!
 					
-					Event* e = Push(&result, allocator);
+					Event* e = Push(&game->active_events, allocator);
+					Assert(event_to_test_idx < event_count);
+					
 					e->event_idx = event_to_test_idx;
 					e->participant_count = filled_slot_count;
+					
 					// NOTE: Takes owenership of the ptr!
 					e->player_indices = slots;
 					commited = true;
@@ -991,7 +969,49 @@ static Dynamic_Array<Event>* Assign_Events_To_Participants(
 				Assert(untested_event_count);
 			}			
 		}
-	}	
+	}
 	
-	return result;
+	Assert(game->active_events->count);
+	
+	int success = 0;
+}
+
+
+static void Begin_Game(Game_State* game, Allocator_Shell* allocator)
+{
+	Assert(!game->player_count);
+	Assert(!game->players);
+	Assert(game->player_images->count);
+	
+	// NOTE: Using the images array as that is application language agnostic.
+	
+	game->player_count = game->player_images->count;
+	
+	u32 s = 
+		sizeof(*game->players) + 
+		sizeof(*game->player_assignement_table);
+	
+	u32 alloc_size 
+		= s * game->player_count;
+	
+	u32 event_count = Max(game->event_table_day.count, game->event_table_night.count);
+	alloc_size += sizeof(*game->event_assignement_table) * event_count;
+	
+	void* m = allocator->push(alloc_size);
+	game->players = (Game_Player*)m;
+	game->player_assignement_table = (u32*)(game->players + game->player_count);
+	
+	game->event_assignement_table_size = event_count;
+	game->event_assignement_table = game->player_assignement_table + game->player_count;
+	
+	for(Game_Player* p = game->players; p < game->players + game->player_count; ++p)
+	{
+		for(u32 i = 0; i < Array_Lenght(p->stats); ++i)
+			p->stats[i] = Game_Player::starting_stat_value;
+		
+		p->marks = Create_Dynamic_Array<Mark_GM>(allocator, 4);
+	}
+	
+	game->display_event_idx = 0;
+	Assign_Events_To_Participants(game, Event_List::day, allocator);
 }

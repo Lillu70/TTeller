@@ -168,27 +168,35 @@ struct Event_Header
 
 struct Game_State
 {
-	void* memory; // <-- Combined allocation
+	// Campaing data converted into fast to operate format ---------------	
+		void* memory; // <-- Combined allocation
+		
+		char* mark_data;
+		Table mark_table;
+		
+		Req_GM_Header* req_data;
+		Table req_table_day;
+		Table req_table_night;
+		
+		Event_Header* events_data;
+		Table event_table_day;
+		Table event_table_night;
+		// -------------------------------------
 	
-	char* mark_data;
-	Table mark_table;
+	// -------------------------------------------------------------------
+	// Player data create after all players have been entered ------------
+		
+		u32 player_count;
+		Game_Player* players; // <-- Combined allocation
+		u32* player_assignement_table;
+		
+		u32 event_assignement_table_size; // NOTE: this is to make multiple of same entry in the array easier for the rarity system.
+		u32* event_assignement_table;
+		// ---------------------------------------------
+		
+	// -------------------------------------------------------------------
 	
-	Req_GM_Header* req_data;
-	Table req_table_day;
-	Table req_table_night;
-	
-	Event_Header* events_data;
-	Table event_table_day;
-	Table event_table_night;
-	// -------------------------------------
-	
-	u32 player_count;
-	Game_Player* players; // <-- Combined allocation
-	u32* player_assignement_table;
-	
-	u32 event_assignement_table_size; // NOTE: this is to make multiple of same entry in the array easier for the rarity system.
-	u32* event_assignement_table;
-	// ---------------------------------------------
+	// runtime allocated items ------------------------
 	
 	Dynamic_Array<Player_Image>* player_images;
 	
@@ -199,6 +207,10 @@ struct Game_State
 	};
 	
 	Dynamic_Array<Mark_GM>* global_marks;
+	
+	Event_List active_event_list;
+	u32 display_event_idx;
+	Dynamic_Array<Event>* active_events;
 };
 
 

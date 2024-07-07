@@ -1,6 +1,12 @@
 
 #pragma once
 
+static f32 s_player_creation_collumn_min_width = 300;
+static f32 s_player_creation_text_box_width = s_player_creation_collumn_min_width - 50;
+static v2f s_player_picture_dim 
+	= v2f{s_player_creation_text_box_width, s_player_creation_text_box_width};
+
+
 static void Do_Create_Player_FI_Instruction_Popup()
 {
 	void(*test)(GUI_Context*) = [](GUI_Context* context)
@@ -130,10 +136,8 @@ static void Do_New_Game_Players()
 		Dynamic_Array<Game_Player_Name_FI>* names = s_game_state.player_names;
 		Player_Image* player_images = Begin(s_game_state.player_images);
 		
-		static constexpr f32 collumn_min_width = 300;
-
 		v2f* pos = &GUI_AUTO_TOP_LEFT;
-		f32 text_box_width = collumn_min_width - 50;
+		
 		
 		context->layout.build_direction = GUI_Build_Direction::right_top;
 		
@@ -184,17 +188,17 @@ static void Do_New_Game_Players()
 			context->layout.build_direction = GUI_Build_Direction::down_left;
 			
 			GUI_Do_Text(context, AUTO, "Nimi:");
-			if(GUI_Do_SL_Input_Field(context, AUTO, &text_box_width, &n->full_name))
+			if(GUI_Do_SL_Input_Field(context, AUTO, &s_player_creation_text_box_width, &n->full_name))
 				context->selected_index += 1;
 			
 			GUI_Do_Text(context, AUTO, "Muoto 1:");
-			if(GUI_Do_SL_Input_Field(context, AUTO, &text_box_width, &n->variant_name_1))
+			if(GUI_Do_SL_Input_Field(context, AUTO, &s_player_creation_text_box_width, &n->variant_name_1))
 				context->selected_index += 1;
 			
 			GUI_Do_Text(context, AUTO, "Muoto 2:");
-			GUI_Do_SL_Input_Field(context, AUTO, &text_box_width, &n->variant_name_2);
+			GUI_Do_SL_Input_Field(context, AUTO, &s_player_creation_text_box_width, &n->variant_name_2);
 			
-			v2f test_button_dim = v2f{text_box_width, context->layout.last_element.dim.y};
+			v2f test_button_dim = v2f{s_player_creation_text_box_width, context->layout.last_element.dim.y};
 			if(GUI_Do_Button(context, AUTO, &test_button_dim, "Testaa muodot"))
 			{
 				
@@ -202,7 +206,7 @@ static void Do_New_Game_Players()
 			
 			GUI_Do_Text(context, AUTO, "Kuva:");
 
-			v2f picture_dim = v2f{text_box_width, text_box_width};
+			
 			if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Valitse kuva"))
 			{
 				char path[260];
@@ -221,7 +225,7 @@ static void Do_New_Game_Players()
 						}
 						
 						#if 1
-							img->dim = picture_dim.As<i32>();
+							img->dim = s_player_picture_dim.As<i32>();
 							u32 sm_size = img->dim.x * img->dim.y * sizeof(Color);
 							
 							img->buffer = (u8*)s_allocator.push(sm_size);
@@ -255,7 +259,7 @@ static void Do_New_Game_Players()
 			
 			GUI_Pop_Layout(context);
 			
-			GUI_Do_Panel(context, AUTO, &picture_dim);
+			GUI_Do_Panel(context, AUTO, &s_player_picture_dim);
 			
 			if(img->buffer)
 			{
@@ -265,7 +269,11 @@ static void Do_New_Game_Players()
 			
 			GUI_Pop_Layout(context);
 			
-			GUI_End_Collumn(context, collumn_min_width, collumn_start, X_AXIS);
+			GUI_End_Collumn(
+				context, 
+				s_player_creation_collumn_min_width, 
+				collumn_start, 
+				X_AXIS);
 		}
 		
 	}; // ----------------------------------------------------------------------------------------
@@ -278,39 +286,75 @@ static void Do_Event_Display_Frame()
 {
 	Assert(s_game_state.player_count);
 	
-	Clear_Canvas(&s_canvas, s_background_color);
+	static Event* active_event;
+	static Event_Header* active_event_header;
+	static bool skip_frame;
 	
-	GUI_Context* context = &s_gui_banner;
+	skip_frame = false;
 	
-	GUI_Begin_Context(
-		context,
-		&s_canvas,
-		&s_global_data.action_context,
-		&s_theme);
+	Table* active_event_table = (s_game_state.active_event_list == Event_List::day)?
+		&s_game_state.event_table_day : 
+		&s_game_state.event_table_night;
+	
+	active_event = Begin(s_game_state.active_events) + s_game_state.display_event_idx;
+	
+	u32 offset = *((u32*)active_event_table->memory + active_event->event_idx);
+	active_event_header = (Event_Header*)((u8*)s_game_state.events_data + offset);
 	
 	
-	if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &GUI_AUTO_FIT, "Lopeta peli"))
-	{
-		Delete_Game(&s_game_state, &s_allocator);
-		s_global_data.active_menu = Menus::main_menu;
-		goto END;
-	}
-	
-	if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Roll event"))
-	{
-		Dynamic_Array<Event>* round = Assign_Events_To_Participants(
-			&s_game_state, 
-			Event_List::day, 
-			&s_allocator);
+	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
+	{		
+		v2f title_scale = v2f{4.f, 4.f};
+		char* event_name = active_event_header->event_name.buffer;
+		GUI_Do_Title_Text(context, &GUI_AUTO_TOP_LEFT, event_name, title_scale);
 		
-		for(each(auto, test, round))
+		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lopeta peli"))
 		{
-			int a = 0;
+			Delete_Game(&s_game_state, &s_allocator);
+			s_global_data.active_menu = Menus::main_menu;
+			skip_frame = true;
+			return;
 		}
 		
-		Free_Event_List(round, &s_allocator);
-	}
-	
-	END:
-	GUI_End_Context(context);
+		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Seuraava tapahtuma"))
+		{
+			skip_frame = true;
+			s_game_state.display_event_idx += 1;
+			if(s_game_state.display_event_idx >= s_game_state.active_events->count)
+			{
+				Assign_Events_To_Participants(&s_game_state, Event_List::day, &s_allocator);
+				return;
+			}
+		}
+	}; // ----------------------------------------------------------------------------------------
+
+	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
+	{
+		if(skip_frame)
+			return;
+		
+		Assert(active_event->participant_count);
+		
+		v2f* p = &GUI_AUTO_TOP_LEFT;
+		for(u32 i = 0; i < active_event->participant_count; ++i)
+		{
+			u32 player_idx = *(active_event->player_indices + i);
+			Game_Player_Name_FI* player_name 
+				= Begin(s_game_state.player_names) + player_idx;
+			
+			GUI_Do_Text(context, p, player_name->full_name.buffer);
+			p = AUTO;
+			
+			GUI_Do_Panel(context, AUTO, &s_player_picture_dim);
+			
+			if(!i)
+				GUI_Push_Layout(context);
+		}
+		
+		GUI_Pop_Layout(context);
+		
+		
+	}; // ----------------------------------------------------------------------------------------
+
+	Do_GUI_Frame_With_Banner(banner_func, menu_func, 200);
 }
