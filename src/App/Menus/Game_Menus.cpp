@@ -119,8 +119,8 @@ static void Do_New_Game_Players()
 		
 		v2f dim = v2f{w1, title_height};
 		
-		b32 player_count = s_game_state.player_names->count; 
-		if(player_count && GUI_Do_Button(context, &title_row_pos, &dim, start_game_text))
+		b32 live_player_count = s_game_state.player_names->count; 
+		if(live_player_count && GUI_Do_Button(context, &title_row_pos, &dim, start_game_text))
 		{
 			s_global_data.active_menu = Menus::GM_let_the_games_begin;
 		}
@@ -280,12 +280,6 @@ static void Do_Let_The_Games_Begin_Frame()
 	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
 		v2f title_scale = v2f{4.f, 4.f};
-		Font* font = &context->theme->font;
-		v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
-		if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
-		{
-			s_global_data.active_menu = Menus::GM_players;
-		}
 		
 		context->layout.anchor = GUI_Anchor::top;
 		context->layout.build_direction = GUI_Build_Direction::down_center;
@@ -301,6 +295,12 @@ static void Do_Let_The_Games_Begin_Frame()
 			Begin_Game(&s_game_state, &s_allocator);
 		}
 		
+		context->layout.anchor = GUI_Anchor::top_left;
+		v2f back_button_dim = GUI_Tight_Fit_Text("<", &context->theme->font, title_scale);
+		if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
+		{
+			s_global_data.active_menu = Menus::GM_players;
+		}
 		
 	}; // ----------------------------------------------------------------------------------------
 
@@ -332,7 +332,7 @@ static void Do_Let_The_Games_Begin_Frame()
 
 static void Do_Event_Display_Frame()
 {
-	Assert(s_game_state.player_count);
+	Assert(s_game_state.live_player_count);
 	
 	static Event* active_event;
 	static Event_Header* active_event_header;
@@ -367,11 +367,11 @@ static void Do_Event_Display_Frame()
 				Resolve_Current_Event_Set(&s_game_state, &s_allocator);
 				skip_frame = true;
 				
-				if(!s_game_state.player_count)
+				if(!s_game_state.live_player_count)
 				{
 					s_global_data.active_menu = Menus::GM_everyone_is_dead;
 				}
-				else if(s_game_state.player_count == 1)
+				else if(s_game_state.live_player_count == 1)
 				{
 					s_global_data.active_menu = Menus::GM_we_have_a_winner;
 				}
@@ -474,6 +474,8 @@ static void Do_Event_Display_Frame()
 
 static void Do_Day_Counter_Display_Frame()
 {
+	#if 0
+	
 	GUI_Context* context = &s_gui_banner;
 	
 	Clear_Canvas(&s_canvas, s_background_color);
@@ -507,6 +509,115 @@ static void Do_Day_Counter_Display_Frame()
 	}
 	
 	GUI_End_Context(context);
+	
+	#else
+	
+	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
+	{
+		context->layout.anchor = GUI_Anchor::top;
+		context->layout.build_direction = GUI_Build_Direction::down_center;
+		
+		v2f title_scale = v2f{4.f, 4.f};
+		GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, "P\xE4iv\xE4", title_scale);
+		v2f title_dim = context->layout.last_element.dim;
+		
+		char index_text_buffer[12] = {0};
+		char* num = U32_To_Char_Buffer((u8*)&index_text_buffer, s_game_state.day_counter);
+		GUI_Do_Text(context, AUTO, num, {}, title_scale);
+		
+		if(GUI_Do_Button(context, AUTO, &title_dim, "Jatka"))
+		{
+			s_global_data.active_menu = Menus::GM_event_display;
+			Assign_Events_To_Participants(&s_game_state, Event_List::day, &s_allocator);
+		}
+		
+	}; // ----------------------------------------------------------------------------------------
+
+	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
+	{
+		context->layout.anchor = GUI_Anchor::top;
+		context->layout.build_direction = GUI_Build_Direction::down_center;
+		
+		v2f title_scale = v2f{3.f, 3.f};
+		GUI_Do_Title_Text(
+			context, 
+			&GUI_AUTO_TOP_CENTER, 
+			"J\xE4ljell\xE4 olevat osallistujat.", 
+			title_scale);
+		
+		f32 padding = f32(context->theme->padding);
+		
+		f32 dx = 
+			(s_player_picture_dim.x * s_game_state.live_player_count) + 
+			(padding * (s_game_state.live_player_count - 1));
+		
+		v2f p = context->layout.last_element.pos - context->anchor_base;
+		p.y -= (context->layout.last_element.dim.y / 2) + (padding * 3) + GUI_DEFAULT_TEXT_SCALE.y;
+		p.x -= dx / 2;
+		
+		Player_Image* images = Begin(s_game_state.player_images);
+		Game_Player_Name_FI* names = Begin(s_game_state.player_names);
+
+		context->layout.anchor = GUI_Anchor::top_left;
+		context->layout.build_direction = GUI_Build_Direction::down_left;
+		
+		char num_text_buffer[12] = {0};
+		for(u32 i = 0; i < s_game_state.live_player_count; ++i)
+		{
+			Game_Player* player = s_game_state.players + i;
+			
+			GUI_Do_Text(context, &p, (names + i)->full_name.buffer);
+			p.x += s_player_picture_dim.x + padding;
+			
+			GUI_Do_Image_Panel(context, AUTO, &s_player_picture_dim, &((images + i)->image));
+			
+			for(u32 s = 0; s < u32(Character_Stat::Stats::COUNT); ++s)
+			{
+				GUI_Do_Text(context, AUTO, (char*)Character_Stat::stat_names[s]);
+				GUI_Push_Layout(context);
+				
+				context->layout.build_direction = GUI_Build_Direction::right_center;
+				
+				context->flags |= GUI_Context_Flags::one_time_skip_padding;
+				GUI_Do_Text(context, AUTO, ": ");
+				context->flags |= GUI_Context_Flags::one_time_skip_padding;
+				
+				char* num = U32_To_Char_Buffer((u8*)&num_text_buffer, player->stats[s]);
+				GUI_Do_Text(context, AUTO, num);
+				
+				GUI_Pop_Layout(context);				
+			}
+			
+			
+			GUI_Do_Text(context, AUTO, "Esineet:");
+			for(each(Mark_GM*, mark, player->marks))
+			{
+				if(mark->type == Mark_Type::item)
+				{
+					u32 offset = *(((u32*)s_game_state.mark_table.memory) + mark->idx);
+					char* mark_text = s_game_state.mark_data + offset;
+					GUI_Do_Text(context, AUTO, mark_text);
+				}
+			}
+			
+			
+			GUI_Do_Text(context, AUTO, "Hahmo merkit:");
+			for(each(Mark_GM*, mark, player->marks))
+			{
+				if(mark->type == Mark_Type::personal)
+				{
+					u32 offset = *(((u32*)s_game_state.mark_table.memory) + mark->idx);
+					char* mark_text = s_game_state.mark_data + offset;
+					GUI_Do_Text(context, AUTO, mark_text);
+				}
+			}
+		}
+		
+	}; // ----------------------------------------------------------------------------------------
+
+	Do_GUI_Frame_With_Banner(banner_func, menu_func, 220);
+	
+	#endif
 }
 
 
@@ -536,10 +647,91 @@ static void Do_Night_Falls_Frame()
 	GUI_End_Context(context);
 }
 
-/*
-If I dont do culling between assignements then I have to check for aliveness when assigning players.
-And it's also possiple that no player is alive at this point in time.
-So I think it's best to avoid this situation.
+
+static void Do_All_Players_Are_Dead_Frame()
+{
+	Assert(s_game_state.live_player_count == 0);
+	
+	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
+	{
+		v2f title_scale = v2f{4.f, 4.f};
+		
+		context->layout.anchor = GUI_Anchor::top;
+		context->layout.build_direction = GUI_Build_Direction::down_center;
+		
+		char* title_text = "Kaikki osallistujat makavat kuolleina...";
+		GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, title_text, title_scale);
+	
+		GUI_Do_Text(context, AUTO, "Kukaan ei selviytynyt!");
+		
+		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lopeta peli"))
+		{
+			Delete_Game(&s_game_state, &s_allocator);
+			s_global_data.active_menu = Menus::main_menu;
+		}
+		
+	}; // ----------------------------------------------------------------------------------------
+
+	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
+	{
+		
+		
+	}; // ----------------------------------------------------------------------------------------
+
+	Do_GUI_Frame_With_Banner(banner_func, menu_func);
+}
 
 
-*/
+static void Do_We_Have_A_Winner_Frame()
+{
+	Assert(s_game_state.live_player_count == 1);
+	
+	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
+	{
+		v2f title_scale = v2f{4.f, 4.f};
+		
+		context->layout.anchor = GUI_Anchor::top;
+		context->layout.build_direction = GUI_Build_Direction::down_center;
+		
+		GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, "Voittaja on selvinnyt!", title_scale);
+		GUI_Do_Text(context, AUTO, "H\xE4nen nimens\xE4 j\xE4\xE4k\xF6\xF6n histoarian kirjoihin.");
+		
+		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lopeta peli"))
+		{
+			Delete_Game(&s_game_state, &s_allocator);
+			s_global_data.active_menu = Menus::main_menu;
+		}
+		
+	}; // ----------------------------------------------------------------------------------------
+
+	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
+	{
+		if(!s_game_state.memory)
+			return;
+		
+		context->layout.anchor = GUI_Anchor::top;
+		context->layout.build_direction = GUI_Build_Direction::down_center;
+		
+		GUI_Do_Text(context, &GUI_AUTO_TOP_CENTER, "Voittaja!");
+		
+		Player_Image* images = Begin(s_game_state.player_images);
+		Game_Player_Name_FI* names = Begin(s_game_state.player_names);
+		
+		GUI_Do_Text(context, AUTO, names->full_name.buffer);
+		GUI_Do_Image_Panel(context, AUTO, &s_player_picture_dim, &images->image);
+		
+		v2f seperator_dim = v2f{f32(context->canvas->dim.x) - 50, 10};
+		seperator_dim.x = Max(seperator_dim.x, s_player_picture_dim.x);
+		
+		GUI_Do_Panel(context, AUTO, &seperator_dim);
+		
+		for(u32 i = 1; i < s_game_state.total_player_count; ++i)
+		{
+			GUI_Do_Text(context, AUTO, (names + i)->full_name.buffer);
+			GUI_Do_Image_Panel(context, AUTO, &s_player_picture_dim, &((images + i)->image));
+		}
+		
+	}; // ----------------------------------------------------------------------------------------
+
+	Do_GUI_Frame_With_Banner(banner_func, menu_func, 210);
+}

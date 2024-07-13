@@ -159,6 +159,16 @@ static void Run_Active_Menu(u32 app_flags)
 			Do_Night_Falls_Frame();
 		}break;
 		
+		case Menus::GM_everyone_is_dead:
+		{
+			Do_All_Players_Are_Dead_Frame();
+		}break;
+		
+		case Menus::GM_we_have_a_winner:
+		{
+			Do_We_Have_A_Winner_Frame();
+		}break;
+		
 		default:
 		{
 			Terminate;
@@ -204,7 +214,7 @@ static void Run_Active_Menu(u32 app_flags)
 		}	
 	}
 	
-	// TODO: sub menu context reseting!
+	
 	if(s_global_data.active_menu != current_menu)
 	{
 		GUI_Reset_Context(&s_gui);
@@ -327,7 +337,7 @@ void Init_App(Platform_Calltable platform_calltable)
 		s_mem.init(&s_platform, 1);
 	}
 	
-	Random_Machine::seed = 0; //i32(s_platform.Get_Time_Stamp());
+	Random_Machine::seed = i32(s_platform.Get_Time_Stamp());
 	Init_GUI();
 }
 

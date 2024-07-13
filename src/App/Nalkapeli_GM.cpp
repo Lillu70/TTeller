@@ -563,7 +563,8 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 	Assert(!event_table_day.get_free_capacity());
 	Assert(!event_table_night.get_free_capacity());
 	
-	game_state->player_count = 0;
+	game_state->total_player_count = 0;
+	game_state->live_player_count = 0;
 	game_state->language = Language::finnish;
 	
 	game_state->player_names 
@@ -615,9 +616,9 @@ static void Delete_Game(Game_State* gm, Allocator_Shell* allocator)
 
 	allocator->free(gm->player_names);
 	
-	if(gm->player_count)
+	if(gm->total_player_count)
 	{
-		for(u32 i = 0; i < gm->player_count; ++i)
+		for(u32 i = 0; i < gm->total_player_count; ++i)
 			Hollow_Game_Player(gm->players + i, allocator);
 		
 		allocator->free(gm->players);
@@ -696,7 +697,7 @@ static inline bool Numerical_Relation_Match(i8 value, i8 relation_target, Numeri
 
 static inline void Search_For_Mark(
 	Dynamic_Array<Mark_GM>* marks, 
-	u32 search_mark_idx, 
+	u32 search_mark_idx,
 	Exists_Statement* out_exists, 
 	i8* out_duration,
 	u32* out_mark_idx = 0)
@@ -761,7 +762,7 @@ static inline bool Player_Satisfies_Requirement(Game_Player* player, Participati
 			result = Numerical_Relation_Match(stat, req->relation_target, req->numerical_relation);
 		}break;
 		
-		case Participation_Requirement_Type::mark_item:
+		case Participation_Requirement_Type::mark_item:	
 		case Participation_Requirement_Type::mark_personal:
 		{
 			Exists_Statement exists;
@@ -810,19 +811,19 @@ static void Assign_Events_To_Participants(
 	}
 	game->active_event_list = event_list;
 	
-	Assert(game->player_count);
+	Assert(game->live_player_count);
 	Assert(game->event_assignement_table_size);
 	
 	static Random_Machine rm = {};
 	
-	for(u32 i = 0; i < game->player_count; ++i)
+	for(u32 i = 0; i < game->live_player_count; ++i)
 		game->player_assignement_table[i] = i;
 	
 	// shuffle player indexes.
-	for(u32 i = 0; i < game->player_count * 1.5; ++i)
+	for(u32 i = 0; i < game->live_player_count * 1.5; ++i)
 	{
-		u32 first = rm.random_u32(game->player_count);
-		u32 second = rm.random_u32(game->player_count);
+		u32 first = rm.random_u32(game->live_player_count);
+		u32 second = rm.random_u32(game->live_player_count);
 		
 		Swap(game->player_assignement_table + first, game->player_assignement_table + second);
 	}
@@ -839,7 +840,7 @@ static void Assign_Events_To_Participants(
 	
 	
 	// Assign players
-	u32 unassigned_player_count = game->player_count;
+	u32 unassigned_player_count = game->live_player_count;
 	while(unassigned_player_count)
 	{	
 		u32 untested_event_count = event_count;
@@ -1002,32 +1003,29 @@ static void Assign_Events_To_Participants(
 
 static void Begin_Game(Game_State* game, Allocator_Shell* allocator)
 {
-	Assert(!game->player_count);
+	Assert(!game->live_player_count);
 	Assert(!game->players);
 	Assert(game->player_images->count);
 	
 	// NOTE: Using the images array as that is application language agnostic.
 	
-	game->player_count = game->player_images->count;
+	game->total_player_count = game->player_images->count;
+	game->live_player_count = game->total_player_count;
 	
-	u32 s = 
-		sizeof(*game->players) + 
-		sizeof(*game->player_assignement_table);
-	
-	u32 alloc_size 
-		= s * game->player_count;
+	u32 s = sizeof(*game->players) + sizeof(*game->player_assignement_table);
+	u32 alloc_size = s * game->live_player_count;
 	
 	u32 event_count = Max(game->event_table_day.count, game->event_table_night.count);
 	alloc_size += sizeof(*game->event_assignement_table) * event_count;
 	
 	void* m = allocator->push(alloc_size);
 	game->players = (Game_Player*)m;
-	game->player_assignement_table = (u32*)(game->players + game->player_count);
+	game->player_assignement_table = (u32*)(game->players + game->live_player_count);
 	
 	game->event_assignement_table_size = event_count;
-	game->event_assignement_table = game->player_assignement_table + game->player_count;
+	game->event_assignement_table = game->player_assignement_table + game->live_player_count;
 	
-	for(Game_Player* p = game->players; p < game->players + game->player_count; ++p)
+	for(Game_Player* p = game->players; p < game->players + game->live_player_count; ++p)
 	{
 		for(u32 i = 0; i < Array_Lenght(p->stats); ++i)
 			p->stats[i] = Game_Player::starting_stat_value;
@@ -1102,7 +1100,11 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
 			}
 			else
 			{
-				*Push(&game->global_marks, allocator) = *((Mark_GM*)gcon);
+				Mark_GM m;
+				m.idx = gcon->mark_idx;
+				m.duration = gcon->mark_duration;
+				
+				*Push(&game->global_marks, allocator) = m;
 			}
 		}
 		
@@ -1145,7 +1147,10 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
 								Assert(inheritor != player);
 								
 								for(each(Mark_GM*, m, player->marks))
-									Give_Player_Mark(inheritor, *m, allocator);
+								{
+									if(m->type == Mark_Type::item)
+										Give_Player_Mark(inheritor, *m, allocator);
+								}
 							}
 							
 							player->alive = false;
@@ -1160,7 +1165,7 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
 						
 						case Event_Consequens_Type::gains_mark:
 						{
-							Mark_GM con_mark = {con->mark_idx, con->duration};
+							Mark_GM con_mark = {con->mark_type, con->duration, con->mark_idx};
 							Give_Player_Mark(player, con_mark, allocator);
 						}break;
 						
@@ -1195,19 +1200,36 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
 	}
 	
 	// Cull dead players.
-	for(u32 i = 0; i < game->player_count; ++i)
+	for(u32 i = 0; i < game->live_player_count; ++i)
 	{
 		Game_Player* player = game->players + i;
 		if(!player->alive)
 		{
-			allocator->free(player->marks);
+			game->live_player_count -= 1;
 			
-			game->player_count -= 1;
-			*player = *(game->players + game->player_count);
+			// ---
+			Game_Player* last_player = game->players + game->live_player_count;
+			Game_Player temp_player = *player;
+			*player = *last_player;
+			*last_player = temp_player;
+			// ---
 			
-			Unordered_Remove(game->player_names, i);
-			Unordered_Remove(game->player_images, i);
-		
+			Game_Player_Name_FI* player_names = Begin(game->player_names); 
+			Game_Player_Name_FI* player_name = player_names + i; 
+			Game_Player_Name_FI* last_player_name = player_names + game->live_player_count; 
+			Game_Player_Name_FI temp_player_name = *player_name;
+			*player_name = *last_player_name;
+			*last_player_name = temp_player_name;
+			// ---
+			
+			Player_Image* player_images = Begin(game->player_images); 
+			Player_Image* player_image = player_images + i; 
+			Player_Image* last_player_image = player_images + game->live_player_count; 
+			Player_Image temp_player_image = *player_image;
+			*player_image = *last_player_image;
+			*last_player_image = temp_player_image;
+			// ---
+			
 			i -= 1;
 		}
 	}

@@ -39,11 +39,11 @@ struct Player_Image
 };
 
 
-// NOTE: Memory layout MUST be the same as with Global_Mark_Requirement_GM.
 struct Mark_GM
 {
-	u32 idx;
+	Mark_Type type;
 	i8 duration;
+	u32 idx;
 };
 
 
@@ -90,9 +90,6 @@ struct Global_Mark_Requirement_GM
 };
 
 
-// NOTE: Memory layout MUST be the same as with Mark_GM.
-// CONSIDER: Use the Mark_GM struct for this as they are idenctical.
-// seperation conveys the intent better maybe tho?
 struct Global_Mark_Consequence_GM
 {
 	u32 mark_idx;
@@ -196,7 +193,8 @@ struct Game_State
 	// -------------------------------------------------------------------
 	// Player data create after all players have been entered ------------
 		
-		u32 player_count;
+		u32 total_player_count;
+		u32 live_player_count;
 		Game_Player* players; // <-- Combined allocation
 		u32* player_assignement_table;
 		
