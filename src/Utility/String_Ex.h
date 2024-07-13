@@ -28,3 +28,22 @@ static char* U32_To_Char_Buffer(u8* buffer, u32 integer)
 	
 	return (char*)(buffer + last_non_zero);
 }
+
+
+static u32 Convert_String_View_Into_U32(String_View view)
+{
+	u32 result = 0;
+	u32 digit = view.lenght;
+	
+	char* begin = view.buffer;
+	for(char* c = begin; c < begin + view.lenght; ++c)
+	{
+		u32 v = *c - u32('0');
+		Assert(v < 10);
+		
+		v *= Pow32(10, --digit);
+		result += v;
+	}
+	
+	return result;
+}

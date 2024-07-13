@@ -306,15 +306,15 @@ static Event_Consequens_GM Convert_To_GM(Event_Consequens* con, Mark_Hash_Table*
 
 
 static bool Convert_Editor_Campaign_Into_Game_Format(
-	Game_State* game_state,
+	Game_State* game,
 	Events_Container* event_container,
 	Allocator_Shell* allocator)
 {
-	Assert(game_state);
+	Assert(game);
 	Assert(event_container);
 	Assert(allocator);
 	
-	*game_state = {};
+	*game = {};
 	bool result = true;
 	
 	u32 alloc_size = 0;
@@ -380,8 +380,8 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 	alloc_size += sizeof(u32) * marks.unique_element_count; // mark table
 	alloc_size += marks.total_unique_string_lenght;			// mark data
 	
-	game_state->memory = allocator->push(alloc_size);
-	Linear_Allocator mem = Create_Linear_Allocator(game_state->memory, alloc_size);
+	game->memory = allocator->push(alloc_size);
+	Linear_Allocator mem = Create_Linear_Allocator(game->memory, alloc_size);
 	
 	// Create mark data and table.
 	{
@@ -389,14 +389,14 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 			mem.push(marks.total_unique_string_lenght), 
 			marks.total_unique_string_lenght);
 		
-		game_state->mark_data = (char*)mark_data.memory;
+		game->mark_data = (char*)mark_data.memory;
 	
 		u32 mark_table_size = sizeof(u32) * marks.unique_element_count;
 		Linear_Allocator mark_table = Create_Linear_Allocator(
 			mem.push(mark_table_size), 
 			mark_table_size);
 		
-		game_state->mark_table = Table{marks.unique_element_count, mark_table.memory};
+		game->mark_table = Table{marks.unique_element_count, mark_table.memory};
 		
 		Mark_Hash_Bucket_Header* bucket = marks.first_bucket;
 		u32 table_slot = 1;
@@ -414,7 +414,7 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 					char* buffer = (char*)mark_data.push(element->string.lenght + 1);
 					Mem_Copy(buffer, element->string.buffer, element->string.lenght + 1);
 					
-					u32 offset = u32(buffer - game_state->mark_data);
+					u32 offset = u32(buffer - game->mark_data);
 					
 					*mark_table.push<u32>() = offset;
 				}
@@ -426,39 +426,39 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 		Assert(!mark_data.get_free_capacity());
 	}
 	
-	game_state->campaign_name = (char*)mem.push(event_container->campaign_name.lenght + 1);
+	game->campaign_name = (char*)mem.push(event_container->campaign_name.lenght + 1);
 	Mem_Copy(
-		game_state->campaign_name, 
+		game->campaign_name, 
 		event_container->campaign_name.buffer, 
 		event_container->campaign_name.lenght + 1);
 	
-	game_state->req_data = (Req_GM_Header*)mem.push(requirements_data_size);
-	Linear_Allocator req_data = Create_Linear_Allocator(game_state->req_data, requirements_data_size);
+	game->req_data = (Req_GM_Header*)mem.push(requirements_data_size);
+	Linear_Allocator req_data = Create_Linear_Allocator(game->req_data, requirements_data_size);
 	
 	u32 req_table_day_size = sizeof(u32) * event_container->day_event_count;
-	game_state->req_table_day = Table{event_container->day_event_count, mem.push(req_table_day_size)};
+	game->req_table_day = Table{event_container->day_event_count, mem.push(req_table_day_size)};
 	
 	Linear_Allocator req_table_day 
-		= Create_Linear_Allocator(game_state->req_table_day.memory, req_table_day_size);
+		= Create_Linear_Allocator(game->req_table_day.memory, req_table_day_size);
 	
 	u32 night_event_count = event_container->events->count - event_container->day_event_count;
 	u32 req_table_night_size = sizeof(u32) * night_event_count;
-	game_state->req_table_night = Table{night_event_count, mem.push(req_table_night_size)};
+	game->req_table_night = Table{night_event_count, mem.push(req_table_night_size)};
 	
 	Linear_Allocator req_table_night 
-		= Create_Linear_Allocator(game_state->req_table_night.memory,req_table_night_size);
+		= Create_Linear_Allocator(game->req_table_night.memory,req_table_night_size);
 	
-	game_state->events_data = (Event_Header*)mem.push(events_data_size);
-	Linear_Allocator events_data = Create_Linear_Allocator(game_state->events_data, events_data_size);
+	game->events_data = (Event_Header*)mem.push(events_data_size);
+	Linear_Allocator events_data = Create_Linear_Allocator(game->events_data, events_data_size);
 	
-	game_state->event_table_day = Table{game_state->req_table_day.count, mem.push(req_table_day_size)};		
+	game->event_table_day = Table{game->req_table_day.count, mem.push(req_table_day_size)};		
 	Linear_Allocator event_table_day 
-		= Create_Linear_Allocator(game_state->event_table_day.memory, req_table_day_size);
+		= Create_Linear_Allocator(game->event_table_day.memory, req_table_day_size);
 	
 	
-	game_state->event_table_night = Table{night_event_count, mem.push(req_table_night_size)};
+	game->event_table_night = Table{night_event_count, mem.push(req_table_night_size)};
 	Linear_Allocator event_table_night
-		= Create_Linear_Allocator(game_state->event_table_night.memory, req_table_night_size);
+		= Create_Linear_Allocator(game->event_table_night.memory, req_table_night_size);
 
 	Assert(!mem.get_free_capacity());
 	
@@ -470,7 +470,7 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 			Req_GM_Header* req_header = req_data.push<Req_GM_Header>();
 			
 			{
-				u32 offset = u32((u8*)req_header - (u8*)game_state->req_data);
+				u32 offset = u32((u8*)req_header - (u8*)game->req_data);
 				if(i < event_container->day_event_count)
 					*req_table_day.push<u32>() = offset;
 				else
@@ -488,7 +488,7 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 			Event_Header* event_header = events_data.push<Event_Header>();
 			
 			{
-				u32 offset = u32((u8*)event_header - (u8*)game_state->events_data);
+				u32 offset = u32((u8*)event_header - (u8*)game->events_data);
 				if(i < event_container->day_event_count)
 					*event_table_day.push<u32>() = offset;
 				else
@@ -544,8 +544,8 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 	
 	#if 1 // Test Code!
 	{
-		Table mark_table = game_state->mark_table;
-		char* mark_data = game_state->mark_data;
+		Table mark_table = game->mark_table;
+		char* mark_data = game->mark_data;
 		
 		for(u32 i = 0; i < mark_table.count; ++i)
 		{
@@ -563,19 +563,241 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 	Assert(!event_table_day.get_free_capacity());
 	Assert(!event_table_night.get_free_capacity());
 	
-	game_state->total_player_count = 0;
-	game_state->live_player_count = 0;
-	game_state->language = Language::finnish;
+	game->total_player_count = 0;
+	game->live_player_count = 0;
+	game->language = Language::finnish;
 	
-	game_state->player_names 
+	game->player_names 
 		= Create_Dynamic_Array<Game_Player_Name_FI>(allocator, u32(6));
 	
-	game_state->player_images = Create_Dynamic_Array<Player_Image>(allocator, u32(6));
+	game->player_images = Create_Dynamic_Array<Player_Image>(allocator, u32(6));
 	
-	game_state->global_marks = Create_Dynamic_Array<Mark_GM>(allocator, 4);
-	game_state->active_events = Create_Dynamic_Array<Event>(allocator, 4);
+	game->global_marks = Create_Dynamic_Array<Mark_GM>(allocator, 4);
+	game->active_events = Create_Dynamic_Array<Event>(allocator, 4);
+	
+	Init_String(&game->display_text, allocator, 1);
 	
 	return result;
+}
+
+
+static void Get_Active_Event_Ref_And_Header(
+	Game_State* game,
+	u32 event_idx, 
+	Event** out_ref, 
+	Event_Header** out_header)
+{
+	Assert(out_ref || out_header);
+	
+	Table* active_event_table = (game->active_event_list == Event_List::day)?
+		&game->event_table_day : 
+		&game->event_table_night;
+	
+	Assert(event_idx < game->active_events->count);
+	
+	Event* active_event = Begin(game->active_events) + event_idx;
+	
+	u32 offset = *((u32*)active_event_table->memory + active_event->event_idx);
+	Event_Header* active_event_header = (Event_Header*)((u8*)game->events_data + offset);
+	
+	if(out_ref)
+		*out_ref = active_event;
+	
+	if(out_header)
+		*out_header = active_event_header;
+}
+
+
+static void Generate_Display_Text(Game_State* game)
+{
+	Event_Header* event_header;
+	Event* event_ref;
+	Get_Active_Event_Ref_And_Header(game, game->display_event_idx, &event_ref, &event_header);
+	
+	u32 display_text_size = 1;
+	
+	enum class Mode
+	{
+		search,
+		seek_number,
+		seek_form,
+		seek_bender
+	};
+	Mode mode = Mode::search;
+	
+	String_View number_view = {};
+	u32 participant_idx = 0;
+	u32 player_idx = 0;
+	bool a_switch = 0;
+	String* full_name = 0;
+	
+	game->display_text.lenght = 0;
+	
+	for(char* cptr = event_header->event_text.buffer; *cptr; ++cptr)
+	{
+		char c = *cptr;
+		switch(mode)
+		{
+			case Mode::search:
+			{
+				if(c == '/')
+				{
+					cptr += 1; // NOTE: skip the next character for now.
+					mode = Mode::seek_number;
+					number_view.buffer = cptr + 1;
+					Assert(*number_view.buffer >= '0' && *number_view.buffer <= '9');
+					number_view.lenght = 0;
+				}
+				else
+				{
+					game->display_text += c;
+				}
+				
+			}break;
+			
+			case Mode::seek_number:
+			{
+				if(c >= '0' && c <= '9')
+				{
+					// Trim leading zeroes.
+					if(c == '0' && !number_view.lenght)
+						number_view.buffer += 1;
+					else
+						number_view.lenght += 1;
+					
+				}
+				else
+				{
+					cptr -= 1; // NOTE GO back!
+					
+					participant_idx = Convert_String_View_Into_U32(number_view) - 1;
+					Assert(participant_idx < event_ref->participant_count);
+					
+					player_idx = *(event_ref->player_indices + participant_idx);
+					Assert(player_idx < game->live_player_count);
+					
+					mode = Mode::seek_form;
+				}
+			}break;
+			
+			case Mode::seek_form:
+			{
+				Game_Player_Name_FI* name = Begin(game->player_names) + player_idx;				
+				a_switch = false;
+				full_name = &name->full_name;
+				switch(c)
+				{
+					case ':':
+					{
+						mode = Mode::seek_bender;
+						if(name->variant_name_1.lenght)
+						{
+							u32 required_memory = game->display_text.lenght + name->variant_name_1.lenght + 1;
+							Reserve_String_Memory(&game->display_text, required_memory);
+							char* dest = game->display_text.buffer + game->display_text.lenght;
+							
+							Mem_Copy(dest, name->variant_name_1.buffer, name->variant_name_1.lenght);
+							game->display_text.lenght += name->variant_name_1.lenght;	
+						}
+					}break;
+					
+					case ';':
+					{
+						mode = Mode::seek_bender;
+						if(name->variant_name_2.lenght)
+						{
+							u32 required_memory = game->display_text.lenght + name->variant_name_2.lenght + 1;
+							Reserve_String_Memory(&game->display_text, required_memory);
+							char* dest = game->display_text.buffer + game->display_text.lenght;
+							
+							Mem_Copy(dest, name->variant_name_2.buffer, name->variant_name_2.lenght);
+							game->display_text.lenght += name->variant_name_2.lenght;
+						}
+					}break;
+					
+					default:
+					{
+						
+						mode = Mode::search;
+						cptr -= 1; // NOTE GO back!
+						
+						if(name->full_name.lenght)
+						{
+							u32 required_memory = game->display_text.lenght + name->full_name.lenght + 1;
+							Reserve_String_Memory(&game->display_text, required_memory);
+							char* dest = game->display_text.buffer + game->display_text.lenght;
+							
+							Mem_Copy(dest, name->full_name.buffer, name->full_name.lenght);
+							game->display_text.lenght += name->full_name.lenght;							
+						}
+					}
+				}
+				
+			}break;
+			
+			case Mode::seek_bender:
+			{
+				if(c == '/')
+				{
+					a_switch = true;
+				}
+				else if(c == 0 || c == ' ' || c == '\n')
+				{
+					mode = Mode::search;
+					cptr -= 1; // NOTE GO back!
+				}
+				else
+				{
+					if(a_switch)
+					{
+						char lc = *(full_name->buffer + (full_name->lenght - 1));
+						
+						if(c == 'a')
+						{
+							char t;
+							
+							t = '\xE4';
+							if(lc == t)
+							{
+								c = t;
+								goto OUT;
+							}
+							
+							t = '\xC4';
+							if(lc == t)
+							{
+								c = t;
+								goto OUT;
+							}
+							
+							t = '\xF6';
+							if(lc == t)
+							{
+								c = t;
+								goto OUT;
+							}
+							
+							t = '\xD6';
+							if(lc == t)
+							{
+								c = t;
+								goto OUT;
+							}
+						}
+						
+						OUT:
+						
+						game->display_text += c;
+					}
+					else
+					{
+						game->display_text += c;
+					}
+				}
+				
+			}break;
+		}
+	}
 }
 
 
@@ -596,12 +818,13 @@ static inline void Hollow_Game_Player(Game_Player* player, Allocator_Shell* allo
 }
 
 
-static void Delete_Game(Game_State* gm, Allocator_Shell* allocator)
+static void Delete_Game(Game_State* game, Allocator_Shell* allocator)
 {
-	allocator->free(gm->memory);
-	allocator->free(gm->global_marks);
+	allocator->free(game->memory);
+	allocator->free(game->global_marks);
+	game->display_text.free();
 	
-	for(Player_Image* i = Begin(gm->player_images); i < End(gm->player_images); ++i)
+	for(Player_Image* i = Begin(game->player_images); i < End(game->player_images); ++i)
 	{
 		if(i->image.buffer)
 		{
@@ -609,35 +832,35 @@ static void Delete_Game(Game_State* gm, Allocator_Shell* allocator)
 			i->file_path.free();
 		}
 	}
-	allocator->free(gm->player_images);
+	allocator->free(game->player_images);
 		
-	for(auto n = Begin(gm->player_names); n < End(gm->player_names); ++n)
+	for(auto n = Begin(game->player_names); n < End(game->player_names); ++n)
 		Hollow_Player_Name_FI(n);
 
-	allocator->free(gm->player_names);
+	allocator->free(game->player_names);
 	
-	if(gm->total_player_count)
+	if(game->total_player_count)
 	{
-		for(u32 i = 0; i < gm->total_player_count; ++i)
-			Hollow_Game_Player(gm->players + i, allocator);
+		for(u32 i = 0; i < game->total_player_count; ++i)
+			Hollow_Game_Player(game->players + i, allocator);
 		
-		allocator->free(gm->players);
+		allocator->free(game->players);
 	}
 	
-	for(each(Event*, e, gm->active_events))
+	for(each(Event*, e, game->active_events))
 		allocator->free(e->player_indices);
-	allocator->free(gm->active_events);
-	*gm = {};
+	allocator->free(game->active_events);
+	*game = {};
 }
 
 
-static void Create_Player_Name_FI(Game_State* gm, Allocator_Shell* allocator)
+static void Create_Player_Name_FI(Game_State* game, Allocator_Shell* allocator)
 {
-	Assert(gm);
-	Assert(gm->memory);
-	Assert(gm->player_names);
+	Assert(game);
+	Assert(game->memory);
+	Assert(game->player_names);
 
-	Game_Player_Name_FI* name = Push(&gm->player_names, allocator);
+	Game_Player_Name_FI* name = Push(&game->player_names, allocator);
 	
 	Init_String(&name->full_name, allocator, u32(0));
 	Init_String(&name->variant_name_1, allocator, u32(0));
@@ -722,32 +945,6 @@ static inline void Search_For_Mark(
 	*out_duration = 0;
 }
 
-
-static void Get_Active_Event_Ref_And_Header(
-	Game_State* game,
-	u32 event_idx, 
-	Event** out_ref, 
-	Event_Header** out_header)
-{
-	Assert(out_ref || out_header);
-	
-	Table* active_event_table = (game->active_event_list == Event_List::day)?
-		&game->event_table_day : 
-		&game->event_table_night;
-	
-	Assert(event_idx < game->active_events->count);
-	
-	Event* active_event = Begin(game->active_events) + event_idx;
-	
-	u32 offset = *((u32*)active_event_table->memory + active_event->event_idx);
-	Event_Header* active_event_header = (Event_Header*)((u8*)game->events_data + offset);
-	
-	if(out_ref)
-		*out_ref = active_event;
-	
-	if(out_header)
-		*out_header = active_event_header;
-}
 
 
 static inline bool Player_Satisfies_Requirement(Game_Player* player, Participation_Requirement_GM* req)
@@ -998,6 +1195,7 @@ static void Assign_Events_To_Participants(
 	Assert(game->active_events->count);
 	
 	game->display_event_idx = 0;
+	Generate_Display_Text(game);
 }
 
 
@@ -1040,6 +1238,8 @@ static void Begin_Game(Game_State* game, Allocator_Shell* allocator)
 
 static void Give_Player_Mark(Game_Player* player, Mark_GM mark, Allocator_Shell* allocator)
 {
+	Assert(u32(mark.type) < u32(Mark_Type::COUNT));
+	
 	Exists_Statement exists;
 	i8 duration;
 	u32 mark_idx;
@@ -1214,6 +1414,7 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
 			*last_player = temp_player;
 			// ---
 			
+			// ---
 			Game_Player_Name_FI* player_names = Begin(game->player_names); 
 			Game_Player_Name_FI* player_name = player_names + i; 
 			Game_Player_Name_FI* last_player_name = player_names + game->live_player_count; 
@@ -1222,6 +1423,7 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
 			*last_player_name = temp_player_name;
 			// ---
 			
+			// ---
 			Player_Image* player_images = Begin(game->player_images); 
 			Player_Image* player_image = player_images + i; 
 			Player_Image* last_player_image = player_images + game->live_player_count; 
@@ -1231,6 +1433,45 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
 			// ---
 			
 			i -= 1;
+		}
+	}
+}
+
+
+static void Tickdown_Marks(Game_State* game)
+{
+	Mark_GM* gmarks = Begin(game->global_marks);
+	
+	for(u32 i = 0; i < game->global_marks->count; ++i)
+	{
+		Mark_GM* gmark = gmarks + i;
+		if(gmark->duration)
+		{
+			gmark->duration -= 1;
+			if(!gmark->duration)
+			{
+				Unordered_Remove(game->global_marks, i--);
+			}
+		}
+	}
+	
+	
+	for(u32 p = 0; p < game->live_player_count; ++p)
+	{
+		Game_Player* player = game->players + p;
+		Mark_GM* marks = Begin(player->marks);
+		
+		for(u32 i = 0; i < player->marks->count; ++i)
+		{
+			Mark_GM* mark = marks + i;
+			if(mark->duration)
+			{
+				mark->duration -= 1;
+				if(!mark->duration)
+				{
+					Unordered_Remove(player->marks, i--);
+				}
+			}
 		}
 	}
 }

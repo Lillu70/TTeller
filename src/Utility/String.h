@@ -316,6 +316,31 @@ static void Init_String(String* str, Allocator_Shell* allocator, char* c_str, u3
 }
 
 
+static void Reserve_String_Memory(String* str, u32 min_capacity, bool copy_into_new_memory = true)
+{
+	Assert(min_capacity);
+	
+	if(str->capacity < min_capacity)
+	{
+		// TODO: realloc!
+		
+		char* new_buffer = (char*)str->alloc->push(min_capacity);
+		if(copy_into_new_memory)
+			Mem_Copy(new_buffer, str->buffer, str->lenght + 1);
+		
+		str->alloc->free(str->buffer);
+		str->buffer = new_buffer;
+		str->capacity = min_capacity;
+	}
+	
+	if(!copy_into_new_memory)
+	{
+		str->lenght = 0;
+		str->buffer[0] = 0;		
+	}
+}
+
+
 inline void String::append_character(char c)
 {
 	if(capacity == 0)

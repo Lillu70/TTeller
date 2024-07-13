@@ -358,6 +358,7 @@ static void Do_Event_Display_Frame()
 			{
 				skip_frame = true;
 				s_game_state.display_event_idx += 1;
+				Generate_Display_Text(&s_game_state);
 			}
 		}
 		else
@@ -387,6 +388,7 @@ static void Do_Event_Display_Frame()
 						case Event_List::night:
 						{
 							s_game_state.day_counter += 1;
+							Tickdown_Marks(&s_game_state);
 							s_global_data.active_menu = Menus::GM_day_counter;
 						}break;
 					}					
@@ -450,19 +452,15 @@ static void Do_Event_Display_Frame()
 		text_box_width = Max(text_box_width, 500.f);
 		
 		v2f text_box_dim = v2f{text_box_width, h};
-		
-		String event_text = {};
-		event_text.buffer = active_event_header->event_text.buffer;
-		event_text.lenght = Null_Terminated_Buffer_Lenght(active_event_header->event_text.buffer);
-		
-
+	
+	
 		context->layout.build_direction = GUI_Build_Direction::right_top;
 		
 		GUI_Do_ML_Input_Field(
 			context, 
 			AUTO, 
 			&text_box_dim,
-			&event_text, 
+			&s_game_state.display_text, 
 			0, 
 			GUI_DEFAULT_TEXT_SCALE,
 			GUI_Character_Check_View_Only);
@@ -474,44 +472,6 @@ static void Do_Event_Display_Frame()
 
 static void Do_Day_Counter_Display_Frame()
 {
-	#if 0
-	
-	GUI_Context* context = &s_gui_banner;
-	
-	Clear_Canvas(&s_canvas, s_background_color);
-	
-	GUI_Begin_Context(
-		context,
-		&s_canvas,
-		&s_global_data.action_context, 
-		&s_theme,
-		v2i{0, 0},
-		GUI_Anchor::center,
-		GUI_Build_Direction::up_center);
-	
-	
-	char index_text_buffer[12] = {0};
-	char* num = U32_To_Char_Buffer((u8*)&index_text_buffer, s_game_state.day_counter);
-	GUI_Do_Text(context, &GUI_AUTO_MIDDLE, num, {}, {20.f, 20.f});
-	
-	GUI_Push_Layout(context);
-	
-	GUI_Do_Title_Text(context, AUTO, "P\xE4iv\xE4", {10.f, 10.f});
-	
-	GUI_Pop_Layout(context);
-	
-	context->layout.build_direction = GUI_Build_Direction::down_center;
-	
-	if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Jatka", {1.f, 1.f}))
-	{
-		s_global_data.active_menu = Menus::GM_event_display;
-		Assign_Events_To_Participants(&s_game_state, Event_List::day, &s_allocator);
-	}
-	
-	GUI_End_Context(context);
-	
-	#else
-	
 	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
 		context->layout.anchor = GUI_Anchor::top;
@@ -597,6 +557,20 @@ static void Do_Day_Counter_Display_Frame()
 					u32 offset = *(((u32*)s_game_state.mark_table.memory) + mark->idx);
 					char* mark_text = s_game_state.mark_data + offset;
 					GUI_Do_Text(context, AUTO, mark_text);
+					
+					GUI_Push_Layout(context);
+					
+					context->layout.build_direction = GUI_Build_Direction::right_center;
+					
+					context->flags |= GUI_Context_Flags::one_time_skip_padding;
+					GUI_Do_Text(context, AUTO, ": ");
+					context->flags |= GUI_Context_Flags::one_time_skip_padding;
+					
+					char* num = U32_To_Char_Buffer((u8*)&num_text_buffer, mark->duration);
+					
+					GUI_Do_Text(context, AUTO, num);
+					
+					GUI_Pop_Layout(context);
 				}
 			}
 			
@@ -609,6 +583,20 @@ static void Do_Day_Counter_Display_Frame()
 					u32 offset = *(((u32*)s_game_state.mark_table.memory) + mark->idx);
 					char* mark_text = s_game_state.mark_data + offset;
 					GUI_Do_Text(context, AUTO, mark_text);
+					
+					GUI_Push_Layout(context);
+					
+					context->layout.build_direction = GUI_Build_Direction::right_center;
+					
+					context->flags |= GUI_Context_Flags::one_time_skip_padding;
+					GUI_Do_Text(context, AUTO, ": ");
+					context->flags |= GUI_Context_Flags::one_time_skip_padding;
+					
+					char* num = U32_To_Char_Buffer((u8*)&num_text_buffer, mark->duration);
+					
+					GUI_Do_Text(context, AUTO, num);
+					
+					GUI_Pop_Layout(context);
 				}
 			}
 		}
@@ -616,8 +604,6 @@ static void Do_Day_Counter_Display_Frame()
 	}; // ----------------------------------------------------------------------------------------
 
 	Do_GUI_Frame_With_Banner(banner_func, menu_func, 220);
-	
-	#endif
 }
 
 

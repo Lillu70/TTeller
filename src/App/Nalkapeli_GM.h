@@ -204,7 +204,7 @@ struct Game_State
 		
 	// -------------------------------------------------------------------
 	
-	// runtime allocated items ------------------------
+	// Runtime allocated items -------------------------
 	
 	Dynamic_Array<Player_Image>* player_images;
 	
@@ -219,6 +219,8 @@ struct Game_State
 	Event_List active_event_list;
 	u32 display_event_idx;
 	Dynamic_Array<Event>* active_events;
+	
+	String display_text;
 };
 
 

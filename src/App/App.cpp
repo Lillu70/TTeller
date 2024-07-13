@@ -327,7 +327,7 @@ static void Run_Active_Menu(u32 app_flags)
 
 
 void Init_App(Platform_Calltable platform_calltable)
-{	
+{
 	Init_Shell_From_Paged_General_Allocator(&s_allocator, &s_mem);
 	
 	s_platform = platform_calltable;
@@ -337,7 +337,7 @@ void Init_App(Platform_Calltable platform_calltable)
 		s_mem.init(&s_platform, 1);
 	}
 	
-	Random_Machine::seed = i32(s_platform.Get_Time_Stamp());
+	Random_Machine::seed = 0;//i32(s_platform.Get_Time_Stamp());
 	Init_GUI();
 }
 
