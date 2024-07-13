@@ -11,8 +11,10 @@
 enum class Event_List : u8
 {
 	day,
-	night
+	night,
+	COUNT
 };
+
 
 enum class Language : u8
 {
@@ -37,6 +39,7 @@ struct Player_Image
 };
 
 
+// NOTE: Memory layout MUST be the same as with Global_Mark_Requirement_GM.
 struct Mark_GM
 {
 	u32 idx;
@@ -46,9 +49,10 @@ struct Mark_GM
 
 struct Game_Player
 {
-	static constexpr i8 starting_stat_value = 3;
+	static constexpr i8 starting_stat_value = 2;
 	
 	i8 stats[(u32)Character_Stat::Stats::COUNT];
+	bool alive;
 	
 	Dynamic_Array<Mark_GM>* marks;
 };
@@ -86,10 +90,13 @@ struct Global_Mark_Requirement_GM
 };
 
 
+// NOTE: Memory layout MUST be the same as with Mark_GM.
+// CONSIDER: Use the Mark_GM struct for this as they are idenctical.
+// seperation conveys the intent better maybe tho?
 struct Global_Mark_Consequence_GM
 {
-	i8 mark_duration;
 	u32 mark_idx;
+	i8 mark_duration;
 };
 
 
@@ -157,9 +164,9 @@ struct Table
 
 struct Event_Header
 {
-	u32 size;
+	u32 size; // TODO: rename to be clear about what size we're talking about.
 	u32 global_con_count;
-	u32 con_count;
+	u32 con_count; // TODO: <- Delete or change to something else.
 	
 	String_View event_name;
 	String_View event_text;
@@ -168,8 +175,11 @@ struct Event_Header
 
 struct Game_State
 {
+	u32 day_counter;
+	
 	// Campaing data converted into fast to operate format ---------------	
 		void* memory; // <-- Combined allocation
+		char* campaign_name;
 		
 		char* mark_data;
 		Table mark_table;
@@ -240,9 +250,11 @@ struct Game_State
 
 /* MEMOERY DESCRIPTION
 	
-	X - mark data -> All referenced tags in a sequence.				; sizeof(all mark texts combined)
+	| - Campaign name buffer
 	
-	X - mark table -> Contains offsets to the beging of each mark.	; sizeof(u32 * mark count)
+	| - mark data -> All referenced tags in a sequence.				; sizeof(all mark texts combined)
+	
+	| - mark table -> Contains offsets to the beging of each mark.	; sizeof(u32 * mark count)
 	
 	| - req data -> All requirements grouped by event, then by 		; sizeof(Req_GM_Header * Event count + Global_Mark_Requirement_GM * count + Participation_Requirement_GM * count)
 		participant. First is stored a Req_GM_Header, it is

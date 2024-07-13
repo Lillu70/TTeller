@@ -29,7 +29,7 @@ static void Do_Settings_Menu_Frame()
 }
 
 
-static void Do_Main_Menu_Quit_Popup()
+static void Do_Default_Quit_Popup()
 {
 	Dim_Entire_Screen(&s_canvas, 0.333f);
 	

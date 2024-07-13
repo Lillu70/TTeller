@@ -288,7 +288,7 @@ static Event_Consequens_GM Convert_To_GM(Event_Consequens* con, Mark_Hash_Table*
 		case Event_Consequens_Type::gains_mark:
 		{
 			result.duration = con->mark_duration;
-		}
+		} // Fall through!
 		case Event_Consequens_Type::loses_mark:
 		{
 			result.mark_type = con->mark_type;
@@ -325,6 +325,7 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 	
 	// First figure out the memory required for the game state.
 	{
+		alloc_size += event_container->campaign_name.lenght + 1;
 		alloc_size += sizeof(u32) * event_container->events->count * 2;
 		events_data_size += sizeof(Event_Header) * event_container->events->count;
 		requirements_data_size += sizeof(Req_GM_Header) * event_container->events->count;
@@ -425,6 +426,12 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 		Assert(!mark_data.get_free_capacity());
 	}
 	
+	game_state->campaign_name = (char*)mem.push(event_container->campaign_name.lenght + 1);
+	Mem_Copy(
+		game_state->campaign_name, 
+		event_container->campaign_name.buffer, 
+		event_container->campaign_name.lenght + 1);
+	
 	game_state->req_data = (Req_GM_Header*)mem.push(requirements_data_size);
 	Linear_Allocator req_data = Create_Linear_Allocator(game_state->req_data, requirements_data_size);
 	
@@ -488,30 +495,25 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 					*event_table_night.push<u32>() = offset;				
 			}
 			
-			event_header->event_name = String_View{(char*)events_data.push(e->name.lenght + 1), e->name.lenght};
+			event_header->event_name = String_View
+			{
+				(char*)events_data.push(e->name.lenght + 1), 
+				e->name.lenght
+			};
 			
 			// name and text
 			
 			Mem_Copy(event_header->event_name.buffer, e->name.buffer, e->name.lenght + 1);
 			event_header->event_text 
 				= String_View{(char*)events_data.push(e->event_text.lenght + 1), e->event_text.lenght};
-			Mem_Copy(event_header->event_text.buffer, e->event_text.buffer, e->event_text.lenght + 1);
-			
-			u32 event_size = e->name.lenght + e->event_text.lenght + 2;
+			Mem_Copy(event_header->event_text.buffer, e->event_text.buffer, e->event_text.lenght + 1);			
+			event_header->size = e->name.lenght + e->event_text.lenght + 2;
 			// ---
 			
 			event_header->global_con_count = e->global_mark_cons->count;
 			for(auto gmc = Begin(e->global_mark_cons); gmc < End(e->global_mark_cons); ++gmc)
 				*events_data.push<Global_Mark_Consequence_GM>() = Convert_To_GM(gmc, &marks);
 			
-			event_size += event_header->global_con_count * sizeof(Global_Mark_Consequence_GM);
-			
-			#if 0
-			if(i == 7)
-			{
-				int a = 0;
-			}
-			#endif
 			
 			u32 req_count = 0;
 			u32 con_count = 0;
@@ -573,32 +575,6 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 	game_state->active_events = Create_Dynamic_Array<Event>(allocator, 4);
 	
 	return result;
-}
-
-
-static inline Participation_Requirement_GM* Begin_Req_Array(Participant_Header* participant_header)
-{
-	return (Participation_Requirement_GM*)(participant_header + 1);
-}
-
-
-// Return a pointer pointing to first address after the end of the array.
-static inline Participation_Requirement_GM* End_Req_Array(Participant_Header* participant_header)
-{
-	return (Participation_Requirement_GM*)(participant_header + 1) + participant_header->count;
-}
-
-
-static inline Event_Consequens_GM* Begin_Con_Array(Participant_Header* participant_header)
-{
-	return (Event_Consequens_GM*)(participant_header + 1);
-}
-
-
-// Return a pointer pointing to first address after the end of the array.
-static inline Event_Consequens_GM* End_Con_Array(Participant_Header* participant_header)
-{
-	return (Event_Consequens_GM*)(participant_header + 1) + participant_header->count;
 }
 
 
@@ -682,7 +658,10 @@ static inline void Free_Event_List(Dynamic_Array<Event>* events, Allocator_Shell
 static inline bool Numerical_Relation_Match(i8 value, i8 relation_target, Numerical_Relation relation)
 {
 	bool result = false;
-
+	
+	if(!value)
+		value = I8_MAX;
+	
 	switch(relation)
 	{
 		case Numerical_Relation::equal_to:
@@ -715,24 +694,58 @@ static inline bool Numerical_Relation_Match(i8 value, i8 relation_target, Numeri
 }
 
 
-static inline void Get_Mark_Info(
+static inline void Search_For_Mark(
 	Dynamic_Array<Mark_GM>* marks, 
 	u32 search_mark_idx, 
 	Exists_Statement* out_exists, 
-	i8* out_duration)
+	i8* out_duration,
+	u32* out_mark_idx = 0)
 {
+	u32 i = 0;
 	for(each(auto, mark, marks))
 	{
 		if(mark->idx == search_mark_idx)
 		{
 			*out_exists = Exists_Statement::does_have;
 			*out_duration = mark->duration;
+			if(out_mark_idx)
+				*out_mark_idx = i;
+			
 			return;
 		}
+		
+		i += 1;
 	}
 	
 	*out_exists = Exists_Statement::does_not_have;
 	*out_duration = 0;
+}
+
+
+static void Get_Active_Event_Ref_And_Header(
+	Game_State* game,
+	u32 event_idx, 
+	Event** out_ref, 
+	Event_Header** out_header)
+{
+	Assert(out_ref || out_header);
+	
+	Table* active_event_table = (game->active_event_list == Event_List::day)?
+		&game->event_table_day : 
+		&game->event_table_night;
+	
+	Assert(event_idx < game->active_events->count);
+	
+	Event* active_event = Begin(game->active_events) + event_idx;
+	
+	u32 offset = *((u32*)active_event_table->memory + active_event->event_idx);
+	Event_Header* active_event_header = (Event_Header*)((u8*)game->events_data + offset);
+	
+	if(out_ref)
+		*out_ref = active_event;
+	
+	if(out_header)
+		*out_header = active_event_header;
 }
 
 
@@ -753,21 +766,18 @@ static inline bool Player_Satisfies_Requirement(Game_Player* player, Participati
 		{
 			Exists_Statement exists;
 			i8 duration;
-			Get_Mark_Info(player->marks, req->mark_idx, &exists, &duration);
+			Search_For_Mark(player->marks, req->mark_idx, &exists, &duration);
 			
 			if(req->mark_exists != exists)
 			{
 				result = false;
 			}
-			else if(exists == Exists_Statement::does_have && req->relation_target > 0)
+			else if(exists == Exists_Statement::does_have)
 			{
-				if(!Numerical_Relation_Match(
+				result = Numerical_Relation_Match(
 					duration, 
 					req->relation_target, 
-					req->numerical_relation))
-				{
-					result = false;
-				}
+					req->numerical_relation);
 			}
 			else
 			{
@@ -854,7 +864,7 @@ static void Assign_Events_To_Participants(
 				
 				Exists_Statement exists;
 				i8 duration;
-				Get_Mark_Info(game->global_marks, global_req->mark_idx, &exists, &duration);
+				Search_For_Mark(game->global_marks, global_req->mark_idx, &exists, &duration);
 				
 				if(global_req->mark_exists != exists)
 				{
@@ -862,7 +872,7 @@ static void Assign_Events_To_Participants(
 					break;
 				}
 				
-				if(exists == Exists_Statement::does_have && global_req->relation_target > 0)
+				if(exists == Exists_Statement::does_have)
 				{
 					if(!Numerical_Relation_Match(
 						duration, 
@@ -893,8 +903,10 @@ static void Assign_Events_To_Participants(
 				for(u32 s = 0; s < req_header->participant_count; ++s)
 				{
 					if(!slots[s]) // NOTE: skip filled slots
-					{		
-						Participation_Requirement_GM* reqs_begin = Begin_Req_Array(parti);
+					{
+						Participation_Requirement_GM* reqs_begin 
+							= (Participation_Requirement_GM*)(parti + 1);
+						
 						Participation_Requirement_GM* reqs_end = reqs_begin + parti->count;
 						
 						bool satisfies_reqs = true;
@@ -1020,8 +1032,183 @@ static void Begin_Game(Game_State* game, Allocator_Shell* allocator)
 		for(u32 i = 0; i < Array_Lenght(p->stats); ++i)
 			p->stats[i] = Game_Player::starting_stat_value;
 		
+		p->alive = true;
 		p->marks = Create_Dynamic_Array<Mark_GM>(allocator, 4);
 	}
 	
-	Assign_Events_To_Participants(game, Event_List::day, allocator);
+	game->day_counter = 1;
+}
+
+
+static void Give_Player_Mark(Game_Player* player, Mark_GM mark, Allocator_Shell* allocator)
+{
+	Exists_Statement exists;
+	i8 duration;
+	u32 mark_idx;
+	Search_For_Mark(player->marks, mark.idx, &exists, &duration, &mark_idx);
+
+	if(u8(exists))
+	{
+		Mark_GM* existing_mark = Begin(player->marks) + mark_idx;
+		
+		// NOTE: 0 duration is infinete!
+		if(existing_mark->duration == 0 || mark.duration == 0)
+			existing_mark->duration = 0;
+		else
+			existing_mark->duration = Max(existing_mark->duration, mark.duration);
+	}
+	else
+	{
+		*Push(&player->marks, allocator) = mark;
+	}
+}
+
+
+static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocator)
+{
+	// Apply active event consequences
+	for(u32 e = 0; e < game->active_events->count; ++e)
+	{
+		Event_Header* event_header;
+		Event* event_ref;
+		Get_Active_Event_Ref_And_Header(game, e, &event_ref, &event_header);
+		
+		
+		Global_Mark_Consequence_GM* gcon_begin =
+			(Global_Mark_Consequence_GM*)((u8*)event_header +
+			sizeof(*event_header) +
+			event_header->size);
+		
+		for(Global_Mark_Consequence_GM* gcon = gcon_begin;
+			gcon < gcon_begin + event_header->global_con_count;
+			++gcon)
+		{
+			// If the global mark already exists set the duration to the bigger one.
+			
+			Exists_Statement exists;
+			i8 duration;
+			u32 mark_idx;
+			Search_For_Mark(game->global_marks, gcon->mark_idx, &exists, &duration, &mark_idx);
+			
+			if(u8(exists))
+			{
+				Mark_GM* mark = Begin(game->global_marks) + mark_idx;
+				
+				// NOTE: 0 duration is infinete!
+				if(mark->duration == 0 || gcon->mark_duration == 0)
+					mark->duration = 0;
+				else
+					mark->duration = Max(mark->duration, gcon->mark_duration);
+			}
+			else
+			{
+				*Push(&game->global_marks, allocator) = *((Mark_GM*)gcon);
+			}
+		}
+		
+		u32 offset = event_header->global_con_count * sizeof(Global_Mark_Consequence_GM);
+			
+		Participant_Header* parti_head = (Participant_Header*)((u8*)gcon_begin + offset);
+		for(u32 p = 0; p < event_ref->participant_count; ++p)
+		{
+			if(parti_head->count)
+			{
+				Event_Consequens_GM* cons = (Event_Consequens_GM*)(parti_head + 1);
+				
+				u32 slot = *(event_ref->player_indices + p);
+				Game_Player* player = game->players + slot;
+				
+				for(u32 c = 0; c < parti_head->count; ++c)
+				{
+					Event_Consequens_GM* con = cons + c;
+					
+					switch(con->type)
+					{
+						case Event_Consequens_Type::death:
+						{
+							// CONSIDER: is there a reason to defer item inheritance?
+							if(con->inheritance_target)
+							{
+								u32 target_idx = con->inheritance_target - 1;
+								Game_Player* inheritor = 0;
+								for(u32 i = 0; i < event_ref->participant_count; ++i)
+								{
+									u32 islot = *(event_ref->player_indices + i);
+									if(islot == target_idx)
+									{
+										inheritor = game->players + islot;
+										break;
+									}
+								}
+								
+								Assert(inheritor);
+								Assert(inheritor != player);
+								
+								for(each(Mark_GM*, m, player->marks))
+									Give_Player_Mark(inheritor, *m, allocator);
+							}
+							
+							player->alive = false;
+						}break;
+						
+						case Event_Consequens_Type::stat_change:
+						{
+							i8* stat = player->stats + u32(con->stat);
+							*stat += con->change_amount;
+							*stat = Max(i8(0), Min(*stat, i8(3)));
+						}break;
+						
+						case Event_Consequens_Type::gains_mark:
+						{
+							Mark_GM con_mark = {con->mark_idx, con->duration};
+							Give_Player_Mark(player, con_mark, allocator);
+						}break;
+						
+						case Event_Consequens_Type::loses_mark:
+						{
+							Exists_Statement exists;
+							i8 duration;
+							u32 mark_idx;
+							Search_For_Mark(
+								player->marks, 
+								con->mark_idx, 
+								&exists, 
+								&duration, 
+								&mark_idx);
+							
+							if(u8(exists))
+								Unordered_Remove(player->marks, mark_idx);
+							
+						}break;
+						
+						default:
+						{
+							Terminate;
+						};
+					}
+				}			
+			}
+			
+			u32 cons_size = parti_head->count * sizeof(Event_Consequens_GM);
+			parti_head = (Participant_Header*)((u8*)(parti_head) + sizeof(*parti_head) + cons_size);
+		}
+	}
+	
+	// Cull dead players.
+	for(u32 i = 0; i < game->player_count; ++i)
+	{
+		Game_Player* player = game->players + i;
+		if(!player->alive)
+		{
+			allocator->free(player->marks);
+			
+			game->player_count -= 1;
+			*player = *(game->players + game->player_count);
+			
+			Unordered_Remove(game->player_names, i);
+			Unordered_Remove(game->player_images, i);
+		
+			i -= 1;
+		}
+	}
 }

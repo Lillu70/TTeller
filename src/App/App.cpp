@@ -27,28 +27,14 @@ static void Run_Active_Menu(u32 app_flags)
 		s_global_data.force_quit_popup = false;
 		s_platform.Set_Flag(App_Flags::wants_to_exit, false);
 		
-		switch(current_menu)
+		if(u32(current_menu) > u32(Menus::EVENT_EDITOR_BEGIN) && 
+			u32(current_menu) < u32(Menus::EVENT_EDITOR_END))
 		{
-			case Menus::main_menu:
-			case Menus::settings_menu:
-			case Menus::campaigns_menu:
-			case Menus::GM_players:
-			{	
-				Set_Popup_Function(Do_Main_Menu_Quit_Popup);
-			}break;
-			
-			default:
-			{
-				if(u32(current_menu) > u32(Menus::EVENT_EDITOR_BEGIN) && 
-					u32(current_menu) < u32(Menus::EVENT_EDITOR_END))
-				{
-					Set_Popup_Function(Do_Event_Editor_Quit_Popup);
-				}
-				else
-				{
-					s_platform.Set_Flag(App_Flags::is_running, false);
-				}
-			}
+			Set_Popup_Function(Do_Event_Editor_Quit_Popup);
+		}
+		else
+		{
+			Set_Popup_Function(Do_Default_Quit_Popup);
 		}
 	}
 	else if(s_hotkeys[Global_Hotkeys::open_quit_popup].Is_Pressed() && s_popup_func)
@@ -101,6 +87,8 @@ static void Run_Active_Menu(u32 app_flags)
 		
 		case Menus::select_campaign_to_play_menu:
 		{
+			// TODO: Replace with an actual menu.
+			
 			s_global_data.active_menu = Menus::GM_players;
 			
 			#if 1
@@ -156,9 +144,24 @@ static void Run_Active_Menu(u32 app_flags)
 			Do_Settings_Menu_Frame();
 		}break;
 		
+		case Menus::GM_let_the_games_begin:
+		{
+			Do_Let_The_Games_Begin_Frame();
+		}break;
+		
+		case Menus::GM_day_counter:
+		{
+			Do_Day_Counter_Display_Frame();
+		}break;
+		
+		case Menus::GM_night_falls:
+		{
+			Do_Night_Falls_Frame();
+		}break;
+		
 		default:
 		{
-			Assert(false);
+			Terminate;
 		}
 	}
 	

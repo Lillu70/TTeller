@@ -853,12 +853,18 @@ static inline void GUI_End_Context(GUI_Context* context)
 					
 					else
 					{
-						bounds.max.y += padding;
-						y_factor = bounds.max.y - canvas_height;
+						//bounds.max.y += padding;
+						
+						// TODO: This was changed from canvas_height without real understanding
+						// of what the meaning is. Look into this!
+						
+						y_factor = bounds.max.y - canvas_bottom_and_height;
 					}
 				}
 				
 				gui_height = bounds.max.y - bounds.min.y;
+				// TODO: On a related note, seems like bounds is effectivel unused after this point,
+				// but still updated, so look into deleteting some code related to it.
 				
 				if(!enable_vertical_slider)
 				{

@@ -65,7 +65,12 @@ enum class Menus : u32
 	
 	GAME_MODE_BEGIN,
 		GM_players,
+		GM_let_the_games_begin,
 		GM_event_display,
+		GM_day_counter,
+		GM_night_falls,
+		GM_everyone_is_dead,
+		GM_we_have_a_winner,
 	GAME_MODE_END
 };
 
@@ -152,7 +157,9 @@ void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
 
 Do_GUI_Frame_With_Banner(banner_func, menu_func);
 */
-static constexpr u32 DEFAULT_BANNER_HEIGHT = 200;
+
+static u32 DEFAULT_BANNER_HEIGHT = 200;
+
 static void Do_GUI_Frame_With_Banner(
 	void(*banner_func)(GUI_Context*), 
 	void(*menu_func)(GUI_Context*), 
@@ -297,6 +304,8 @@ static inline void Init_GUI()
 	GUI_Activate_Context(&s_gui_banner);
 	
 	s_gui_pop_up.flags |= GUI_Context_Flags::enable_dynamic_sliders;
+	s_gui_banner.flags |= GUI_Context_Flags::enable_dynamic_sliders;
+	s_gui.flags |= GUI_Context_Flags::enable_dynamic_sliders;
 	
 	GUI_Set_Default_Menu_Actions();
 

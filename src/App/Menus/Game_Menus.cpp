@@ -110,7 +110,7 @@ static void Do_New_Game_Players()
 		// -- title bar buttons --	
 		f32 padding = context->theme->padding;
 		
-		static constexpr char* start_game_text = "Aloita peli";
+		static constexpr char* start_game_text = "Valmista";
 		
 		f32 w1 = GUI_Tight_Fit_Text(start_game_text, font).x + padding;
 		
@@ -122,8 +122,7 @@ static void Do_New_Game_Players()
 		b32 player_count = s_game_state.player_names->count; 
 		if(player_count && GUI_Do_Button(context, &title_row_pos, &dim, start_game_text))
 		{
-			s_global_data.active_menu = Menus::GM_event_display;
-			Begin_Game(&s_game_state, &s_allocator);
+			s_global_data.active_menu = Menus::GM_let_the_games_begin;
 		}
 		
 	}; // ----------------------------------------------------------------------------------------
@@ -276,6 +275,61 @@ static void Do_New_Game_Players()
 }
 
 
+static void Do_Let_The_Games_Begin_Frame()
+{
+	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
+	{
+		v2f title_scale = v2f{4.f, 4.f};
+		Font* font = &context->theme->font;
+		v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
+		if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
+		{
+			s_global_data.active_menu = Menus::GM_players;
+		}
+		
+		context->layout.anchor = GUI_Anchor::top;
+		context->layout.build_direction = GUI_Build_Direction::down_center;
+		
+		GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, s_game_state.campaign_name, title_scale);
+	
+		GUI_Do_Text(context, AUTO, "Osallistujat kamppailevat kuolemaan asti.");
+		GUI_Do_Text(context, AUTO, "On vain yksi voittaja.");
+		
+		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Aloita peli!"))
+		{
+			s_global_data.active_menu = Menus::GM_day_counter;
+			Begin_Game(&s_game_state, &s_allocator);
+		}
+		
+		
+	}; // ----------------------------------------------------------------------------------------
+
+	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
+	{
+		context->layout.anchor = GUI_Anchor::top;
+		context->layout.build_direction = GUI_Build_Direction::down_center;
+		
+		v2f* p = &GUI_AUTO_TOP_CENTER;
+		
+		Player_Image* player_images = Begin(s_game_state.player_images);
+		Game_Player_Name_FI* player_names = Begin(s_game_state.player_names);
+		
+		for(u32 i = 0; i < s_game_state.player_images->count; ++i)
+		{
+			char* name = (player_names + i)->full_name.buffer;
+			Image* img = &(player_images + i)->image;
+			
+			GUI_Do_Text(context, p, name);
+			p = AUTO;
+			
+			GUI_Do_Image_Panel(context, AUTO, &s_player_picture_dim, img);
+		}
+	}; // ----------------------------------------------------------------------------------------
+
+	Do_GUI_Frame_With_Banner(banner_func, menu_func, 210);
+}
+
+
 static void Do_Event_Display_Frame()
 {
 	Assert(s_game_state.player_count);
@@ -286,21 +340,61 @@ static void Do_Event_Display_Frame()
 	
 	skip_frame = false;
 	
-	Table* active_event_table = (s_game_state.active_event_list == Event_List::day)?
-		&s_game_state.event_table_day : 
-		&s_game_state.event_table_night;
-	
-	active_event = Begin(s_game_state.active_events) + s_game_state.display_event_idx;
-	
-	u32 offset = *((u32*)active_event_table->memory + active_event->event_idx);
-	active_event_header = (Event_Header*)((u8*)s_game_state.events_data + offset);
-	
+	Get_Active_Event_Ref_And_Header(
+		&s_game_state, 
+		s_game_state.display_event_idx, 
+		&active_event, 
+		&active_event_header);	
 	
 	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
 	{		
 		v2f title_scale = v2f{4.f, 4.f};
 		char* event_name = active_event_header->event_name.buffer;
 		GUI_Do_Title_Text(context, &GUI_AUTO_TOP_LEFT, event_name, title_scale);
+		
+		if(s_game_state.display_event_idx < s_game_state.active_events->count - 1)
+		{
+			if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Seuraava tapahtuma"))
+			{
+				skip_frame = true;
+				s_game_state.display_event_idx += 1;
+			}
+		}
+		else
+		{
+			if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Jatka"))
+			{
+				Resolve_Current_Event_Set(&s_game_state, &s_allocator);
+				skip_frame = true;
+				
+				if(!s_game_state.player_count)
+				{
+					s_global_data.active_menu = Menus::GM_everyone_is_dead;
+				}
+				else if(s_game_state.player_count == 1)
+				{
+					s_global_data.active_menu = Menus::GM_we_have_a_winner;
+				}
+				else
+				{
+					switch(s_game_state.active_event_list)
+					{
+						case Event_List::day:
+						{
+							s_global_data.active_menu = Menus::GM_night_falls;
+						}break;
+						
+						case Event_List::night:
+						{
+							s_game_state.day_counter += 1;
+							s_global_data.active_menu = Menus::GM_day_counter;
+						}break;
+					}					
+				}
+				return;
+			}
+		}
+		
 		
 		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lopeta peli"))
 		{
@@ -310,16 +404,6 @@ static void Do_Event_Display_Frame()
 			return;
 		}
 		
-		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Seuraava tapahtuma"))
-		{
-			skip_frame = true;
-			s_game_state.display_event_idx += 1;
-			if(s_game_state.display_event_idx >= s_game_state.active_events->count)
-			{
-				Assign_Events_To_Participants(&s_game_state, Event_List::day, &s_allocator);
-				return;
-			}
-		}
 	}; // ----------------------------------------------------------------------------------------
 
 	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
@@ -359,10 +443,12 @@ static void Do_Event_Display_Frame()
 		
 		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(context);
 		f32 h = bounds.max.y - bounds.min.y;
-		f32 w = bounds.max.x - bounds.min.x;
 		
-		f32 _ = context->layout.last_element.pos.x + context->layout.last_element.dim.x - context->anchor_base.x;
-		f32 text_box_width = f32(context->canvas->dim.x) - _ - f32(context->theme->padding) * 2 - 50;
+		f32 last_element_x = context->layout.last_element.dim.x;
+		f32 w = context->layout.last_element.pos.x + last_element_x - context->anchor_base.x;
+		f32 text_box_width = f32(context->canvas->dim.x) - w - f32(context->theme->padding) * 2 - 50;
+		text_box_width = Max(text_box_width, 500.f);
+		
 		v2f text_box_dim = v2f{text_box_width, h};
 		
 		String event_text = {};
@@ -384,3 +470,76 @@ static void Do_Event_Display_Frame()
 
 	Do_GUI_Frame_With_Banner(banner_func, menu_func, 200);
 }
+
+
+static void Do_Day_Counter_Display_Frame()
+{
+	GUI_Context* context = &s_gui_banner;
+	
+	Clear_Canvas(&s_canvas, s_background_color);
+	
+	GUI_Begin_Context(
+		context,
+		&s_canvas,
+		&s_global_data.action_context, 
+		&s_theme,
+		v2i{0, 0},
+		GUI_Anchor::center,
+		GUI_Build_Direction::up_center);
+	
+	
+	char index_text_buffer[12] = {0};
+	char* num = U32_To_Char_Buffer((u8*)&index_text_buffer, s_game_state.day_counter);
+	GUI_Do_Text(context, &GUI_AUTO_MIDDLE, num, {}, {20.f, 20.f});
+	
+	GUI_Push_Layout(context);
+	
+	GUI_Do_Title_Text(context, AUTO, "P\xE4iv\xE4", {10.f, 10.f});
+	
+	GUI_Pop_Layout(context);
+	
+	context->layout.build_direction = GUI_Build_Direction::down_center;
+	
+	if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Jatka", {1.f, 1.f}))
+	{
+		s_global_data.active_menu = Menus::GM_event_display;
+		Assign_Events_To_Participants(&s_game_state, Event_List::day, &s_allocator);
+	}
+	
+	GUI_End_Context(context);
+}
+
+
+static void Do_Night_Falls_Frame()
+{
+	GUI_Context* context = &s_gui_banner;
+	
+	Clear_Canvas(&s_canvas, s_background_color);
+	
+	GUI_Begin_Context(
+		context,
+		&s_canvas,
+		&s_global_data.action_context, 
+		&s_theme,
+		v2i{0, 0},
+		GUI_Anchor::center,
+		GUI_Build_Direction::down_center);
+	
+	GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, "Y\xF6 laskeutuu...", v2f{6.f, 6.f});
+	
+	if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Jatka", {1.f, 1.f}))
+	{
+		s_global_data.active_menu = Menus::GM_event_display;
+		Assign_Events_To_Participants(&s_game_state, Event_List::night, &s_allocator);
+	}
+	
+	GUI_End_Context(context);
+}
+
+/*
+If I dont do culling between assignements then I have to check for aliveness when assigning players.
+And it's also possiple that no player is alive at this point in time.
+So I think it's best to avoid this situation.
+
+
+*/

@@ -77,3 +77,19 @@ static T* Push(Dynamic_Array<T>** darray_ptr, Allocator_Shell* allocator)
 	
 	return result;
 }
+
+
+template<typename T>
+static void Unordered_Remove(Dynamic_Array<T>* darray_ptr, u32 idx_to_remove)
+{
+	Assert(darray_ptr->count);
+	Assert(idx_to_remove < darray_ptr->count);
+	
+	darray_ptr->count -= 1;
+	
+	T* buffer = Begin(darray_ptr);
+	T* slot_to_remove = buffer + idx_to_remove;
+	T* last_element = buffer + darray_ptr->count;
+	
+	*last_element = *slot_to_remove;
+}
