@@ -64,6 +64,7 @@ static const char* s_duration_names[] =
 
 enum class Mark_Type :u8
 {
+	global = U8_MAX,
 	item = 0,
 	personal,
 	COUNT

@@ -542,7 +542,7 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 		}
 	}
 	
-	#if 1 // Test Code!
+	#if 0 // Test Code!
 	{
 		Table mark_table = game->mark_table;
 		char* mark_data = game->mark_data;
@@ -643,6 +643,8 @@ static void Generate_Display_Text(Game_State* game)
 				if(c == '/')
 				{
 					cptr += 1; // NOTE: skip the next character for now.
+					Assert(*cptr == 'k');
+					
 					mode = Mode::seek_number;
 					number_view.buffer = cptr + 1;
 					Assert(*number_view.buffer >= '0' && *number_view.buffer <= '9');
@@ -752,40 +754,8 @@ static void Generate_Display_Text(Game_State* game)
 					{
 						char lc = *(full_name->buffer + (full_name->lenght - 1));
 						
-						if(c == 'a')
-						{
-							char t;
-							
-							t = '\xE4';
-							if(lc == t)
-							{
-								c = t;
-								goto OUT;
-							}
-							
-							t = '\xC4';
-							if(lc == t)
-							{
-								c = t;
-								goto OUT;
-							}
-							
-							t = '\xF6';
-							if(lc == t)
-							{
-								c = t;
-								goto OUT;
-							}
-							
-							t = '\xD6';
-							if(lc == t)
-							{
-								c = t;
-								goto OUT;
-							}
-						}
-						
-						OUT:
+						if(c == 'a' && ((lc == '\xE4' || lc == '\xF6')))
+							c = '\xE4';
 						
 						game->display_text += c;
 					}
@@ -849,8 +819,65 @@ static void Delete_Game(Game_State* game, Allocator_Shell* allocator)
 	
 	for(each(Event*, e, game->active_events))
 		allocator->free(e->player_indices);
+	
 	allocator->free(game->active_events);
 	*game = {};
+}
+
+
+static void Reset_Game(Game_State* game, Allocator_Shell* allocator)
+{
+	if(game->total_player_count)
+	{
+		for(u32 i = 0; i < game->total_player_count; ++i)
+			Hollow_Game_Player(game->players + i, allocator);
+		
+		allocator->free(game->players);
+	}
+	game->players = 0;
+	
+	game->player_images->count = game->total_player_count;
+	game->player_names->count = game->total_player_count;
+	
+	game->live_player_count = 0;
+	game->global_marks->count = 0;
+}
+
+
+static void Begin_Game(Game_State* game, Allocator_Shell* allocator)
+{
+	Assert(!game->live_player_count);
+	Assert(!game->players);
+	Assert(game->player_images->count);
+	
+	// NOTE: Using the images array as that is application language agnostic.
+	
+	game->total_player_count = game->player_images->count;
+	game->live_player_count = game->total_player_count;
+	
+	u32 s = sizeof(*game->players) + sizeof(*game->player_assignement_table);
+	u32 alloc_size = s * game->live_player_count;
+	
+	u32 event_count = Max(game->event_table_day.count, game->event_table_night.count);
+	alloc_size += sizeof(*game->event_assignement_table) * event_count;
+	
+	void* m = allocator->push(alloc_size);
+	game->players = (Game_Player*)m;
+	game->player_assignement_table = (u32*)(game->players + game->live_player_count);
+	
+	game->event_assignement_table_size = event_count;
+	game->event_assignement_table = game->player_assignement_table + game->live_player_count;
+	
+	for(Game_Player* p = game->players; p < game->players + game->live_player_count; ++p)
+	{
+		for(u32 i = 0; i < Array_Lenght(p->stats); ++i)
+			p->stats[i] = Game_Player::starting_stat_value;
+		
+		p->alive = true;
+		p->marks = Create_Dynamic_Array<Mark_GM>(allocator, 4);
+	}
+	
+	game->day_counter = 1;
 }
 
 
@@ -1196,43 +1223,6 @@ static void Assign_Events_To_Participants(
 	
 	game->display_event_idx = 0;
 	Generate_Display_Text(game);
-}
-
-
-static void Begin_Game(Game_State* game, Allocator_Shell* allocator)
-{
-	Assert(!game->live_player_count);
-	Assert(!game->players);
-	Assert(game->player_images->count);
-	
-	// NOTE: Using the images array as that is application language agnostic.
-	
-	game->total_player_count = game->player_images->count;
-	game->live_player_count = game->total_player_count;
-	
-	u32 s = sizeof(*game->players) + sizeof(*game->player_assignement_table);
-	u32 alloc_size = s * game->live_player_count;
-	
-	u32 event_count = Max(game->event_table_day.count, game->event_table_night.count);
-	alloc_size += sizeof(*game->event_assignement_table) * event_count;
-	
-	void* m = allocator->push(alloc_size);
-	game->players = (Game_Player*)m;
-	game->player_assignement_table = (u32*)(game->players + game->live_player_count);
-	
-	game->event_assignement_table_size = event_count;
-	game->event_assignement_table = game->player_assignement_table + game->live_player_count;
-	
-	for(Game_Player* p = game->players; p < game->players + game->live_player_count; ++p)
-	{
-		for(u32 i = 0; i < Array_Lenght(p->stats); ++i)
-			p->stats[i] = Game_Player::starting_stat_value;
-		
-		p->alive = true;
-		p->marks = Create_Dynamic_Array<Mark_GM>(allocator, 4);
-	}
-	
-	game->day_counter = 1;
 }
 
 

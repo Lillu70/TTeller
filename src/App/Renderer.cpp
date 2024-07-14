@@ -1291,10 +1291,12 @@ static void Draw_Image(Canvas* canvas, Image* img, Rect rect)
 		v4f c1_up = Unpack_Color_With_Alpha(*c1);
 		
 		v2i p = v2i{x_min - 1, y_min - 1};
-		
-		f32 fa = fx_min * fy_min;
-		f32 f = f32(c1_up.a) / 255.f * fa;
-		Blend_Pixel_With_Color(canvas, p, c1_up.rgb, f);
+		if(Is_Point_On_Canvas(canvas, p))
+		{
+			f32 fa = fx_min * fy_min;
+			f32 f = f32(c1_up.a) / 255.f * fa;
+			Blend_Pixel_With_Color(canvas, p, c1_up.rgb, f);			
+		}
 	}
 	
 	// Draw top left corner
@@ -1304,10 +1306,12 @@ static void Draw_Image(Canvas* canvas, Image* img, Rect rect)
 		v4f c1_up = Unpack_Color_With_Alpha(*c1);
 		
 		v2i p = v2i{x_min - 1, y_max};
-		
-		f32 fa = fx_min * fy_max;
-		f32 f = f32(c1_up.a) / 255.f * fa;
-		Blend_Pixel_With_Color(canvas, p, c1_up.rgb, f);
+		if(Is_Point_On_Canvas(canvas, p))
+		{
+			f32 fa = fx_min * fy_max;
+			f32 f = f32(c1_up.a) / 255.f * fa;
+			Blend_Pixel_With_Color(canvas, p, c1_up.rgb, f);			
+		}
 	}
 	
 	// Draw bottom right corner
@@ -1317,10 +1321,12 @@ static void Draw_Image(Canvas* canvas, Image* img, Rect rect)
 		v4f c1_up = Unpack_Color_With_Alpha(*c1);
 		
 		v2i p = v2i{x_max, y_min - 1};
-		
-		f32 fa =  fx_max * fy_min;
-		f32 f = f32(c1_up.a) / 255.f * fa;
-		Blend_Pixel_With_Color(canvas, p, c1_up.rgb, f);
+		if(Is_Point_On_Canvas(canvas, p))
+		{
+			f32 fa =  fx_max * fy_min;
+			f32 f = f32(c1_up.a) / 255.f * fa;
+			Blend_Pixel_With_Color(canvas, p, c1_up.rgb, f);			
+		}
 	}
 	
 	// Draw top right corner
@@ -1330,10 +1336,12 @@ static void Draw_Image(Canvas* canvas, Image* img, Rect rect)
 		v4f c1_up = Unpack_Color_With_Alpha(*c1);
 		
 		v2i p = v2i{x_max, y_max};
-		
-		f32 fa =  fx_max * fy_max;
-		f32 f = f32(c1_up.a) / 255.f * fa;
-		Blend_Pixel_With_Color(canvas, p, c1_up.rgb, f);
+		if(Is_Point_On_Canvas(canvas, p))
+		{
+			f32 fa =  fx_max * fy_max;
+			f32 f = f32(c1_up.a) / 255.f * fa;
+			Blend_Pixel_With_Color(canvas, p, c1_up.rgb, f);			
+		}
 	}
 	
 	#if 1

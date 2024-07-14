@@ -188,7 +188,22 @@ static void Do_New_Game_Players()
 			
 			GUI_Do_Text(context, AUTO, "Nimi:");
 			if(GUI_Do_SL_Input_Field(context, AUTO, &s_player_creation_text_box_width, &n->full_name))
+			{
 				context->selected_index += 1;
+				if(!n->variant_name_1.lenght)
+				{
+					Reserve_String_Memory(&n->variant_name_1, n->full_name.lenght + 1, false);
+					Mem_Copy(n->variant_name_1.buffer, n->full_name.buffer, n->full_name.lenght + 1);
+					n->variant_name_1.lenght = n->full_name.lenght;
+				}
+				
+				if(!n->variant_name_2.lenght)
+				{
+					Reserve_String_Memory(&n->variant_name_2, n->full_name.lenght + 1, false);
+					Mem_Copy(n->variant_name_2.buffer, n->full_name.buffer, n->full_name.lenght + 1);
+					n->variant_name_2.lenght = n->full_name.lenght;
+				}
+			}
 			
 			GUI_Do_Text(context, AUTO, "Muoto 1:");
 			if(GUI_Do_SL_Input_Field(context, AUTO, &s_player_creation_text_box_width, &n->variant_name_1))
@@ -672,6 +687,9 @@ static void Do_We_Have_A_Winner_Frame()
 {
 	Assert(s_game_state.live_player_count == 1);
 	
+	static bool skip_frame;
+	skip_frame = false;
+	
 	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
 		v2f title_scale = v2f{4.f, 4.f};
@@ -684,15 +702,23 @@ static void Do_We_Have_A_Winner_Frame()
 		
 		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lopeta peli"))
 		{
+			skip_frame = true;
 			Delete_Game(&s_game_state, &s_allocator);
 			s_global_data.active_menu = Menus::main_menu;
+		}
+		
+		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Pelaa uudelleen"))
+		{
+			skip_frame = true;
+			Reset_Game(&s_game_state, &s_allocator);
+			s_global_data.active_menu = Menus::GM_let_the_games_begin;
 		}
 		
 	}; // ----------------------------------------------------------------------------------------
 
 	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
-		if(!s_game_state.memory)
+		if(skip_frame)
 			return;
 		
 		context->layout.anchor = GUI_Anchor::top;
