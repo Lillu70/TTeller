@@ -6,6 +6,7 @@ static constexpr char* campaigns_folder_path = "Tiedostot\\Kampanjat\\";
 static constexpr char* campaign_file_extension = ".nalkmp";
 static constexpr char* campaign_folder_wildcard_path = "Tiedostot\\Kampanjat\\*.nalkmp";
 
+
 enum class Exists_Statement : u8
 {
 	does_not_have = 0,

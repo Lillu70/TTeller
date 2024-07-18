@@ -1278,6 +1278,7 @@ static void Do_Event_Editor_Campaigns_Menu_Frame()
 		if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
 		{
 			s_global_data.active_menu = Menus::main_menu;
+			Clear_Editor_Format_Campaigns();
 		}
 		
 		GUI_Do_Text(context, AUTO, "Kampanja Editori", {}, title_scale, true);
@@ -1397,13 +1398,22 @@ static void Do_Event_Editor_On_Exit_Popup()
 	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t2))
 	{
 		Serialize_Campaign(s_editor_state.event_container, &s_platform);
+		
+		Delete_All_Events(&s_editor_state.event_container, &s_allocator);
+		
+		Gather_Editor_Format_Campaigns();
 		s_global_data.active_menu = Menus::campaigns_menu;
+		
 		Close_Popup();
 	}
 	
 	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t3))
 	{
+		Delete_All_Events(&s_editor_state.event_container, &s_allocator);
+		
+		Gather_Editor_Format_Campaigns();
 		s_global_data.active_menu = Menus::campaigns_menu;
+		
 		Close_Popup();
 	}
 	

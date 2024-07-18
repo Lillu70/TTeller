@@ -275,8 +275,16 @@ static Event_Consequens_GM Convert_To_GM(Event_Consequens* con, Mark_Hash_Table*
 	{
 		case Event_Consequens_Type::death:
 		{
-			// TODO: Implement this!
-			result.inheritance_target = 0;
+			if(con->str.lenght)
+			{
+				String_View view = Create_String_View(&con->str);
+				result.inheritance_target = Convert_String_View_Into_U32(view);;
+			}
+			else
+			{
+				result.inheritance_target = 0;				
+			}
+			
 		}break;
 		
 		case Event_Consequens_Type::stat_change:
@@ -659,16 +667,7 @@ static void Generate_Display_Text(Game_State* game)
 			
 			case Mode::seek_number:
 			{
-				if(c >= '0' && c <= '9')
-				{
-					// Trim leading zeroes.
-					if(c == '0' && !number_view.lenght)
-						number_view.buffer += 1;
-					else
-						number_view.lenght += 1;
-					
-				}
-				else
+				if(c < '0' || c > '9')
 				{
 					cptr -= 1; // NOTE GO back!
 					
@@ -679,6 +678,10 @@ static void Generate_Display_Text(Game_State* game)
 					Assert(player_idx < game->live_player_count);
 					
 					mode = Mode::seek_form;
+				}
+				else
+				{
+					number_view.lenght += 1;
 				}
 			}break;
 			
@@ -752,12 +755,15 @@ static void Generate_Display_Text(Game_State* game)
 				{
 					if(a_switch)
 					{
-						char lc = *(full_name->buffer + (full_name->lenght - 1));
-						
-						if(c == 'a' && ((lc == '\xE4' || lc == '\xF6')))
-							c = '\xE4';
-						
-						game->display_text += c;
+						if(full_name->lenght)
+						{
+							char lc = *(full_name->buffer + (full_name->lenght - 1));
+							
+							if(c == 'a' && ((lc == '\xE4' || lc == '\xF6')))
+								c = '\xE4';
+							
+							game->display_text += c;							
+						}
 					}
 					else
 					{
@@ -947,6 +953,7 @@ static inline bool Numerical_Relation_Match(i8 value, i8 relation_target, Numeri
 
 static inline void Search_For_Mark(
 	Dynamic_Array<Mark_GM>* marks, 
+	Mark_Type type,
 	u32 search_mark_idx,
 	Exists_Statement* out_exists, 
 	i8* out_duration,
@@ -955,7 +962,7 @@ static inline void Search_For_Mark(
 	u32 i = 0;
 	for(each(auto, mark, marks))
 	{
-		if(mark->idx == search_mark_idx)
+		if(mark->idx == search_mark_idx && mark->type == type)
 		{
 			*out_exists = Exists_Statement::does_have;
 			*out_duration = mark->duration;
@@ -974,7 +981,9 @@ static inline void Search_For_Mark(
 
 
 
-static inline bool Player_Satisfies_Requirement(Game_Player* player, Participation_Requirement_GM* req)
+static inline bool Player_Satisfies_Requirement(
+	Game_Player* player, 
+	Participation_Requirement_GM* req)
 {
 	bool result = false;
 	
@@ -986,12 +995,35 @@ static inline bool Player_Satisfies_Requirement(Game_Player* player, Participati
 			result = Numerical_Relation_Match(stat, req->relation_target, req->numerical_relation);
 		}break;
 		
-		case Participation_Requirement_Type::mark_item:	
+		case Participation_Requirement_Type::mark_item:
+		{
+			Exists_Statement exists;
+			i8 duration;
+			Search_For_Mark(player->marks, Mark_Type::item, req->mark_idx, &exists, &duration);
+			
+			if(req->mark_exists != exists)
+			{
+				result = false;
+			}
+			else if(exists == Exists_Statement::does_have)
+			{
+				result = Numerical_Relation_Match(
+					duration, 
+					req->relation_target, 
+					req->numerical_relation);
+			}
+			else
+			{
+				result = true;
+			}
+			
+		}break;
+		
 		case Participation_Requirement_Type::mark_personal:
 		{
 			Exists_Statement exists;
 			i8 duration;
-			Search_For_Mark(player->marks, req->mark_idx, &exists, &duration);
+			Search_For_Mark(player->marks, Mark_Type::personal, req->mark_idx, &exists, &duration);
 			
 			if(req->mark_exists != exists)
 			{
@@ -1089,7 +1121,12 @@ static void Assign_Events_To_Participants(
 				
 				Exists_Statement exists;
 				i8 duration;
-				Search_For_Mark(game->global_marks, global_req->mark_idx, &exists, &duration);
+				Search_For_Mark(
+					game->global_marks, 
+					Mark_Type::global, 
+					global_req->mark_idx, 
+					&exists, 
+					&duration);
 				
 				if(global_req->mark_exists != exists)
 				{
@@ -1233,7 +1270,7 @@ static void Give_Player_Mark(Game_Player* player, Mark_GM mark, Allocator_Shell*
 	Exists_Statement exists;
 	i8 duration;
 	u32 mark_idx;
-	Search_For_Mark(player->marks, mark.idx, &exists, &duration, &mark_idx);
+	Search_For_Mark(player->marks, mark.type, mark.idx, &exists, &duration, &mark_idx);
 
 	if(u8(exists))
 	{
@@ -1276,7 +1313,13 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
 			Exists_Statement exists;
 			i8 duration;
 			u32 mark_idx;
-			Search_For_Mark(game->global_marks, gcon->mark_idx, &exists, &duration, &mark_idx);
+			Search_For_Mark(
+				game->global_marks, 
+				Mark_Type::global, 
+				gcon->mark_idx, 
+				&exists, 
+				&duration, 
+				&mark_idx);
 			
 			if(u8(exists))
 			{
@@ -1291,6 +1334,7 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
 			else
 			{
 				Mark_GM m;
+				m.type = Mark_Type::global;
 				m.idx = gcon->mark_idx;
 				m.duration = gcon->mark_duration;
 				
@@ -1322,16 +1366,9 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
 							if(con->inheritance_target)
 							{
 								u32 target_idx = con->inheritance_target - 1;
-								Game_Player* inheritor = 0;
-								for(u32 i = 0; i < event_ref->participant_count; ++i)
-								{
-									u32 islot = *(event_ref->player_indices + i);
-									if(islot == target_idx)
-									{
-										inheritor = game->players + islot;
-										break;
-									}
-								}
+								u32 islot = *(event_ref->player_indices + target_idx);
+								Game_Player* inheritor = game->players + islot;	
+
 								
 								Assert(inheritor);
 								Assert(inheritor != player);
@@ -1366,6 +1403,7 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
 							u32 mark_idx;
 							Search_For_Mark(
 								player->marks, 
+								con->mark_type,
 								con->mark_idx, 
 								&exists, 
 								&duration, 

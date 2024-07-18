@@ -348,4 +348,50 @@ static inline void Init_GUI()
 }
 
 
-static void Run_Active_Menu(u32 app_flags);
+static inline void Clear_Editor_Format_Campaigns()
+{
+	if(s_global_data.on_disk_campaign_names)
+	{
+		Dynamic_Array<String>* on_disk_names = s_global_data.on_disk_campaign_names;
+		for(String* name = Begin(on_disk_names); name < End(on_disk_names); ++name)
+			name->free();
+		
+		s_allocator.free(s_global_data.on_disk_campaign_names);
+		s_global_data.on_disk_campaign_names = 0;
+	}
+}
+
+
+static inline void Gather_Editor_Format_Campaigns()
+{
+	Clear_Editor_Format_Campaigns();
+	
+	char exe_path[260];
+	u32 exe_path_lenght = s_platform.Get_Executable_Path(exe_path, Array_Lenght(exe_path));
+	
+	String campaign_directory 
+		= Create_String(&s_allocator, exe_path, campaign_folder_wildcard_path);
+	
+	s_global_data.on_disk_campaign_names = s_platform.Search_Directory_For_Maching_Names(
+		campaign_directory.buffer, 
+		&s_allocator);
+	
+	campaign_directory.free();
+	
+	Dynamic_Array<String>* on_disk_names = s_global_data.on_disk_campaign_names;
+	if(on_disk_names)
+	{
+		for(String* name = Begin(on_disk_names); name < End(on_disk_names); ++name)
+		{
+			for(u32 i = name->lenght - 1; i < name->lenght; --i)
+			{
+				if(name->buffer[i] == '.')
+				{
+					name->lenght = i;
+					name->buffer[i] = 0;
+					break;
+				}
+			}
+		}
+	}
+}

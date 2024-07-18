@@ -513,10 +513,29 @@ static void Do_Day_Counter_Display_Frame()
 		context->layout.anchor = GUI_Anchor::top;
 		context->layout.build_direction = GUI_Build_Direction::down_center;
 		
+		GUI_Do_Text(context, &GUI_AUTO_TOP_CENTER, "Aktiiviset yleis merkit.");
+		
+		char num_text_buffer[12] = {0};
+		
+		for(each(Mark_GM*, gmark, s_game_state.global_marks))
+		{
+			u32 offset = *(((u32*)s_game_state.mark_table.memory) + gmark->idx);
+			char* mark_text = s_game_state.mark_data + offset;
+			GUI_Do_Text(context, AUTO, mark_text);
+			
+			GUI_Push_Layout(context);
+			
+			context->layout.build_direction = GUI_Build_Direction::right_center;
+			char* num = U32_To_Char_Buffer((u8*)&num_text_buffer, gmark->duration);
+			GUI_Do_Text(context, AUTO, num);
+			
+			GUI_Pop_Layout(context);
+		}
+		
 		v2f title_scale = v2f{3.f, 3.f};
 		GUI_Do_Title_Text(
 			context, 
-			&GUI_AUTO_TOP_CENTER, 
+			AUTO, 
 			"J\xE4ljell\xE4 olevat osallistujat.", 
 			title_scale);
 		
@@ -536,7 +555,6 @@ static void Do_Day_Counter_Display_Frame()
 		context->layout.anchor = GUI_Anchor::top_left;
 		context->layout.build_direction = GUI_Build_Direction::down_left;
 		
-		char num_text_buffer[12] = {0};
 		for(u32 i = 0; i < s_game_state.live_player_count; ++i)
 		{
 			Game_Player* player = s_game_state.players + i;
@@ -653,6 +671,10 @@ static void Do_All_Players_Are_Dead_Frame()
 {
 	Assert(s_game_state.live_player_count == 0);
 	
+	static bool skip_frame;
+	
+	skip_frame = false;
+	
 	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
 		v2f title_scale = v2f{4.f, 4.f};
@@ -665,8 +687,16 @@ static void Do_All_Players_Are_Dead_Frame()
 	
 		GUI_Do_Text(context, AUTO, "Kukaan ei selviytynyt!");
 		
+		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Pelaa uudelleen"))
+		{
+			skip_frame = true;
+			Reset_Game(&s_game_state, &s_allocator);
+			s_global_data.active_menu = Menus::GM_let_the_games_begin;
+		}
+		
 		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lopeta peli"))
 		{
+			skip_frame = true;
 			Delete_Game(&s_game_state, &s_allocator);
 			s_global_data.active_menu = Menus::main_menu;
 		}
@@ -675,8 +705,19 @@ static void Do_All_Players_Are_Dead_Frame()
 
 	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
+		if(skip_frame)
+			return;
 		
+		Player_Image* images = Begin(s_game_state.player_images);
+		Game_Player_Name_FI* names = Begin(s_game_state.player_names);	
 		
+		GUI_Do_Text(context, &GUI_AUTO_TOP_CENTER, "Kuolleet:");
+		
+		for(u32 i = 1; i < s_game_state.total_player_count; ++i)
+		{
+			GUI_Do_Text(context, AUTO, (names + i)->full_name.buffer);
+			GUI_Do_Image_Panel(context, AUTO, &s_player_picture_dim, &((images + i)->image));
+		}
 	}; // ----------------------------------------------------------------------------------------
 
 	Do_GUI_Frame_With_Banner(banner_func, menu_func);
@@ -700,13 +741,6 @@ static void Do_We_Have_A_Winner_Frame()
 		GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, "Voittaja on selvinnyt!", title_scale);
 		GUI_Do_Text(context, AUTO, "H\xE4nen nimens\xE4 j\xE4\xE4k\xF6\xF6n histoarian kirjoihin.");
 		
-		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lopeta peli"))
-		{
-			skip_frame = true;
-			Delete_Game(&s_game_state, &s_allocator);
-			s_global_data.active_menu = Menus::main_menu;
-		}
-		
 		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Pelaa uudelleen"))
 		{
 			skip_frame = true;
@@ -714,6 +748,12 @@ static void Do_We_Have_A_Winner_Frame()
 			s_global_data.active_menu = Menus::GM_let_the_games_begin;
 		}
 		
+		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lopeta peli"))
+		{
+			skip_frame = true;
+			Delete_Game(&s_game_state, &s_allocator);
+			s_global_data.active_menu = Menus::main_menu;
+		}
 	}; // ----------------------------------------------------------------------------------------
 
 	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
@@ -737,6 +777,8 @@ static void Do_We_Have_A_Winner_Frame()
 		
 		GUI_Do_Panel(context, AUTO, &seperator_dim);
 		
+		GUI_Do_Text(context, AUTO, "Kuolleet:");
+		
 		for(u32 i = 1; i < s_game_state.total_player_count; ++i)
 		{
 			GUI_Do_Text(context, AUTO, (names + i)->full_name.buffer);
@@ -746,4 +788,76 @@ static void Do_We_Have_A_Winner_Frame()
 	}; // ----------------------------------------------------------------------------------------
 
 	Do_GUI_Frame_With_Banner(banner_func, menu_func, 210);
+}
+
+
+static void Do_Select_Campagin_To_Play_Frame()
+{
+	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
+	{
+		context->layout.build_direction = GUI_Build_Direction::right_center;
+		
+		v2f title_scale = v2f{4.f, 4.f};
+		Font* font = &context->theme->font;
+		v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
+		if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
+		{
+			s_global_data.active_menu = Menus::main_menu;
+			Clear_Editor_Format_Campaigns();
+		}
+		
+		GUI_Do_Text(context, AUTO, "Uusi peli", {}, title_scale, true);
+		f32 title_height = context->layout.last_element.dim.y;
+		f32 title_max_x = context->layout.last_element.rect.max.x - context->anchor_base.x;
+	
+	}; // ----------------------------------------------------------------------------------------
+
+	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
+	{
+		GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "(l\xF6ydetty kohteesta \"", {}, v2f{1.f, 1.f});
+		GUI_Push_Layout(context);
+		context->layout.build_direction = GUI_Build_Direction::right_center;
+		
+		context->flags |= GUI_Context_Flags::one_time_skip_padding;
+		GUI_Do_Text(context, AUTO, campaign_folder_wildcard_path, {}, v2f{1.f, 1.f});
+		
+		context->flags |= GUI_Context_Flags::one_time_skip_padding;
+		GUI_Do_Text(context, AUTO, "\" jossa * on kampanjan nimi.)", {}, v2f{1.f, 1.f});
+		
+		GUI_Pop_Layout(context);
+		GUI_Do_Text(context, AUTO, "Valitse kampanja:");
+		
+		Dynamic_Array<String>* on_disk_names = s_global_data.on_disk_campaign_names;
+		if(on_disk_names)
+		{
+			for(String* save_name = Begin(on_disk_names); save_name < End(on_disk_names); ++save_name)
+			{
+				if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, save_name->buffer))
+				{
+					Events_Container editor_format_campagin;
+					if(Load_Campaign(&editor_format_campagin, save_name, &s_allocator, &s_platform))
+					{
+						Game_State game_state;
+				
+						if(Convert_Editor_Campaign_Into_Game_Format(
+							&game_state,
+							&editor_format_campagin,
+							&s_allocator))
+						{
+							if(s_game_state.memory)
+								Delete_Game(&s_game_state, &s_allocator);
+							
+							s_game_state = game_state;
+							s_global_data.active_menu = Menus::GM_players;
+						}
+
+						Delete_All_Events(&editor_format_campagin, &s_allocator);
+					}
+				}
+			}
+		}
+		
+	}; // ----------------------------------------------------------------------------------------
+
+	Do_GUI_Frame_With_Banner(banner_func, menu_func, 100);
 }

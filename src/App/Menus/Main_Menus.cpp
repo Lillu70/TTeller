@@ -163,14 +163,8 @@ static void Do_Main_Menu_Frame()
 		v2i{0, 0},
 		GUI_Anchor::top);
 	
-	f32 title_scale = 7.f;
-	GUI_Do_Text(
-		context, 
-		&GUI_AUTO_TOP_CENTER, 
-		"N\xE4lk\xE4pelit", 
-		{}, 
-		v2f{title_scale, title_scale}, 
-		true);
+	v2f title_scale = v2f{7.f, 7.f};
+	GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, "Tarina Kuolemaan", title_scale);
 	
 	
 	GUI_Do_Spacing(context, AUTO);
@@ -204,6 +198,7 @@ static void Do_Main_Menu_Frame()
 	// New game
 	if(GUI_Do_Button(context, AUTO, AUTO, button_texts[i++]))
 	{
+		Gather_Editor_Format_Campaigns();
 		s_global_data.active_menu = Menus::select_campaign_to_play_menu;
 	}
 	
@@ -216,6 +211,7 @@ static void Do_Main_Menu_Frame()
 	// Open editor
 	if(GUI_Do_Button(context, AUTO, AUTO, button_texts[i++]))
 	{
+		Gather_Editor_Format_Campaigns();
 		s_global_data.active_menu = Menus::campaigns_menu;
 	}
 	
