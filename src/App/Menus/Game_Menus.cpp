@@ -120,7 +120,8 @@ static void Do_New_Game_Players()
 		v2f dim = v2f{w1, title_height};
 		
 		b32 live_player_count = s_game_state.player_names->count; 
-		if(live_player_count && GUI_Do_Button(context, &title_row_pos, &dim, start_game_text))
+		if(live_player_count > 1 && 
+			GUI_Do_Button(context, &title_row_pos, &dim, start_game_text))
 		{
 			s_global_data.active_menu = Menus::GM_let_the_games_begin;
 		}
@@ -398,6 +399,8 @@ static void Do_Event_Display_Frame()
 						case Event_List::day:
 						{
 							s_global_data.active_menu = Menus::GM_night_falls;
+							f64 time = s_platform.Get_Time_Stamp();
+							s_game_state.night_falls_start_time = time;
 						}break;
 						
 						case Event_List::night:
@@ -643,6 +646,7 @@ static void Do_Day_Counter_Display_Frame()
 static void Do_Night_Falls_Frame()
 {
 	GUI_Context* context = &s_gui_banner;
+	Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::enable_dynamic_sliders);
 	
 	Clear_Canvas(&s_canvas, s_background_color);
 	
@@ -655,15 +659,34 @@ static void Do_Night_Falls_Frame()
 		GUI_Anchor::center,
 		GUI_Build_Direction::down_center);
 	
-	GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, "Y\xF6 laskeutuu...", v2f{6.f, 6.f});
+	Font* font = &context->theme->font;
+	v2f text_scale = v2f{6.f, 6.f};
 	
-	if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Jatka", {1.f, 1.f}))
+	f32 char_height = font->char_height * text_scale.y;
+	f32 x = Get_Middle(context->canvas).x;
+	f32 top = f32(context->canvas->dim.y - 1) + char_height;
+	f32 bottom = 0.f - char_height;
+	
+	f64 time = s_platform.Get_Time_Stamp();
+	f64 delta = time - s_game_state.night_falls_start_time;
+	f64 f = delta / s_game_state.night_falls_time;
+	f = Clamp_To_Barycentric(f);
+	
+	f32 y = Lerp(top, bottom, f32(f));
+	
+	v2f text_pos = v2f{x, y};
+	
+	GUI_Do_Title_Text(context, &text_pos, "Y\xF6 laskeutuu...", text_scale);
+	
+	if(f >= 1.0 || GUI_Context::actions[GUI_Menu_Actions::enter].Is_Released())
 	{
 		s_global_data.active_menu = Menus::GM_event_display;
 		Assign_Events_To_Participants(&s_game_state, Event_List::night, &s_allocator);
 	}
 	
 	GUI_End_Context(context);
+	
+	context->flags |= GUI_Context_Flags::enable_dynamic_sliders;
 }
 
 

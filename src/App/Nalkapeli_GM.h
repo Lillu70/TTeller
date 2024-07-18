@@ -172,8 +172,6 @@ struct Event_Header
 
 struct Game_State
 {
-	u32 day_counter;
-	
 	// Campaing data converted into fast to operate format ---------------	
 		void* memory; // <-- Combined allocation
 		char* campaign_name;
@@ -221,6 +219,13 @@ struct Game_State
 	Dynamic_Array<Event>* active_events;
 	
 	String display_text;
+	
+	// ----------------------------------------
+	
+	u32 day_counter;
+	f64 night_falls_start_time;
+	
+	static inline f64 night_falls_time = 2.5;
 };
 
 

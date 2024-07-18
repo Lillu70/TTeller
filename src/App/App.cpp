@@ -21,9 +21,8 @@ void Init_App(Platform_Calltable platform_calltable)
 }
 
 
-void Update_App(f64 delta_time, bool* update_surface)
+void Update_App()
 {
-	*update_surface = true;
 	Begin_Timing_Block(internal_run_time);
 	
 	u32 app_flags = s_platform.Get_Flags();

@@ -310,14 +310,29 @@ static inline Rect Shink_Rect(Rect rect, f32 shrink_factor)
  
 static inline f32 Clamp_To_Barycentric(f32 real)
 {
-	if(real != real)
-		return 0;
+	if(real != real) // NOTE: This is to deal with NaN.
+		return 0.f;
 	
-	if(real > 1)
-		return 1;
+	if(real > 1.f)
+		return 1.f;
 	
-	if(real < 0)
-		return 0;
+	if(real < 0.f)
+		return 0.f;
+	
+	return real;
+}
+
+
+static inline f64 Clamp_To_Barycentric(f64 real)
+{
+	if(real != real) // NOTE: This is to deal with NaN.
+		return 0.0;
+	
+	if(real > 1.0)
+		return 1.0;
+	
+	if(real < 0.0)
+		return 0.0;
 	
 	return real;
 }

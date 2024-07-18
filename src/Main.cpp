@@ -20,20 +20,16 @@
 
 #include "App\Main_App.h"
 
-static const wchar_t* APP_TITLE = L"N\xE4lk\xE4peli";
+static const wchar_t* APP_TITLE = L"StoryToTheDeath";
 
 Declare_Timing_Tables();
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
-	Assert(sizeof(Color) == sizeof(u32));
-
 	Win32_Init(620 * 2, 480 * 2, CW_USEDEFAULT, CW_USEDEFAULT, APP_TITLE);
 	
 	Platform_Calltable calltable = Win32_Get_Calltable();
 	Init_App(calltable);
-	
-	f64 frame_time = 0;
 	
 	while(Is_Flag_Set(s_app.flags, (u32)App_Flags::is_running))
     {
@@ -41,13 +37,11 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 		
 		Win32_Flush_Events();
 		
-		bool update_surface = false;
+		Update_App();
 		
-		Update_App(frame_time, &update_surface);
+		Win32_Update_Surface(true);
 		
-		Win32_Update_Surface(update_surface);
-		
-		frame_time = Win32_Update_Frame_Time();
+		Win32_Update_Frame_Time();
 		
 		End_Timing_Block(run_time);
 		

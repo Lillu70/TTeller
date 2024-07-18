@@ -193,6 +193,8 @@ static void Win32_Init(
 {
 	GetSystemInfo(&s_app.sys_info);
 	
+	s_app.frame_time = 0;
+	
 	Window_Create_Info wci = 
 	{
 		window_width, 
@@ -486,7 +488,9 @@ static f64 Win32_Update_Frame_Time()
 	i64 counter_elapsed_time = current_time.QuadPart - s_app.last_time_counter.QuadPart;
 	s_app.last_time_counter = current_time;	
 	
-	return f64(counter_elapsed_time) / s_app.timer_counter_freg;
+	s_app.frame_time = f64(counter_elapsed_time) / s_app.timer_counter_freg;
+	
+	return s_app.frame_time;
 }
 
 
@@ -835,6 +839,12 @@ static Dynamic_Array<String>* Win32_Search_Directory_For_Maching_Names(
 }
 
 
+static f64 Wi32_Get_Frame_Time()
+{
+	return s_app.frame_time;
+}
+
+
 static bool Win32_Open_Select_File_Dialog(
 	char* result_buffer, 
 	u32 result_buffer_size
@@ -931,6 +941,7 @@ static Platform_Calltable Win32_Get_Calltable()
 	ct.Search_Directory_For_Maching_Names = Win32_Search_Directory_For_Maching_Names;
 	ct.Open_Select_File_Dialog = Win32_Open_Select_File_Dialog;
 	ct.Get_Executable_Path = Win32_Get_Executable_Path;
+	ct.Get_Frame_Time = Wi32_Get_Frame_Time;
 	
 	return ct;
 }

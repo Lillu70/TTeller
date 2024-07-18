@@ -15,6 +15,7 @@ struct Win32_App
 	
 	WINDOWPLACEMENT window_placement = { sizeof(window_placement) };
 	
+	f64 frame_time = 0;
 	u64 frame_counter = 0;
 	i64 timer_counter_freg = 0;
 	LARGE_INTEGER last_time_counter;

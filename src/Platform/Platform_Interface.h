@@ -70,6 +70,8 @@ struct Platform_Calltable
 	
 	f64 (*Get_Time_Stamp)() = 0;
 	
+	f64 (*Get_Frame_Time)() = 0;
+	
 	u64 (*Get_CPU_Time_Stamp)() = 0;
 	
 	u64 (*Get_Frame_Count)() = 0;

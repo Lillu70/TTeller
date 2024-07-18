@@ -96,7 +96,7 @@ struct Global_Data
 	
 	GUI_Theme popup_panel_theme;
 	v2f popup_panel_dim = v2f{0.f, 0.f};
-	
+
 	Rect popup_panel_rect = {};
 	
 	bool force_quit_popup = false;
