@@ -225,7 +225,7 @@ struct Game_State
 	u32 day_counter;
 	f64 night_falls_start_time;
 	
-	static inline f64 night_falls_time = 2.5;
+	static inline f64 night_falls_time = 1.5;
 };
 
 

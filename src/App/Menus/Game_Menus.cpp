@@ -414,16 +414,6 @@ static void Do_Event_Display_Frame()
 				return;
 			}
 		}
-		
-		
-		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lopeta peli"))
-		{
-			Delete_Game(&s_game_state, &s_allocator);
-			s_global_data.active_menu = Menus::main_menu;
-			skip_frame = true;
-			return;
-		}
-		
 	}; // ----------------------------------------------------------------------------------------
 
 	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
@@ -490,6 +480,9 @@ static void Do_Event_Display_Frame()
 
 static void Do_Day_Counter_Display_Frame()
 {
+	static bool skip_frame;
+	skip_frame = false;
+	
 	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
 		context->layout.anchor = GUI_Anchor::top;
@@ -509,10 +502,22 @@ static void Do_Day_Counter_Display_Frame()
 			Assign_Events_To_Participants(&s_game_state, Event_List::day, &s_allocator);
 		}
 		
+		context->layout.anchor = GUI_Anchor::top_left;
+		if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &GUI_AUTO_FIT, "Lopeta peli"))
+		{
+			Delete_Game(&s_game_state, &s_allocator);
+			s_global_data.active_menu = Menus::main_menu;
+			skip_frame = true;
+			return;
+		}
+		
 	}; // ----------------------------------------------------------------------------------------
 
 	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
+		if(skip_frame)
+			return;
+	
 		context->layout.anchor = GUI_Anchor::top;
 		context->layout.build_direction = GUI_Build_Direction::down_center;
 		
@@ -662,23 +667,28 @@ static void Do_Night_Falls_Frame()
 	Font* font = &context->theme->font;
 	v2f text_scale = v2f{6.f, 6.f};
 	
-	f32 char_height = font->char_height * text_scale.y;
+	f32 half_char_height = (font->char_height * text_scale.y) * 0.5f;
 	f32 x = Get_Middle(context->canvas).x;
-	f32 top = f32(context->canvas->dim.y - 1) + char_height;
-	f32 bottom = 0.f - char_height;
+	f32 top = f32(context->canvas->dim.y - 1) - half_char_height;
+	f32 bottom = 0.f - half_char_height;
 	
 	f64 time = s_platform.Get_Time_Stamp();
 	f64 delta = time - s_game_state.night_falls_start_time;
-	f64 f = delta / s_game_state.night_falls_time;
-	f = Clamp_To_Barycentric(f);
-	
-	f32 y = Lerp(top, bottom, f32(f));
+	f64 t = delta / s_game_state.night_falls_time;
+	t = Clamp_To_Barycentric(t);
+	t = Square(t);
+	f32 y = Lerp(top, bottom, f32(t));
 	
 	v2f text_pos = v2f{x, y};
 	
 	GUI_Do_Title_Text(context, &text_pos, "Y\xF6 laskeutuu...", text_scale);
 	
-	if(f >= 1.0 || GUI_Context::actions[GUI_Menu_Actions::enter].Is_Released())
+	v2i cursor_pos = s_platform.Get_Cursor_Position();
+	bool cursor_on_canvas = Is_Point_On_Canvas(context->canvas, cursor_pos);
+	
+	if(t >= 1.0 || 
+		GUI_Context::actions[GUI_Menu_Actions::enter].Is_Released() ||
+		(cursor_on_canvas && GUI_Context::actions[GUI_Menu_Actions::mouse].Is_Released()))
 	{
 		s_global_data.active_menu = Menus::GM_event_display;
 		Assign_Events_To_Participants(&s_game_state, Event_List::night, &s_allocator);

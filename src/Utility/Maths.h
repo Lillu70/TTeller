@@ -69,6 +69,13 @@ static inline f32 Square(f32 value)
 }
 
 
+static inline f64 Square(f64 value)
+{
+	f64 result = value * value;
+	return result;
+}
+
+
 // Rounds to the nearest whole number towards negative infinity.
 static inline f32 Floor(f32 value)
 {
