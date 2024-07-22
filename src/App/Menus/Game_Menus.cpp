@@ -52,12 +52,35 @@ static void Do_Create_Player_FI_Instruction_Popup()
 		if(GUI_Do_Button(context, AUTO, &b, "X"))
 			Close_Popup();
 		
+		// TODO: Check if this line is neccecary!
 		context->layout.build_direction = GUI_Build_Direction::down_center;
-		
 	};
 	
 	Do_Popup_GUI_Frame(test);
 	
+}
+
+
+static void Do_Out_Of_Template_Names_Popup()
+{
+	void(*test)(GUI_Context*) = [](GUI_Context* context)
+	{
+		v2f title_scale = GUI_DEFAULT_TEXT_SCALE * 1.5f;
+		
+		GUI_Do_Title_Text(
+			context, 
+			&GUI_AUTO_MIDDLE, 
+			"Hupsis, valmiit nimet loppuivat kesken.", 
+			title_scale);
+		
+		context->layout.build_direction = GUI_Build_Direction::down_center;
+		
+		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Okei :("))
+			Close_Popup();
+		
+	};
+	
+	Do_Popup_GUI_Frame(test);
 }
 
 
@@ -105,6 +128,14 @@ static void Do_New_Game_Players()
 		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Ohje"))
 		{
 			Set_Popup_Function(Do_Create_Player_FI_Instruction_Popup);
+		}
+		
+		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "T\xE4yt\xE4 tyhj\xE4t paikat"))
+		{
+			if(!Fill_Empty_Names(&s_game_state, &s_allocator))
+			{
+				Set_Popup_Function(Do_Out_Of_Template_Names_Popup);
+			}
 		}
 		
 		// -- title bar buttons --	
@@ -187,7 +218,7 @@ static void Do_New_Game_Players()
 			GUI_Push_Layout(context);
 			context->layout.build_direction = GUI_Build_Direction::down_left;
 			
-			GUI_Do_Text(context, AUTO, "Nimi:");
+			GUI_Do_Text(context, AUTO, "Nimi:", GUI_Highlight_Next(context));
 			if(GUI_Do_SL_Input_Field(context, AUTO, &s_player_creation_text_box_width, &n->full_name))
 			{
 				context->selected_index += 1;
@@ -206,21 +237,43 @@ static void Do_New_Game_Players()
 				}
 			}
 			
-			GUI_Do_Text(context, AUTO, "Muoto 1:");
-			if(GUI_Do_SL_Input_Field(context, AUTO, &s_player_creation_text_box_width, &n->variant_name_1))
+			GUI_Do_Text(context, AUTO, "Muoto 1:", GUI_Highlight_Next(context));
+			
+			if(GUI_Do_SL_Input_Field(
+				context, 
+				AUTO, 
+				&s_player_creation_text_box_width, 
+				&n->variant_name_1))
+			{
 				context->selected_index += 1;
+			}
 			
-			GUI_Do_Text(context, AUTO, "Muoto 2:");
-			GUI_Do_SL_Input_Field(context, AUTO, &s_player_creation_text_box_width, &n->variant_name_2);
+			GUI_Do_Text(context, AUTO, "Muoto 2:", GUI_Highlight_Next(context));
 			
-			v2f test_button_dim = v2f{s_player_creation_text_box_width, context->layout.last_element.dim.y};
+			GUI_Do_SL_Input_Field(
+				context, 
+				AUTO, 
+				&s_player_creation_text_box_width, 
+				&n->variant_name_2);
+			
+			
+			v2f checkbox_dim = v2f{1.f, 1.f} * context->layout.last_element.dim.y;
+			GUI_Do_Checkbox(context, AUTO, &checkbox_dim, &n->special_char_override);
+			
+			GUI_Push_Layout(context);
+			
+			context->layout.build_direction = GUI_Build_Direction::right_center;
+			
+			GUI_Do_Text(context, AUTO, "\xC4\xE4kk\xF6s ohitus", GUI_Highlight_Prev(context));
+			
+			GUI_Pop_Layout(context);
+			
+			v2f test_button_dim = 
+				v2f{s_player_creation_text_box_width, context->layout.last_element.dim.y};
 			if(GUI_Do_Button(context, AUTO, &test_button_dim, "Testaa muodot"))
 			{
 				
 			}
-			
-			GUI_Do_Text(context, AUTO, "Kuva:");
-
 			
 			if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Valitse kuva"))
 			{

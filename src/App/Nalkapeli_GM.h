@@ -29,6 +29,8 @@ struct Game_Player_Name_FI
 	String full_name;
 	String variant_name_1;
 	String variant_name_2;
+	
+	bool special_char_override;
 };
 
 
@@ -225,6 +227,7 @@ struct Game_State
 	u32 day_counter;
 	f64 night_falls_start_time;
 	
+	static inline Random_Machine rm;
 	static inline f64 night_falls_time = 1.5;
 };
 
@@ -281,3 +284,61 @@ struct Game_State
 
 	| - event table night -> Containts offsets to Event_Headers.	; sizeof(u32 * night event count)	
 */
+
+
+struct Filler_Name_Data_FI
+{
+	char* full_name;
+	char* variant_name_1;
+	char* variant_name_2;
+	bool special_char_override;
+};
+
+
+Filler_Name_Data_FI s_filler_name_list_FI[]= 
+{
+	{"Matti", 		"Mati", 		"Matti", 	0},
+	{"Pekka", 		"Peka", 		"Pekka", 	0},
+	{"Roosa", 		"Roosa",		"Roosa", 	0},
+	{"Liisa", 		"Liisa", 		"Liisa", 	0},
+	{"Tuomas", 		"Tuomakse", 	"Tuomast", 	0},
+	{"Thomas", 		"Thomakse", 	"Thomast", 	0},
+	{"Valtteri", 	"Valtteri", 	"Valtteri", 0},
+	{"Marika", 		"Marika", 		"Marika", 	0},
+	{"Yrj\xF6",     "Yrj\xF6", 		"Yrj\xF6", 	1},
+	{"Ville",       "Ville",		"Ville",	1},
+	{"Juhani",      "Juhani",		"Juhani",	0},
+	{"Johannes",    "Johannekse", 	"Jonnest",	0},
+	{"Mikael",      "Mikaeli",		"Mikaeli", 	0},
+	{"Olavi",       "Olavi",		"Olavi",	0},
+	{"Onni",        "Onne",			"Onne",		0},
+	{"Matias",      "Matiakse",		"Matiast",	0},
+	{"Elias",       "Eliakse",		"Eliast",	0},
+	{"Oliver",      "Oliveri",		"Oliveri",	0},
+	{"Ilmari",      "Ilmari",		"Ilmari",	0},
+	{"Eemeli",      "Eemeli",		"Eemeli",	1},
+	{"Maria",       "Maria",		"Maria",	0},
+	{"Sofia",       "Sofia",		"Sofia",	0},
+	{"Emilia",      "Emilia",		"Emilia",	0},
+	{"Olivia",      "Olivia",		"Olivia",	0},
+	{"Aino",        "Aino",			"Aino",		0},
+	{"Amanda",      "Amanda",		"Amanda",	0},
+	{"Matilda",     "Matilda",		"Matilda",	0},
+	{"Helmi",       "Helme",		"Helme",	1},
+	{"Aurora",      "Aurora",		"Aurora",	0},
+	{"Ilona",       "Ilona",		"Ilona",	0},
+	{"Eino",        "Eino",			"Eino",		0},
+	{"Toivo",       "Toivo",		"Toivo",	0},
+	{"Veikko",      "Veiko",		"Veikko",	0},
+	{"Armas",       "Armakse",		"Armast",	0},
+	{"V\xE4in\xF6", "V\xE4in\xF6","V\xE4in\xF6",1},
+	{"Tauno",       "Tauno",		"Tauno",	0},
+	{"Viljo",       "Viljo",		"Viljo",	0},
+	{"Anna",        "Anna",			"Anna",		0},
+	{"Aili",        "Aili",			"Aili",		0},
+	{"Aune",        "Aune",			"Aune",		0},
+	{"Tyyne",       "Tyyne",		"Tyyne",	1},
+	{"Helena",      "Helena",		"Helena",	0},
+	{"Martta",      "Marta",		"Martta",	0},
+	{"Elisabet",	"Elisabeti",	"Elisabeti",1}
+};

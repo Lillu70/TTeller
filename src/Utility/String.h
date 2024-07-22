@@ -328,7 +328,9 @@ static void Reserve_String_Memory(String* str, u32 min_capacity, bool copy_into_
 		if(copy_into_new_memory)
 			Mem_Copy(new_buffer, str->buffer, str->lenght + 1);
 		
-		str->alloc->free(str->buffer);
+		if(str->buffer)
+			str->alloc->free(str->buffer);
+		
 		str->buffer = new_buffer;
 		str->capacity = min_capacity;
 	}
@@ -338,6 +340,17 @@ static void Reserve_String_Memory(String* str, u32 min_capacity, bool copy_into_
 		str->lenght = 0;
 		str->buffer[0] = 0;		
 	}
+}
+
+
+static inline void Set_String_Text(String* string, char* new_text)
+{
+	u32 new_text_lenght = Null_Terminated_Buffer_Lenght(new_text) + 1;
+	
+	Reserve_String_Memory(string, new_text_lenght, false);
+	Mem_Copy(string->buffer, new_text, new_text_lenght);
+	
+	string->lenght = new_text_lenght - 1;		
 }
 
 
@@ -446,6 +459,7 @@ static void operator += (String& str, char c)
 }
 
 
+// CONSIDER: Just decay all Compare opps down to this???
 static bool C_STR_Compare(char* a, char* b)
 {
 	while(*a == *b++ && *a++ != 0);
@@ -475,6 +489,7 @@ static bool String_View_Compare(String_View a, String_View b)
 }
 
 
+// TODO: Make this not suck...
 static bool String_Compare(String* a, String* b)
 {
 	if(a->lenght != b->lenght)

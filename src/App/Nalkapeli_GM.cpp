@@ -637,6 +637,7 @@ static void Generate_Display_Text(Game_State* game)
 	u32 participant_idx = 0;
 	u32 player_idx = 0;
 	bool a_switch = 0;
+	bool a_switch_owerride;
 	String* full_name = 0;
 	
 	game->display_text.lenght = 0;
@@ -689,6 +690,7 @@ static void Generate_Display_Text(Game_State* game)
 			{
 				Game_Player_Name_FI* name = Begin(game->player_names) + player_idx;				
 				a_switch = false;
+				a_switch_owerride = name->special_char_override;
 				full_name = &name->full_name;
 				switch(c)
 				{
@@ -759,7 +761,7 @@ static void Generate_Display_Text(Game_State* game)
 						{
 							char lc = *(full_name->buffer + (full_name->lenght - 1));
 							
-							if(c == 'a' && ((lc == '\xE4' || lc == '\xF6')))
+							if(c == 'a' && ((lc == '\xE4' || lc == '\xF6') || a_switch_owerride))
 								c = '\xE4';
 							
 							game->display_text += c;							
@@ -1070,16 +1072,14 @@ static void Assign_Events_To_Participants(
 	Assert(game->live_player_count);
 	Assert(game->event_assignement_table_size);
 	
-	static Random_Machine rm = {};
-	
 	for(u32 i = 0; i < game->live_player_count; ++i)
 		game->player_assignement_table[i] = i;
 	
 	// shuffle player indexes.
 	for(u32 i = 0; i < game->live_player_count * 1.5; ++i)
 	{
-		u32 first = rm.random_u32(game->live_player_count);
-		u32 second = rm.random_u32(game->live_player_count);
+		u32 first = game->rm.random_u32(game->live_player_count);
+		u32 second = game->rm.random_u32(game->live_player_count);
 		
 		Swap(game->player_assignement_table + first, game->player_assignement_table + second);
 	}
@@ -1102,7 +1102,7 @@ static void Assign_Events_To_Participants(
 		u32 untested_event_count = event_count;
 		for(;;)
 		{
-			u32 event_to_test_table_idx = rm.random_u32(untested_event_count);
+			u32 event_to_test_table_idx = game->rm.random_u32(untested_event_count);
 			u32 event_to_test_idx = game->event_assignement_table[event_to_test_table_idx];
 			
 			u32 offset =  *(req_table_memory + event_to_test_idx);
@@ -1502,4 +1502,58 @@ static void Tickdown_Marks(Game_State* game)
 			}
 		}
 	}
+}
+
+
+static inline bool Fill_Empty_Names(Game_State* game, Allocator_Shell* allocator)
+{	
+	u32 filler_name_list_lenght = Array_Lenght(s_filler_name_list_FI);
+	
+	bool result = true;
+	
+	for(each(Game_Player_Name_FI*, name, game->player_names))
+	{
+		if(!name->full_name.lenght && !name->variant_name_1.lenght && !name->variant_name_2.lenght)
+		{
+			u32 name_idx = game->rm.random_u32(filler_name_list_lenght);
+			
+			bool success = false;
+			u32 attempt_count = 0;
+			while(!success && attempt_count < filler_name_list_lenght)
+			{
+				
+				u32 offset = (name_idx + attempt_count) % filler_name_list_lenght;
+				Filler_Name_Data_FI* filler_name = s_filler_name_list_FI + offset;
+
+				for(each(Game_Player_Name_FI*, cmp_name, game->player_names))
+					if(C_STR_Compare(cmp_name->full_name.buffer, filler_name->full_name))
+						goto FAIL;
+				
+				
+				// Success!
+				{
+					Set_String_Text(&name->full_name, filler_name->full_name);
+					Set_String_Text(&name->variant_name_1, filler_name->variant_name_1);
+					Set_String_Text(&name->variant_name_2, filler_name->variant_name_2);
+					
+					name->special_char_override = filler_name->special_char_override;
+					
+					success = true;
+				}
+				continue;
+				
+				
+				FAIL:
+				attempt_count += 1;
+			}
+			
+			if(!success)
+			{
+				result = false;
+				break;
+			}
+		}
+	}
+	
+	return result;
 }
