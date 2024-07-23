@@ -72,21 +72,14 @@ enum class Mark_Type :u8
 };
 
 
-struct Character_Stat
+enum class Character_Stats : u8
 {
-	enum class Stats : u8
-	{
-		body = 0,
-		mind,
-		COUNT
-	};
-	
-	static inline const char* stat_names[] = 
-		{"Keho", "Mieli"};
-	
-	Stats type;
-	u16 value;
+	body = 0,
+	mind,
+	COUNT
 };
+
+static const char* s_stat_names[] = {"Keho", "Mieli"};
 
 
 struct Global_Mark_Requirement
@@ -123,7 +116,7 @@ struct Participation_Requirement
 	Exists_Statement mark_exists;
 	Numerical_Relation numerical_relation = Numerical_Relation::greater_than_equals;
 	
-	Character_Stat::Stats stat_type;
+	Character_Stats stat_type;
 	
 	u16 relation_target = 1;
 
@@ -162,7 +155,7 @@ struct Event_Consequens
 		i8 mark_duration;
 		i8 stat_change_amount;
 	};
-	Character_Stat::Stats stat = Character_Stat::Stats::body;
+	Character_Stats stat = Character_Stats::body;
 	
 	String str = {};
 };
@@ -178,7 +171,7 @@ struct Participent
 };
 
 
-struct Event_State
+struct Editor_Event
 {
 	static constexpr u32 max_participent_count = 100;
 	Dynamic_Array<Participent>* participents;
@@ -195,6 +188,6 @@ struct Events_Container
 	String campaign_name = {};
 	
 	// Day events are stored first, then night events.
-	Dynamic_Array<Event_State>* events = 0;
+	Dynamic_Array<Editor_Event>* events = 0;
 	u32 day_event_count = 0;
 };

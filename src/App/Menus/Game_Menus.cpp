@@ -617,9 +617,9 @@ static void Do_Day_Counter_Display_Frame()
 			
 			GUI_Do_Image_Panel(context, AUTO, &s_player_picture_dim, &((images + i)->image));
 			
-			for(u32 s = 0; s < u32(Character_Stat::Stats::COUNT); ++s)
+			for(u32 s = 0; s < u32(Character_Stats::COUNT); ++s)
 			{
-				GUI_Do_Text(context, AUTO, (char*)Character_Stat::stat_names[s]);
+				GUI_Do_Text(context, AUTO, (char*)s_stat_names[s]);
 				GUI_Push_Layout(context);
 				
 				context->layout.build_direction = GUI_Build_Direction::right_center;

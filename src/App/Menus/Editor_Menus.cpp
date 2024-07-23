@@ -62,7 +62,7 @@ static void Do_Event_Editor_All_Events_Frame()
 			// the actual memory contents is irrelevant at this point in time.
 			Push(&s_editor_state.event_container.events, &s_allocator);
 			
-			Event_State* buffer = Begin(s_editor_state.event_container.events);
+			Editor_Event* buffer = Begin(s_editor_state.event_container.events);
 			
 			// Checks if there are any night events.
 			if(temp_count - s_editor_state.event_container.day_event_count > 0)
@@ -75,7 +75,7 @@ static void Do_Event_Editor_All_Events_Frame()
 					s_editor_state.event_container.day_event_count);				
 			}
 			
-			Event_State* event = buffer + s_editor_state.event_container.day_event_count;
+			Editor_Event* event = buffer + s_editor_state.event_container.day_event_count;
 			Init_Event_Takes_Name_Ownership(event, &s_allocator, &unique_name);
 			
 			s_editor_state.event_container.day_event_count += 1;
@@ -96,7 +96,7 @@ static void Do_Event_Editor_All_Events_Frame()
 				s_editor_state.event_container.events->count - s_editor_state.event_container.day_event_count,
 				&s_allocator);
 			
-			Event_State* event = Push(&s_editor_state.event_container.events, &s_allocator);
+			Editor_Event* event = Push(&s_editor_state.event_container.events, &s_allocator);
 			Init_Event_Takes_Name_Ownership(event, &s_allocator, &unique_name);
 		}
 		
@@ -236,12 +236,12 @@ static void Do_Event_Editor_All_Events_Frame()
 				&s_theme,
 				day_list_buffer_offset.As<i32>());
 			{
-				Event_State* begin = Begin(s_editor_state.event_container.events);
+				Editor_Event* begin = Begin(s_editor_state.event_container.events);
 				
 				v2f* pos = &GUI_AUTO_TOP_LEFT;
 				for(u32 i = 0; i < s_editor_state.event_container.day_event_count; ++i)
 				{
-					Event_State* e = begin + i;
+					Editor_Event* e = begin + i;
 					
 					// Destroy event
 					if(GUI_Do_Button(&gui_event_list_day, pos, &GUI_AUTO_FIT, "X"))
@@ -296,13 +296,13 @@ static void Do_Event_Editor_All_Events_Frame()
 				&s_theme,
 				night_list_buffer_offset.As<i32>());
 			{
-				Event_State* begin = Begin(s_editor_state.event_container.events);
+				Editor_Event* begin = Begin(s_editor_state.event_container.events);
 				
 				v2f* pos = &GUI_AUTO_TOP_LEFT;
 				for(u32 i = s_editor_state.event_container.day_event_count; 
 					i < s_editor_state.event_container.events->count; ++i)
 				{
-					Event_State* e = begin + i;
+					Editor_Event* e = begin + i;
 					
 					// Destroy event
 					if(GUI_Do_Button(&gui_event_list_night, pos, &GUI_AUTO_FIT, "X"))
@@ -373,7 +373,7 @@ static void Do_Event_Editor_Participants_Frame()
 		
 		GUI_Do_Spacing(context, v2f{0, s_post_title_y_spacing});
 		
-		Event_State* event = Begin(s_editor_state.event_container.events) + s_editor_state.active_event_index;
+		Editor_Event* event = Begin(s_editor_state.event_container.events) + s_editor_state.active_event_index;
 		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lis\xE4\xE4 uusi osallistuja"))
 		{
 			s_gui.flags |= GUI_Context_Flags::maxout_horizontal_slider;
@@ -429,7 +429,7 @@ static void Do_Event_Editor_Participants_Frame()
 	
 	void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
-		Event_State* event = Begin(s_editor_state.event_container.events) + s_editor_state.active_event_index;
+		Editor_Event* event = Begin(s_editor_state.event_container.events) + s_editor_state.active_event_index;
 	
 		static constexpr f32 collumn_min_width = 300;
 		f32 padding = context->theme->padding;
@@ -681,11 +681,11 @@ static void Do_Event_Editor_Participants_Frame()
 						// Stat
 						if(u32 s = GUI_Do_Dropdown_Button(
 							context, AUTO, &GUI_AUTO_FIT, 
-							(char*)Character_Stat::stat_names[u32(req->stat_type)],
-							Array_Lenght(Character_Stat::stat_names),
-							(char**)Character_Stat::stat_names))
+							(char*)s_stat_names[u32(req->stat_type)],
+							Array_Lenght(s_stat_names),
+							(char**)s_stat_names))
 						{
-							req->stat_type = Character_Stat::Stats(s - 1);
+							req->stat_type = Character_Stats(s - 1);
 						}
 						
 						GUI_Push_Layout(context);
@@ -756,7 +756,7 @@ static void Do_Event_Editor_Text_Frame()
 {
 	void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
 	{
-		Event_State* event = Begin(s_editor_state.event_container.events) + s_editor_state.active_event_index;
+		Editor_Event* event = Begin(s_editor_state.event_container.events) + s_editor_state.active_event_index;
 		
 		v2f title_scale = v2f{4.f, 4.f};
 		Font* font = &context->theme->font;
@@ -820,7 +820,7 @@ static void Do_Event_Editor_Text_Frame()
 		v2f dim = v2u::Cast<f32>(context->canvas->dim) - 50.f;
 		if(dim.x >= 0 && dim.y >= 0)
 		{
-			Event_State* event 
+			Editor_Event* event 
 				= Begin(s_editor_state.event_container.events) + s_editor_state.active_event_index;
 			
 			context->layout.anchor = GUI_Anchor::center;
@@ -870,7 +870,7 @@ static void Do_Event_Editor_Consequences_Frame()
 		{
 			if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lis\xE4\xE4 yleis seuraamus"))
 			{
-				Event_State* event 
+				Editor_Event* event 
 					= Begin(s_editor_state.event_container.events) + s_editor_state.active_event_index;
 				
 				Global_Mark_Consequence* gmc = Push(&event->global_mark_cons, &s_allocator);
@@ -919,7 +919,7 @@ static void Do_Event_Editor_Consequences_Frame()
 		
 		v2f* start_pos_ptr = &GUI_AUTO_TOP_LEFT;
 		
-		Event_State* event = Begin(s_editor_state.event_container.events) + s_editor_state.active_event_index;
+		Editor_Event* event = Begin(s_editor_state.event_container.events) + s_editor_state.active_event_index;
 		
 		if(event->global_mark_cons->count)
 		{
@@ -1140,11 +1140,11 @@ static void Do_Event_Editor_Consequences_Frame()
 							context, 
 							AUTO, 
 							&GUI_AUTO_FIT, 
-							(char*)Character_Stat::stat_names[u32(con->stat)], 
-							Array_Lenght(Character_Stat::stat_names),
-							(char**)Character_Stat::stat_names))
+							(char*)s_stat_names[u32(con->stat)], 
+							Array_Lenght(s_stat_names),
+							(char**)s_stat_names))
 						{
-							con->stat = Character_Stat::Stats(s - 1);
+							con->stat = Character_Stats(s - 1);
 						}
 						
 						GUI_Push_Layout(context);

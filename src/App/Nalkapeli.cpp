@@ -113,7 +113,7 @@ static inline void Delete_Participent(
 
 
 static inline void Init_Event_Takes_Name_Ownership(
-	Event_State* event, 
+	Editor_Event* event, 
 	Allocator_Shell* allocator, 
 	String* name)
 {
@@ -126,7 +126,7 @@ static inline void Init_Event_Takes_Name_Ownership(
 }
 
 
-static void Delete_All_Participants_From_Event(Event_State* event, Allocator_Shell* allocator)
+static void Delete_All_Participants_From_Event(Editor_Event* event, Allocator_Shell* allocator)
 {
 	for(u32 i = 0; i < event->participents->count; ++i)
 		Hollow_Participent(i, event->participents, allocator);
@@ -136,15 +136,15 @@ static void Delete_All_Participants_From_Event(Event_State* event, Allocator_She
 
 
 static void Delete_Event(
-	Dynamic_Array<Event_State>* darray, 
+	Dynamic_Array<Editor_Event>* darray, 
 	Allocator_Shell* allocator, 
 	u32 idx_to_delete, 
 	bool remove_from_array=true)
 {
 	Assert(idx_to_delete < darray->count);
 	
-	Event_State* buffer = Begin(darray);
-	Event_State* element = buffer + idx_to_delete;
+	Editor_Event* buffer = Begin(darray);
+	Editor_Event* element = buffer + idx_to_delete;
 	
 	Delete_All_Participants_From_Event(element, allocator);
 	allocator->free(element->participents);
@@ -256,13 +256,13 @@ static void Init_Event_Container_Takes_Name_Ownership(
 	String* name)
 {
 	ec->campaign_name = *name;
-	ec->events = Create_Dynamic_Array<Event_State>(allocator, 12);
+	ec->events = Create_Dynamic_Array<Editor_Event>(allocator, 12);
 	
 	*name = {};
 }
 
 
-static String Generate_Unique_Name(Event_State* events, u32 event_count, Allocator_Shell* allocator)
+static String Generate_Unique_Name(Editor_Event* events, u32 event_count, Allocator_Shell* allocator)
 {
 	char* def_name = "Uusi tapahtuma";
 	u32 def_name_len = Null_Terminated_Buffer_Lenght(def_name);
@@ -271,7 +271,7 @@ static String Generate_Unique_Name(Event_State* events, u32 event_count, Allocat
 	{
 		bool name_is_unique = true;
 		
-		for(Event_State* e = events; e < events + event_count; ++e)
+		for(Editor_Event* e = events; e < events + event_count; ++e)
 		{
 			if(String_Compare(&unique_name, &e->name))
 			{
@@ -383,7 +383,7 @@ static void Serialize_Campaign(
 	WRITE(version, u32);
 	WRITE(event_container.events->count, u32);
 	WRITE(event_container.day_event_count, u32);
-	for(Event_State* e = Begin(event_container.events); e < End(event_container.events); ++e)
+	for(Editor_Event* e = Begin(event_container.events); e < End(event_container.events); ++e)
 	{
 		// event name
 		WRITE(e->name.lenght, u32);
@@ -440,7 +440,7 @@ static void Serialize_Campaign(
 				{
 					case Participation_Requirement_Type::character_stat:
 					{
-						WRITE(req->stat_type, Character_Stat::Stats);
+						WRITE(req->stat_type, Character_Stats);
 					
 					}break;
 					
@@ -501,7 +501,7 @@ static void Serialize_Campaign(
 					case Event_Consequens_Type::stat_change:
 					{
 						WRITE(con->stat_change_amount, i8);
-						WRITE(con->stat, Character_Stat::Stats);
+						WRITE(con->stat, Character_Stats);
 					}break;
 					
 					default:
@@ -557,10 +557,10 @@ static inline void Load_Campaign_V2(
 	
 	Assert(container->day_event_count <= event_count);
 	
-	container->events = Create_Dynamic_Array<Event_State>(allocator, Max(u32(4), event_count));
+	container->events = Create_Dynamic_Array<Editor_Event>(allocator, Max(u32(4), event_count));
 	container->events->count = event_count;
 	
-	for(Event_State* e = Begin(container->events); e < End(container->events); ++e)
+	for(Editor_Event* e = Begin(container->events); e < End(container->events); ++e)
 	{
 		e->global_mark_reqs = Create_Dynamic_Array<Global_Mark_Requirement>(allocator, 4);
 		e->global_mark_cons = Create_Dynamic_Array<Global_Mark_Consequence>(allocator, 4);
@@ -631,7 +631,7 @@ static inline void Load_Campaign_V2(
 							};
 							
 							Character_Stat_V2 s = READ(Character_Stat_V2);
-							req->stat_type = (Character_Stat::Stats)s.type;
+							req->stat_type = (Character_Stats)s.type;
 						}break;
 						
 						case Participation_Requirement_Type::mark_item:
@@ -713,7 +713,7 @@ static inline void Load_Campaign_V2(
 						case Event_Consequens_Type::stat_change:
 						{
 							con->stat_change_amount = READ(i8);
-							con->stat = (Character_Stat::Stats)READ(u16);
+							con->stat = (Character_Stats)READ(u16);
 						}break;
 						
 						
@@ -743,10 +743,10 @@ static inline void Load_Campaign_V3(
 	
 	Assert(container->day_event_count <= event_count);
 	
-	container->events = Create_Dynamic_Array<Event_State>(allocator, Max(u32(4), event_count));
+	container->events = Create_Dynamic_Array<Editor_Event>(allocator, Max(u32(4), event_count));
 	container->events->count = event_count;
 	
-	for(Event_State* e = Begin(container->events); e < End(container->events); ++e)
+	for(Editor_Event* e = Begin(container->events); e < End(container->events); ++e)
 	{
 		// -- event name 
 		u32 event_name_lenght = READ(u32);
@@ -848,7 +848,7 @@ static inline void Load_Campaign_V3(
 					{
 						case Participation_Requirement_Type::character_stat:
 						{
-							req->stat_type = READ(Character_Stat::Stats);
+							req->stat_type = READ(Character_Stats);
 						}break;
 						
 						case Participation_Requirement_Type::mark_item:
@@ -931,7 +931,7 @@ static inline void Load_Campaign_V3(
 						case Event_Consequens_Type::stat_change:
 						{
 							con->stat_change_amount = READ(i8);
-							con->stat = READ(Character_Stat::Stats);
+							con->stat = READ(Character_Stats);
 						}break;
 						
 						

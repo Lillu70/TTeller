@@ -53,10 +53,10 @@ struct Game_Player
 {
 	static constexpr i8 starting_stat_value = 2;
 	
-	i8 stats[(u32)Character_Stat::Stats::COUNT];
-	bool alive;
-	
 	Dynamic_Array<Mark_GM>* marks;
+	
+	i8 stats[(u32)Character_Stats::COUNT];
+	bool alive;
 };
 
 
@@ -121,7 +121,7 @@ struct Participation_Requirement_GM
 		
 		struct // For stat requirement.
 		{
-			Character_Stat::Stats stat_type;
+			Character_Stats stat_type;
 		};
 	};
 };
@@ -148,7 +148,7 @@ struct Event_Consequens_GM
 		
 		struct // For stat gain/loss.
 		{
-			Character_Stat::Stats stat;
+			Character_Stats stat;
 		};
 	};
 };

@@ -338,7 +338,7 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 		events_data_size += sizeof(Event_Header) * event_container->events->count;
 		requirements_data_size += sizeof(Req_GM_Header) * event_container->events->count;
 		
-		for(Event_State* e = Begin(event_container->events); e < End(event_container->events); ++e)
+		for(Editor_Event* e = Begin(event_container->events); e < End(event_container->events); ++e)
 		{
 			u32 participant_header_size = sizeof(Participant_Header) * e->participents->count;
 			
@@ -473,7 +473,7 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 	// Slot in the data
 	{
 		u32 i = 0;
-		for(Event_State* e = Begin(event_container->events); e < End(event_container->events); ++e, ++i)
+		for(Editor_Event* e = Begin(event_container->events); e < End(event_container->events); ++e, ++i)
 		{
 			Req_GM_Header* req_header = req_data.push<Req_GM_Header>();
 			
