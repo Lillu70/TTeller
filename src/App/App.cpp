@@ -62,7 +62,7 @@ void Update_App()
 	if(app_wants_to_exit ||
 		s_global_data.force_quit_popup || 
 		(s_hotkeys[Global_Hotkeys::open_quit_popup].Is_Pressed() && 
-		!s_popup_func))
+		!s_global_data.popup_func))
 	{
 		s_global_data.force_quit_popup = false;
 		s_platform.Set_Flag(App_Flags::wants_to_exit, false);
@@ -77,10 +77,10 @@ void Update_App()
 			Set_Popup_Function(Do_Default_Quit_Popup);
 		}
 	}
-	else if(s_hotkeys[Global_Hotkeys::open_quit_popup].Is_Pressed() && s_popup_func)
+	else if(s_hotkeys[Global_Hotkeys::open_quit_popup].Is_Pressed() && s_global_data.popup_func)
 		Close_Popup();
 	
-	if(s_popup_func)
+	if(s_global_data.popup_func)
 	{
 		s_gui.flags |= GUI_Context_Flags::hard_ignore_selection;
 		s_gui_banner.flags |= GUI_Context_Flags::hard_ignore_selection;
@@ -176,9 +176,9 @@ void Update_App()
 		}
 	}
 	
-	if(s_popup_func)
+	if(s_global_data.popup_func)
 	{
-		s_popup_func();
+		Run_Popup_GUI_Frame();
 	}
 	else	
 	{

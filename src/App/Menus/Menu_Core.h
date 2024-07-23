@@ -14,8 +14,6 @@ static GUI_Context s_gui_pop_up;
 
 static constexpr f32 s_post_title_y_spacing = 20;
 
-static void(*s_popup_func)() = 0;
-
 
 // TODO: Figure out where to put these enums
 namespace Global_Hotkeys
@@ -94,6 +92,7 @@ struct Global_Data
 	String new_campaign_name;
 	Dynamic_Array<String>* on_disk_campaign_names = 0;
 	
+	void(*popup_func)(GUI_Context*) = 0;
 	GUI_Theme popup_panel_theme;
 	v2f popup_panel_dim = v2f{0.f, 0.f};
 
@@ -109,7 +108,7 @@ static Game_State s_game_state = {};
 
 static inline void Close_Popup()
 {
-	s_popup_func = 0;
+	s_global_data.popup_func = 0;
 	GUI_Activate_Context(&s_gui_banner);
 }
 
@@ -133,13 +132,14 @@ static inline v2f Get_Title_Bar_Row_Placement(
 }
 
 
-static inline void Set_Popup_Function(void(*popup_function)())
+static inline void Set_Popup_Function(void(*popup_function)(GUI_Context*))
 {
+	s_global_data.popup_panel_rect = Create_Rect_Min_Max_HZ(v2f{0,0}, v2f{0,0});
 	s_global_data.popup_panel_dim = v2f{0.f, 0.f};
 	
 	GUI_Reset_Context(&s_gui_pop_up);
 	GUI_Activate_Context(&s_gui_pop_up);
-	s_popup_func = popup_function;
+	s_global_data.popup_func = popup_function;
 }
 
 
@@ -237,11 +237,11 @@ static void Do_GUI_Frame_With_Banner(
 }
 
 
-static void Do_Popup_GUI_Frame(void(*popup_func)(GUI_Context*), f32 dim_factor = 0.333f)
+static void Run_Popup_GUI_Frame()
 {
-	Assert(popup_func);
+	Assert(s_global_data.popup_func);
 	
-	Dim_Entire_Screen(&s_canvas, dim_factor);
+	Dim_Entire_Screen(&s_canvas, 0.333f);
 
 	BEGIN:
 	GUI_Begin_Context(
@@ -263,7 +263,7 @@ static void Do_Popup_GUI_Frame(void(*popup_func)(GUI_Context*), f32 dim_factor =
 		s_gui_pop_up.theme = &s_theme;
 	}
 	
-	popup_func(&s_gui_pop_up);
+	s_global_data.popup_func(&s_gui_pop_up);
 	
 	if(!panel_prop_set)
 	{

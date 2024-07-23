@@ -7,80 +7,69 @@ static v2f s_player_picture_dim
 	= v2f{s_player_creation_text_box_width, s_player_creation_text_box_width};
 
 
-static void Do_Create_Player_FI_Instruction_Popup()
+static void Do_Create_Player_FI_Instruction_Popup(GUI_Context* context)
 {
-	void(*test)(GUI_Context*) = [](GUI_Context* context)
+	static String instruction_text = {};
+	if(!instruction_text.buffer)
 	{
-		static String instruction_text = {};
-		if(!instruction_text.buffer)
-		{
-			Init_String(&instruction_text, &s_allocator, 
-			"Here is another video inspired by the Deus Ex series!\n"
-			"I hope you all enjoy it.\n"
-			"I love making music like this that has more tense rhythmic elements,\n"
-			"as it\'s closer to a lot of the music I compose for my full time work.\n"
-			"This track feels like the music,\n"
-			"that plays when you are stealthily sneaking around hostile territory,\n"
-			"possibly to hack into a system or quietly take down a target.\n" 
-			"I hope it helps you feel energized and productive!\n"
-			"Please help my channel by sharing, liking, commenting and subscribing!\n"
-			"\n\nSee you in the next one");
-		}
-		
-		v2f title_scale = GUI_DEFAULT_TEXT_SCALE * 1.5f;
-		
-		static constexpr char* title_text = "Pelihahmon luonti ohjeet";
-		v2f d = GUI_Tight_Fit_Text(title_text, &context->theme->font, title_scale);
-		v2f b = v2f{d.y, d.y};
-		
-		context->layout.anchor = GUI_Anchor::center;
-		
-		v2f dim = v2f{d.x + context->theme->padding + b.x, 400.f};
-		GUI_Do_ML_Input_Field(
-			context, 
-			&GUI_AUTO_MIDDLE, 
-			&dim, 
-			&instruction_text,
-			GUI_NO_CHARACTER_LIMIT,
-			GUI_DEFAULT_TEXT_SCALE,
-			GUI_Character_Check_View_Only);
-		
-		context->layout.build_direction = GUI_Build_Direction::up_left;
-		GUI_Do_Title_Text(context, AUTO, title_text, title_scale);
-		
-		context->layout.build_direction = GUI_Build_Direction::right_center;
-		if(GUI_Do_Button(context, AUTO, &b, "X"))
-			Close_Popup();
-		
-		// TODO: Check if this line is neccecary!
-		context->layout.build_direction = GUI_Build_Direction::down_center;
-	};
+		Init_String(&instruction_text, &s_allocator, 
+		"Here is another video inspired by the Deus Ex series!\n"
+		"I hope you all enjoy it.\n"
+		"I love making music like this that has more tense rhythmic elements,\n"
+		"as it\'s closer to a lot of the music I compose for my full time work.\n"
+		"This track feels like the music,\n"
+		"that plays when you are stealthily sneaking around hostile territory,\n"
+		"possibly to hack into a system or quietly take down a target.\n" 
+		"I hope it helps you feel energized and productive!\n"
+		"Please help my channel by sharing, liking, commenting and subscribing!\n"
+		"\n\nSee you in the next one");
+	}
 	
-	Do_Popup_GUI_Frame(test);
+	v2f title_scale = GUI_DEFAULT_TEXT_SCALE * 1.5f;
+	
+	static constexpr char* title_text = "Pelihahmon luonti ohjeet";
+	v2f d = GUI_Tight_Fit_Text(title_text, &context->theme->font, title_scale);
+	v2f b = v2f{d.y, d.y};
+	
+	context->layout.anchor = GUI_Anchor::center;
+	
+	v2f dim = v2f{d.x + context->theme->padding + b.x, 400.f};
+	GUI_Do_ML_Input_Field(
+		context, 
+		&GUI_AUTO_MIDDLE, 
+		&dim, 
+		&instruction_text,
+		GUI_NO_CHARACTER_LIMIT,
+		GUI_DEFAULT_TEXT_SCALE,
+		GUI_Character_Check_View_Only);
+	
+	context->layout.build_direction = GUI_Build_Direction::up_left;
+	GUI_Do_Title_Text(context, AUTO, title_text, title_scale);
+	
+	context->layout.build_direction = GUI_Build_Direction::right_center;
+	if(GUI_Do_Button(context, AUTO, &b, "X"))
+		Close_Popup();
+	
+	// TODO: Check if this line is neccecary!
+	context->layout.build_direction = GUI_Build_Direction::down_center;
 	
 }
 
 
-static void Do_Out_Of_Template_Names_Popup()
+static void Do_Out_Of_Template_Names_Popup(GUI_Context* context)
 {
-	void(*test)(GUI_Context*) = [](GUI_Context* context)
-	{
-		v2f title_scale = GUI_DEFAULT_TEXT_SCALE * 1.5f;
-		
-		GUI_Do_Title_Text(
-			context, 
-			&GUI_AUTO_MIDDLE, 
-			"Hupsis, valmiit nimet loppuivat kesken.", 
-			title_scale);
-		
-		context->layout.build_direction = GUI_Build_Direction::down_center;
-		
-		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Okei :("))
-			Close_Popup();
-		
-	};
+	v2f title_scale = GUI_DEFAULT_TEXT_SCALE * 1.5f;
 	
-	Do_Popup_GUI_Frame(test);
+	GUI_Do_Title_Text(
+		context, 
+		&GUI_AUTO_MIDDLE, 
+		"Hupsis, valmiit nimet loppuivat kesken.", 
+		title_scale);
+	
+	context->layout.build_direction = GUI_Build_Direction::down_center;
+	
+	if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Okei :("))
+		Close_Popup();
 }
 
 
@@ -130,12 +119,15 @@ static void Do_New_Game_Players()
 			Set_Popup_Function(Do_Create_Player_FI_Instruction_Popup);
 		}
 		
-		if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "T\xE4yt\xE4 tyhj\xE4t paikat"))
+		if(s_game_state.player_images->count)
 		{
-			if(!Fill_Empty_Names(&s_game_state, &s_allocator))
+			if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "T\xE4yt\xE4 tyhj\xE4t paikat"))
 			{
-				Set_Popup_Function(Do_Out_Of_Template_Names_Popup);
-			}
+				if(!Fill_Empty_Names(&s_game_state, &s_allocator))
+				{
+					Set_Popup_Function(Do_Out_Of_Template_Names_Popup);
+				}
+			}			
 		}
 		
 		// -- title bar buttons --	

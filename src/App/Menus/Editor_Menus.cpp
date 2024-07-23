@@ -1,9 +1,9 @@
 
 #pragma once
 
-static void Do_Main_Menu_Name_New_Campaign_Popup();
-static void Do_Event_Editor_On_Exit_Popup();
-static void Do_Event_Editor_Delete_Event_Popup();
+static void Do_Main_Menu_Name_New_Campaign_Popup(GUI_Context*);
+static void Do_Event_Editor_On_Exit_Popup(GUI_Context*);
+static void Do_Event_Editor_Delete_Event_Popup(GUI_Context*);
 
 
 static void Do_Event_Editor_All_Events_Frame()
@@ -1357,32 +1357,12 @@ static void Do_Event_Editor_Campaigns_Menu_Frame()
 }
 
 
-static void Do_Event_Editor_On_Exit_Popup()
+static void Do_Event_Editor_On_Exit_Popup(GUI_Context* context)
 {
-	Dim_Entire_Screen(&s_canvas, 0.333f);
-	
-	BEGIN:
-	GUI_Begin_Context(
-		&s_gui_pop_up, 
-		&s_canvas, 
-		&s_global_data.action_context, 
-		&s_theme, 
-		v2i{0, 0}, 
-		GUI_Anchor::top);
-	
-	bool panel_dim_set = s_global_data.popup_panel_dim != v2f{0.f, 0.f};
-	
-	if(panel_dim_set)
-	{
-		s_gui_pop_up.theme = &s_global_data.popup_panel_theme;
-		GUI_Do_Panel(&s_gui_pop_up, &GUI_AUTO_MIDDLE, &s_global_data.popup_panel_dim);
-		s_gui_pop_up.theme = &s_theme;
-	}
-	
 	static constexpr char* text = "Tallenetaanko kampanja?";
-	GUI_Do_Text(&s_gui_pop_up, &GUI_AUTO_MIDDLE, text, {}, GUI_DEFAULT_TEXT_SCALE * 1.5f, true);		
+	GUI_Do_Text(context, &GUI_AUTO_MIDDLE, text, {}, GUI_DEFAULT_TEXT_SCALE * 1.5f, true);		
 	
-	s_gui_pop_up.layout.build_direction = GUI_Build_Direction::down_center;
+	context->layout.build_direction = GUI_Build_Direction::down_center;
 	
 	static constexpr char* t1 = "Peruuta";
 	static constexpr char* t2 = "Tallena ja jatka";
@@ -1390,12 +1370,12 @@ static void Do_Event_Editor_On_Exit_Popup()
 	
 	v2f button_dim = GUI_Tight_Fit_Text(t3, &s_theme.font) + s_theme.padding;
 	
-	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t1))
+	if(GUI_Do_Button(context, AUTO, &button_dim, t1))
 	{
 		Close_Popup();
 	}
 	
-	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t2))
+	if(GUI_Do_Button(context, AUTO, &button_dim, t2))
 	{
 		Serialize_Campaign(s_editor_state.event_container, &s_platform);
 		
@@ -1407,7 +1387,7 @@ static void Do_Event_Editor_On_Exit_Popup()
 		Close_Popup();
 	}
 	
-	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t3))
+	if(GUI_Do_Button(context, AUTO, &button_dim, t3))
 	{
 		Delete_All_Events(&s_editor_state.event_container, &s_allocator);
 		
@@ -1416,45 +1396,15 @@ static void Do_Event_Editor_On_Exit_Popup()
 		
 		Close_Popup();
 	}
-	
-	if(!panel_dim_set)
-	{
-		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(&s_gui_pop_up);
-		s_global_data.popup_panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
-		GUI_End_Context(&s_gui_pop_up);
-		goto BEGIN;
-	}
-	
-	GUI_End_Context(&s_gui_pop_up);
 }
 
 
-static void Do_Event_Editor_Quit_Popup()
-{
-	Dim_Entire_Screen(&s_canvas, 0.333f);
-
-	BEGIN:
-	GUI_Begin_Context(
-		&s_gui_pop_up,
-		&s_canvas, 
-		&s_global_data.action_context, 
-		&s_theme, 
-		v2i{0, 0}, 
-		GUI_Anchor::top);
-	
-	bool panel_dim_set = s_global_data.popup_panel_dim != v2f{0.f, 0.f};
-	
-	if(panel_dim_set)
-	{
-		s_gui_pop_up.theme = &s_global_data.popup_panel_theme;
-		GUI_Do_Panel(&s_gui_pop_up, &GUI_AUTO_MIDDLE, &s_global_data.popup_panel_dim);
-		s_gui_pop_up.theme = &s_theme;
-	}
-	
+static void Do_Event_Editor_Quit_Popup(GUI_Context* context)
+{	
 	static constexpr char* text = "Suljetaanko varmasti?";
-	GUI_Do_Text(&s_gui_pop_up, &GUI_AUTO_MIDDLE, text, {}, GUI_DEFAULT_TEXT_SCALE * 1.5f, true);		
+	GUI_Do_Text(context, &GUI_AUTO_MIDDLE, text, {}, GUI_DEFAULT_TEXT_SCALE * 1.5f, true);		
 	
-	s_gui_pop_up.layout.build_direction = GUI_Build_Direction::down_center;
+	context->layout.build_direction = GUI_Build_Direction::down_center;
 	
 	static constexpr char* t1 = "Peruuta ja jatka";
 	static constexpr char* t2 = "Tallenna ja sulje";
@@ -1462,71 +1412,42 @@ static void Do_Event_Editor_Quit_Popup()
 	
 	v2f button_dim = GUI_Tight_Fit_Text(t3, &s_theme.font) + s_theme.padding;
 	
-	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t1))
+	if(GUI_Do_Button(context, AUTO, &button_dim, t1))
 	{
 		Close_Popup();
 	}
 	
-	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t2))
+	if(GUI_Do_Button(context, AUTO, &button_dim, t2))
 	{
 		Serialize_Campaign(s_editor_state.event_container, &s_platform);
 		s_platform.Set_Flag(App_Flags::is_running, false);
 	}
 	
-	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t3))
+	if(GUI_Do_Button(context, AUTO, &button_dim, t3))
 	{
 		s_platform.Set_Flag(App_Flags::is_running, false);
 	}
-	
-	if(!panel_dim_set)
-	{
-		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(&s_gui_pop_up);
-		s_global_data.popup_panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
-		GUI_End_Context(&s_gui_pop_up);
-		goto BEGIN;
-	}
-	
-	GUI_End_Context(&s_gui_pop_up);
 }
 
-static void Do_Event_Editor_Delete_Event_Popup()
-{
-	Dim_Entire_Screen(&s_canvas, 0.333f);
 
-	BEGIN:
-	GUI_Begin_Context(
-		&s_gui_pop_up,
-		&s_canvas, 
-		&s_global_data.action_context, 
-		&s_theme, 
-		v2i{0, 0}, 
-		GUI_Anchor::top);
-	
-	bool panel_dim_set = s_global_data.popup_panel_dim != v2f{0.f, 0.f};
-	
-	if(panel_dim_set)
-	{
-		s_gui_pop_up.theme = &s_global_data.popup_panel_theme;
-		GUI_Do_Panel(&s_gui_pop_up, &GUI_AUTO_MIDDLE, &s_global_data.popup_panel_dim);
-		s_gui_pop_up.theme = &s_theme;
-	}
-	
+static void Do_Event_Editor_Delete_Event_Popup(GUI_Context* context)
+{
 	static constexpr char* text = "Poistetaanko varmasti?";
-	GUI_Do_Text(&s_gui_pop_up, &GUI_AUTO_MIDDLE, text, {}, GUI_DEFAULT_TEXT_SCALE * 1.5f, true);		
+	GUI_Do_Text(context, &GUI_AUTO_MIDDLE, text, {}, GUI_DEFAULT_TEXT_SCALE * 1.5f, true);		
 	
-	s_gui_pop_up.layout.build_direction = GUI_Build_Direction::down_center;
+	context->layout.build_direction = GUI_Build_Direction::down_center;
 	
 	static constexpr char* t1 = "Peruuta";
 	static constexpr char* t2 = "Poista";
 
 	v2f button_dim = GUI_Tight_Fit_Text(t1, &s_theme.font) + s_theme.padding;
 	
-	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t1))
+	if(GUI_Do_Button(context, AUTO, &button_dim, t1))
 	{
 		Close_Popup();
 	}
 	
-	if(GUI_Do_Button(&s_gui_pop_up, AUTO, &button_dim, t2))
+	if(GUI_Do_Button(context, AUTO, &button_dim, t2))
 	{
 		if(s_editor_state.event_idx_to_delete < s_editor_state.event_container.day_event_count)
 			s_editor_state.event_container.day_event_count -= 1;
@@ -1534,14 +1455,4 @@ static void Do_Event_Editor_Delete_Event_Popup()
 		Delete_Event(s_editor_state.event_container.events, &s_allocator, s_editor_state.event_idx_to_delete);
 		Close_Popup();
 	}
-	
-	if(!panel_dim_set)
-	{
-		Rect bounds = GUI_Get_Bounds_In_Pixel_Space(&s_gui_pop_up);
-		s_global_data.popup_panel_dim = bounds.max - bounds.min + s_gui_pop_up.theme->padding;
-		GUI_End_Context(&s_gui_pop_up);
-		goto BEGIN;
-	}
-	
-	GUI_End_Context(&s_gui_pop_up);
 }
