@@ -12,25 +12,25 @@ It is not thread safe at all.
 
 struct Instrumentation_Cycle_Measurement
 {
-	u64 accumulated_cycle_count = 0;
-	u64 hit_count = 0;
-	u64 total_hit_count = 0;
-	u64 total_cycle_count = 0;
-	u64 lowest_cycle_count = 0;
-	u64 lowest_cycles_per_hit = 0;
+    u64 accumulated_cycle_count = 0;
+    u64 hit_count = 0;
+    u64 total_hit_count = 0;
+    u64 total_cycle_count = 0;
+    u64 lowest_cycle_count = 0;
+    u64 lowest_cycles_per_hit = 0;
 };
 
 
 enum class __Time_Table_Names : u64
 {
-	run_time,
-	internal_run_time,
-	render_glyph,
-	clear_canvas,
-	scale_pixel,
-	set_sub_canvas,
-	img2_pixel,
-	COUNT
+    run_time,
+    internal_run_time,
+    render_glyph,
+    clear_canvas,
+    scale_pixel,
+    set_sub_canvas,
+    img2_pixel,
+    COUNT
 };
 
 
@@ -44,36 +44,36 @@ extern Instrumentation_Cycle_Measurement __timing_table[u64(__Time_Table_Names::
 
 
 static inline void __RECORD_MEASUREMENT(
-	u64 elapsed_cycles, 
-	u64 idx, 
-	char* human_readable_label)
+    u64 elapsed_cycles, 
+    u64 idx, 
+    char* human_readable_label)
 {
-	__timing_table_labels[idx] = human_readable_label;
-	
-	Instrumentation_Cycle_Measurement* icm = __timing_table + idx;
-	icm->accumulated_cycle_count += elapsed_cycles;
-	icm->hit_count += 1;
+    __timing_table_labels[idx] = human_readable_label;
+    
+    Instrumentation_Cycle_Measurement* icm = __timing_table + idx;
+    icm->accumulated_cycle_count += elapsed_cycles;
+    icm->hit_count += 1;
 }
 
 
 struct __Scoped_Timer 
 {
-	__Scoped_Timer(char* _label, u64 _block_idx) : 
-		label(_label), 
-		block_idx(_block_idx), 
-		start_time(Get_CPU_Cycle_Count()) 
-	{
-		
-	}
-	
-	~__Scoped_Timer() // The first and only destructor in the project! Much wow.
-	{
-		__RECORD_MEASUREMENT(Get_CPU_Cycle_Count() - start_time, block_idx, label);
-	}
-	
-	char* label = 0;
-	u64 start_time;
-	u64 block_idx;
+    __Scoped_Timer(char* _label, u64 _block_idx) : 
+        label(_label), 
+        block_idx(_block_idx), 
+        start_time(Get_CPU_Cycle_Count()) 
+    {
+        
+    }
+    
+    ~__Scoped_Timer() // The first and only destructor in the project! Much wow.
+    {
+        __RECORD_MEASUREMENT(Get_CPU_Cycle_Count() - start_time, block_idx, label);
+    }
+    
+    char* label = 0;
+    u64 start_time;
+    u64 block_idx;
 };
 
 

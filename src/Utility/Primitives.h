@@ -49,23 +49,23 @@ static constexpr i8 I8_MAX = 127;
 // TODO: ifdef for platform and endianess.
 union Color
 {
-	u32 as_u32;
-	
-	struct
-	{
-		u8 blue;
-		u8 green;
-		u8 red;
-		u8 alpha;
-	};
-	
-	struct 
-	{
-		u8 b;
-		u8 g;
-		u8 r;
-		u8 a;	
-	};
+    u32 as_u32;
+    
+    struct
+    {
+        u8 blue;
+        u8 green;
+        u8 red;
+        u8 alpha;
+    };
+    
+    struct 
+    {
+        u8 b;
+        u8 g;
+        u8 r;
+        u8 a;
+    };
 };
 
 
@@ -83,6 +83,6 @@ static constexpr Color MAGENTA = { 0xFFFF00FF };
 
 struct Rect
 {
-	v2f min = {};
-	v2f max = {};
+    v2f min = {};
+    v2f max = {};
 };

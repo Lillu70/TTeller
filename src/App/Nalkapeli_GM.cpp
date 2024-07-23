@@ -282,7 +282,7 @@ static Event_Consequens_GM Convert_To_GM(Event_Consequens* con, Mark_Hash_Table*
 			}
 			else
 			{
-				result.inheritance_target = 0;				
+				result.inheritance_target = 0;
 			}
 			
 		}break;
@@ -354,7 +354,7 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 				marks.push(String_View{gmr->mark.buffer, gmr->mark.lenght}, allocator);
 			
 			for(auto gmc = Begin(e->global_mark_cons); gmc < End(e->global_mark_cons); ++gmc)
-				marks.push(String_View{gmc->mark.buffer, gmc->mark.lenght}, allocator);				
+				marks.push(String_View{gmc->mark.buffer, gmc->mark.lenght}, allocator);
 		
 			for(Participent* p = Begin(e->participents); p < End(e->participents); ++p)
 			{ 
@@ -459,7 +459,7 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 	game->events_data = (Event_Header*)mem.push(events_data_size);
 	Linear_Allocator events_data = Create_Linear_Allocator(game->events_data, events_data_size);
 	
-	game->event_table_day = Table{game->req_table_day.count, mem.push(req_table_day_size)};		
+	game->event_table_day = Table{game->req_table_day.count, mem.push(req_table_day_size)};
 	Linear_Allocator event_table_day 
 		= Create_Linear_Allocator(game->event_table_day.memory, req_table_day_size);
 	
@@ -482,7 +482,7 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 				if(i < event_container->day_event_count)
 					*req_table_day.push<u32>() = offset;
 				else
-					*req_table_night.push<u32>() = offset;				
+					*req_table_night.push<u32>() = offset;
 			}
 			
 			req_header->participant_count = e->participents->count;
@@ -500,7 +500,7 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 				if(i < event_container->day_event_count)
 					*event_table_day.push<u32>() = offset;
 				else
-					*event_table_night.push<u32>() = offset;				
+					*event_table_night.push<u32>() = offset;
 			}
 			
 			event_header->event_name = String_View
@@ -514,7 +514,7 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
 			Mem_Copy(event_header->event_name.buffer, e->name.buffer, e->name.lenght + 1);
 			event_header->event_text 
 				= String_View{(char*)events_data.push(e->event_text.lenght + 1), e->event_text.lenght};
-			Mem_Copy(event_header->event_text.buffer, e->event_text.buffer, e->event_text.lenght + 1);			
+			Mem_Copy(event_header->event_text.buffer, e->event_text.buffer, e->event_text.lenght + 1);
 			event_header->size = e->name.lenght + e->event_text.lenght + 2;
 			// ---
 			
@@ -688,7 +688,7 @@ static void Generate_Display_Text(Game_State* game)
 			
 			case Mode::seek_form:
 			{
-				Game_Player_Name_FI* name = Begin(game->player_names) + player_idx;				
+				Game_Player_Name_FI* name = Begin(game->player_names) + player_idx;
 				a_switch = false;
 				a_switch_owerride = name->special_char_override;
 				full_name = &name->full_name;
@@ -704,7 +704,7 @@ static void Generate_Display_Text(Game_State* game)
 							char* dest = game->display_text.buffer + game->display_text.lenght;
 							
 							Mem_Copy(dest, name->variant_name_1.buffer, name->variant_name_1.lenght);
-							game->display_text.lenght += name->variant_name_1.lenght;	
+							game->display_text.lenght += name->variant_name_1.lenght;
 						}
 					}break;
 					
@@ -735,7 +735,7 @@ static void Generate_Display_Text(Game_State* game)
 							char* dest = game->display_text.buffer + game->display_text.lenght;
 							
 							Mem_Copy(dest, name->full_name.buffer, name->full_name.lenght);
-							game->display_text.lenght += name->full_name.lenght;							
+							game->display_text.lenght += name->full_name.lenght;
 						}
 					}
 				}
@@ -764,7 +764,7 @@ static void Generate_Display_Text(Game_State* game)
 							if(c == 'a' && ((lc == '\xE4' || lc == '\xF6') || a_switch_owerride))
 								c = '\xE4';
 							
-							game->display_text += c;							
+							game->display_text += c;
 						}
 					}
 					else
@@ -1252,7 +1252,7 @@ static void Assign_Events_To_Participants(
 				game->event_assignement_table[event_to_test_table_idx] = last_table_entry;
 				
 				Assert(untested_event_count);
-			}			
+			}
 		}
 	}
 	
@@ -1419,7 +1419,7 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
 							Terminate;
 						};
 					}
-				}			
+				}
 			}
 			
 			u32 cons_size = parti_head->count * sizeof(Event_Consequens_GM);

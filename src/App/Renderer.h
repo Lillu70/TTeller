@@ -3,27 +3,27 @@
 
 struct Font
 {
-	u32 char_width = 0;
-	u32 char_height = 0;
-	u8* data_buffer = 0; 	// reqular ascii
-	u8* data_buffer_sc = 0; // äöÄÖ
+    u32 char_width = 0;
+    u32 char_height = 0;
+    u8* data_buffer = 0;     // reqular ascii
+    u8* data_buffer_sc = 0; // äöÄÖ
 };
 
 
 struct Image
 {
-	// TODO: Make this into Color*
-	u8* buffer;
-	v2i dim;
+    // TODO: Make this into Color*
+    u8* buffer;
+    v2i dim;
 };
 
 
 struct Canvas
 {
-	// TODO: Make this into Color*
-	u32* buffer = 0;
-	v2u dim = {};
-	u32 row_stride = 0;
+    // TODO: Make this into Color*
+    u32* buffer = 0;
+    v2u dim = {};
+    u32 row_stride = 0;
 };
 
 
@@ -74,48 +74,48 @@ static void Draw_Vertical_Line(Canvas* canvas, v2f pos, f32 height, Color color)
 static void Draw_Filled_Rect(Canvas* canvas, Rect rect, Color fill_color);
 
 static void Draw_Filled_Rect_With_Outline(
-	Canvas* canvas, 
-	Rect rect,
-	Color fill_color,
-	u32 outline_thickness, 
-	Color outline_color);
+    Canvas* canvas, 
+    Rect rect,
+    Color fill_color,
+    u32 outline_thickness, 
+    Color outline_color);
 
 
 static void Draw_Percentile_Bar(
-	Canvas* canvas, 
-	Rect rect, 
-	Color fill_color,
-	u32 outline_thickness, 
-	Color outline_color,
-	Color bar_color,
-	f32 fill_percent);
+    Canvas* canvas, 
+    Rect rect, 
+    Color fill_color,
+    u32 outline_thickness, 
+    Color outline_color,
+    Color bar_color,
+    f32 fill_percent);
 
 
 static void Draw_Text(
-	Canvas* canvas,
-	u8* text,
-	v2f pos,
-	Color color,
-	Font* font,
-	v2i scale);
+    Canvas* canvas,
+    u8* text,
+    v2f pos,
+    Color color,
+    Font* font,
+    v2i scale);
 
-	
+    
 static void Draw_Text(
-	Canvas* canvas,
-	String_View text,
-	v2f pos,
-	Color color,
-	Font* font,
-	v2f scale);	
+    Canvas* canvas,
+    String_View text,
+    v2f pos,
+    Color color,
+    Font* font,
+    v2f scale);    
 
 
 static void Draw_Glyph(
-	Canvas* canvas,
-	v2f pos,
-	v2f scale,
-	Color color,
-	char character,
-	Font* font);
+    Canvas* canvas,
+    v2f pos,
+    v2f scale,
+    Color color,
+    char character,
+    Font* font);
 
 
 static void Draw_Image(Canvas* canvas, Image* img);

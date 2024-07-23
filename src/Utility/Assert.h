@@ -12,7 +12,7 @@
 #define Release_Call(X)
 
 #else
-	
+
 #define Assert(stament)
 #define DB_Call(X)
 #define Release_Call(X) X

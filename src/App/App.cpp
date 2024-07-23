@@ -36,7 +36,7 @@ void Update_App()
 		if(window_width > 0 && window_height > 0)
 		{
 			u32* pixel_buffer = s_platform.Resize_Pixel_Buffer(window_width, window_height);
-			Init_Canvas(&s_canvas, pixel_buffer, v2u{u32(window_width), u32(window_height)});					
+			Init_Canvas(&s_canvas, pixel_buffer, v2u{u32(window_width), u32(window_height)});
 		}
 		else
 		{
