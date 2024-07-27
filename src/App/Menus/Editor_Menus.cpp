@@ -77,7 +77,7 @@ static void Do_Event_Editor_All_Events_Frame()
             
             Editor_Event* event = buffer + s_editor_state.event_container.day_event_count;
             Init_Event_Takes_Name_Ownership(event, &s_allocator, &unique_name);
-            
+            Update_Editor_Event_Issues(event);
             s_editor_state.event_container.day_event_count += 1;
         }
         
@@ -98,6 +98,7 @@ static void Do_Event_Editor_All_Events_Frame()
             
             Editor_Event* event = Push(&s_editor_state.event_container.events, &s_allocator);
             Init_Event_Takes_Name_Ownership(event, &s_allocator, &unique_name);
+            Update_Editor_Event_Issues(event);
         }
         
         // -- title bar buttons --    
@@ -223,6 +224,13 @@ static void Do_Event_Editor_All_Events_Frame()
         {
             Editor_Event* event = events + i;
             
+            GUI_Theme* theme = context->theme;
+            
+            if(event->issues.errors)
+                context->theme = &s_error_theme;                
+            else if(event->issues.warnings)
+                context->theme = &s_warning_theme;
+            
             // Destroy event
             if(GUI_Do_Button(context, *pos, &GUI_AUTO_FIT, "X"))
             {
@@ -234,13 +242,6 @@ static void Do_Event_Editor_All_Events_Frame()
             GUI_Push_Layout(context);
             
             context->layout.build_direction = GUI_Build_Direction::right_center;
-            
-            GUI_Theme* theme = context->theme;
-            
-            if(event->issues.errors)
-                context->theme = &s_error_theme;                
-            else if(event->issues.warnings)
-                context->theme = &s_warning_theme;
             
             if((event->issues.errors || event->issues.warnings) && 
                 GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "!"))
@@ -1480,5 +1481,10 @@ static void Do_Event_Editor_Display_Active_Event_Errors(GUI_Context* context)
             if(event->issues.warnings & (1 << i))
                 GUI_Do_Text(context, AUTO, (char*)Event_Warnings::names[i]);
         }        
+    }
+    
+    if(GUI_Context::actions[GUI_Menu_Actions::mouse].Is_Pressed())
+    {
+        Close_Popup();
     }
 }

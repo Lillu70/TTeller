@@ -230,6 +230,12 @@ void Update_App()
                 Update_Editor_Event_Text_Issues(event);
             }break;
             
+            case Menus::EE_participants:
+            {
+                Editor_Event* event = Active_Event(&s_editor_state);
+                Update_Editor_Event_Participant_Issues(event);
+            }break;
+            
             case Menus::select_campaign_to_play_menu:
             case Menus::campaigns_menu:
             {

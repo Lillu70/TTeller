@@ -14,9 +14,9 @@ namespace Event_Errors
         text_references_uninvolved_participant          = 1 << 0,
         escape_character_without_valid_followup         = 1 << 1,
         participant_identifier_is_not_a_number          = 1 << 2,
-        contains_impossiple_requirement                 = 1 << 3,
-        death_consequence_with_uninvolved_inheritor     = 1 << 4,
-        has_no_participants                             = 1 << 5
+        has_no_participants                             = 1 << 3,
+        contains_impossiple_requirement                 = 1 << 4,
+        death_consequence_with_uninvolved_inheritor     = 1 << 5
     };
     
     char* names[] = 
@@ -24,9 +24,9 @@ namespace Event_Errors
         "Tapahtumateksti viittaa osallistujaan joka ei ole tapahtumassa mukana!",
         "Merkki (/) ilman hyv\xE4ksytt\xE4v\xE4\xE4 jatko merkki\xE4!",
         "Osallistujan tunnistaja ei ole numero!",
+        "Tapahtumassa ei ole osallitujia!",
         "Sis\xE4lt\xE4\xE4 mahdottoman vaatimuksen!",
-        "Kuolema seuraamus jossa tapahtumaan osallistumaton perij\xE4!",
-        "Tapahtumassa ei ole osallitujia!"
+        "Kuolema seuraamus jossa tapahtumaan osallistumaton perij\xE4!"
     };
 }
 
@@ -45,7 +45,7 @@ namespace Event_Warnings
     {
         "Tapahtumateksti on tyhj\xE4.",
         "Tapahtumateksti ei viittaa jokaiseen osallistujaan.",
-        "Sis/xE4lt/xE4\xE4 merkitsem\xE4tt\xF6m\xE4n vaatimuksen.",
+        "Sis\xE4lt\xE4\xE4 merkitsem\xE4tt\xF6m\xE4n vaatimuksen.",
         "Kuolema seuraamus jossa perij\xE4n\xE4 on itse kuolija."
     };
 }

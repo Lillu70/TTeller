@@ -471,8 +471,79 @@ static void Update_Editor_Event_Text_Issues(Editor_Event* event)
 }
 
 
+static void Update_Editor_Event_Participant_Issues(Editor_Event* event)
+{
+    Editor_Event_Issues issues = event->issues;
+    
+    u32 text_error_mask = 
+        Event_Errors::contains_impossiple_requirement | Event_Errors::has_no_participants;
+    Inverse_Bit_Mask(&issues.errors, text_error_mask);
+    
+    u32 text_warning_mask = Event_Warnings::contains_irrelevant_requirement;
+    Inverse_Bit_Mask(&issues.warnings, text_warning_mask);
+    
+    if(event->participents->count)
+    {
+        for(each(Participent*, parti, event->participents))
+        {
+            for(each(Participation_Requirement*, req, parti->reqs))
+            {
+                bool possible = true;
+                bool relevant = true;
+                
+                switch(req->type)
+                {
+                    case Participation_Requirement_Type::character_stat:
+                    {
+                        if((req->numerical_relation == Numerical_Relation::less_than &&
+                            req->relation_target == 0) ||
+                            (req->numerical_relation == Numerical_Relation::greater_than &&
+                            req->relation_target == 3))
+                        {
+                            possible = false;
+                        }
+                    }break;
+                    
+                    case Participation_Requirement_Type::mark_item:
+                    case Participation_Requirement_Type::mark_personal:
+                    {
+                        if(req->mark_exists == Exists_Statement::does_have && 
+                            req->numerical_relation == Numerical_Relation::less_than &&
+                            req->relation_target == 1)
+                        {
+                            relevant = false;
+                        }
+                    }break;
+                }
+                
+                if(!possible)
+                {
+                    issues.errors |= Event_Errors::contains_impossiple_requirement;
+                    if(issues.warnings & Event_Warnings::contains_irrelevant_requirement)
+                        goto END;
+                }
+                
+                if(!relevant)
+                {
+                    issues.warnings |= Event_Warnings::contains_irrelevant_requirement;
+                    if(issues.errors & Event_Errors::contains_impossiple_requirement)
+                        goto END;
+                }
+            }
+        }
+    }
+    else
+        issues.errors |= Event_Errors::has_no_participants;
+    
+    END:
+    
+    event->issues = issues;
+}
+
+
 static void Update_Editor_Event_Issues(Editor_Event* event)
 {
+    Update_Editor_Event_Participant_Issues(event);
     Update_Editor_Event_Text_Issues(event); 
 }
 
