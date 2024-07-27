@@ -7,6 +7,50 @@ static constexpr char* campaign_file_extension = ".nalkmp";
 static constexpr char* campaign_folder_wildcard_path = "Tiedostot\\Kampanjat\\*.nalkmp";
 
 
+namespace Event_Errors
+{
+    enum T : u32
+    {
+        text_references_uninvolved_participant          = 1 << 0,
+        escape_character_without_valid_followup         = 1 << 1,
+        participant_identifier_is_not_a_number          = 1 << 2,
+        contains_impossiple_requirement                 = 1 << 3,
+        death_consequence_with_uninvolved_inheritor     = 1 << 4,
+        has_no_participants                             = 1 << 5
+    };
+    
+    char* names[] = 
+    {
+        "Tapahtumateksti viittaa osallistujaan joka ei ole tapahtumassa mukana!",
+        "Merkki (/) ilman hyv\xE4ksytt\xE4v\xE4\xE4 jatko merkki\xE4!",
+        "Osallistujan tunnistaja ei ole numero!",
+        "Sis\xE4lt\xE4\xE4 mahdottoman vaatimuksen!",
+        "Kuolema seuraamus jossa tapahtumaan osallistumaton perij\xE4!",
+        "Tapahtumassa ei ole osallitujia!"
+    };
+}
+
+
+namespace Event_Warnings
+{
+    enum T : u32
+    {
+        text_is_empty                                   = 1 << 0,
+        text_does_not_reference_every_participant       = 1 << 1,
+        contains_irrelevant_requirement                 = 1 << 2,
+        death_consequence_with_self_inheriting          = 1 << 3,
+    };
+    
+    char* names[] = 
+    {
+        "Tapahtumateksti on tyhj\xE4.",
+        "Tapahtumateksti ei viittaa jokaiseen osallistujaan.",
+        "Sis/xE4lt/xE4\xE4 merkitsem\xE4tt\xF6m\xE4n vaatimuksen.",
+        "Kuolema seuraamus jossa perij\xE4n\xE4 on itse kuolija."
+    };
+}
+
+
 enum class Exists_Statement : u8
 {
     does_not_have = 0,
@@ -171,15 +215,25 @@ struct Participent
 };
 
 
+struct Editor_Event_Issues
+{
+    u32 errors = 0;
+    u32 warnings = 0;
+};
+
+
 struct Editor_Event
 {
     static constexpr u32 max_participent_count = 100;
+    
     Dynamic_Array<Participent>* participents;
     Dynamic_Array<Global_Mark_Requirement>* global_mark_reqs = 0;
     Dynamic_Array<Global_Mark_Consequence>* global_mark_cons = 0;
     
     String name;
     String event_text;
+    
+    Editor_Event_Issues issues = {};
 };
 
 
@@ -190,4 +244,13 @@ struct Events_Container
     // Day events are stored first, then night events.
     Dynamic_Array<Editor_Event>* events = 0;
     u32 day_event_count = 0;
+};
+
+
+struct Editor_State
+{
+    Events_Container event_container;
+    
+    u32 active_event_index = 0;
+    u32 event_idx_to_delete = 0;
 };

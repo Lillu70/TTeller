@@ -4,7 +4,7 @@
 static void Do_Main_Menu_Name_New_Campaign_Popup(GUI_Context*);
 static void Do_Event_Editor_On_Exit_Popup(GUI_Context*);
 static void Do_Event_Editor_Delete_Event_Popup(GUI_Context*);
-
+static void Do_Event_Editor_Display_Active_Event_Errors(GUI_Context*);
 
 static void Do_Event_Editor_All_Events_Frame()
 {
@@ -218,6 +218,59 @@ static void Do_Event_Editor_All_Events_Frame()
         if(context->canvas->dim.y <= top_offset || canvas_half_width <= border_width_x2)
             return;
         
+        void(*do_event_list)(GUI_Context*, Editor_Event*, v2f**, u32) 
+            = [](GUI_Context* context, Editor_Event* events, v2f** pos, u32 i)
+        {
+            Editor_Event* event = events + i;
+            
+            // Destroy event
+            if(GUI_Do_Button(context, *pos, &GUI_AUTO_FIT, "X"))
+            {
+                s_editor_state.event_idx_to_delete = i;
+                Set_Popup_Function(Do_Event_Editor_Delete_Event_Popup);
+            }
+            *pos = 0;
+            
+            GUI_Push_Layout(context);
+            
+            context->layout.build_direction = GUI_Build_Direction::right_center;
+            
+            GUI_Theme* theme = context->theme;
+            
+            if(event->issues.errors)
+                context->theme = &s_error_theme;                
+            else if(event->issues.warnings)
+                context->theme = &s_warning_theme;
+            
+            if((event->issues.errors || event->issues.warnings) && 
+                GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "!"))
+            {
+                
+                s_editor_state.active_event_index = i;
+                Set_Popup_Function(Do_Event_Editor_Display_Active_Event_Errors);
+            }
+            
+            if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, event->name.buffer))
+            {
+                s_global_data.active_menu = Menus::EE_participants;
+                s_editor_state.active_event_index = i;
+            }
+            
+            context->theme = theme;
+            
+            #if 0
+            
+            char index_text_buffer[12] = {0};
+            GUI_Do_Text(
+                context, 
+                AUTO, 
+                U32_To_Char_Buffer((u8*)&index_text_buffer, i));
+            
+            #endif
+            
+            GUI_Pop_Layout(context);
+        };
+        
         // Day list sub gui
         {
             v2u day_list_buffer_offset = v2u{border_width, border_width};
@@ -236,42 +289,12 @@ static void Do_Event_Editor_All_Events_Frame()
                 &s_theme,
                 day_list_buffer_offset.As<i32>());
             {
-                Editor_Event* begin = Begin(s_editor_state.event_container.events);
+                Editor_Event* events = Begin(s_editor_state.event_container.events);
                 
                 v2f* pos = &GUI_AUTO_TOP_LEFT;
                 for(u32 i = 0; i < s_editor_state.event_container.day_event_count; ++i)
                 {
-                    Editor_Event* e = begin + i;
-                    
-                    // Destroy event
-                    if(GUI_Do_Button(&gui_event_list_day, pos, &GUI_AUTO_FIT, "X"))
-                    {
-                        s_editor_state.event_idx_to_delete = i;
-                        Set_Popup_Function(Do_Event_Editor_Delete_Event_Popup);
-                    }
-                    pos = 0;
-                    
-                    GUI_Push_Layout(&gui_event_list_day);
-                    
-                    gui_event_list_day.layout.build_direction = GUI_Build_Direction::right_center;
-                    
-                    if(GUI_Do_Button(&gui_event_list_day, AUTO, &GUI_AUTO_FIT, e->name.buffer))
-                    {
-                        s_global_data.active_menu = Menus::EE_participants;
-                        s_editor_state.active_event_index = i;
-                    }
-                    
-                    #if 1
-                    
-                    char index_text_buffer[12] = {0};
-                    GUI_Do_Text(
-                        &gui_event_list_day, 
-                        AUTO, 
-                        U32_To_Char_Buffer((u8*)&index_text_buffer, i));
-                    
-                    #endif
-                    
-                    GUI_Pop_Layout(&gui_event_list_day);
+                    do_event_list(&gui_event_list_day, events, &pos, i);
                 }
                 
             }
@@ -296,43 +319,13 @@ static void Do_Event_Editor_All_Events_Frame()
                 &s_theme,
                 night_list_buffer_offset.As<i32>());
             {
-                Editor_Event* begin = Begin(s_editor_state.event_container.events);
+                Editor_Event* events = Begin(s_editor_state.event_container.events);
                 
                 v2f* pos = &GUI_AUTO_TOP_LEFT;
                 for(u32 i = s_editor_state.event_container.day_event_count; 
                     i < s_editor_state.event_container.events->count; ++i)
                 {
-                    Editor_Event* e = begin + i;
-                    
-                    // Destroy event
-                    if(GUI_Do_Button(&gui_event_list_night, pos, &GUI_AUTO_FIT, "X"))
-                    {
-                        s_editor_state.event_idx_to_delete = i;
-                        Set_Popup_Function(Do_Event_Editor_Delete_Event_Popup);
-                    }
-                    pos = 0;
-                    
-                    GUI_Push_Layout(&gui_event_list_night);
-                    
-                    gui_event_list_night.layout.build_direction = GUI_Build_Direction::right_center;
-                    
-                    if(GUI_Do_Button(&gui_event_list_night, AUTO, &GUI_AUTO_FIT, e->name.buffer))
-                    {
-                        s_global_data.active_menu = Menus::EE_participants;
-                        s_editor_state.active_event_index = i;
-                    }
-                    
-                    #if 1
-                    
-                    char index_text_buffer[12] = {0};
-                    GUI_Do_Text(
-                        &gui_event_list_night, 
-                        AUTO, 
-                        U32_To_Char_Buffer((u8*)&index_text_buffer, i));
-                    
-                    #endif
-                    
-                    GUI_Pop_Layout(&gui_event_list_night);
+                    do_event_list(&gui_event_list_night, events, &pos, i);
                 }
                 
             }
@@ -373,7 +366,7 @@ static void Do_Event_Editor_Participants_Frame()
         
         GUI_Do_Spacing(context, v2f{0, s_post_title_y_spacing});
         
-        Editor_Event* event = Begin(s_editor_state.event_container.events) + s_editor_state.active_event_index;
+        Editor_Event* event = Active_Event(&s_editor_state);
         if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lis\xE4\xE4 uusi osallistuja"))
         {
             s_gui.flags |= GUI_Context_Flags::maxout_horizontal_slider;
@@ -429,7 +422,7 @@ static void Do_Event_Editor_Participants_Frame()
     
     void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
     {
-        Editor_Event* event = Begin(s_editor_state.event_container.events) + s_editor_state.active_event_index;
+        Editor_Event* event = Active_Event(&s_editor_state);
     
         static constexpr f32 collumn_min_width = 300;
         f32 padding = context->theme->padding;
@@ -756,7 +749,7 @@ static void Do_Event_Editor_Text_Frame()
 {
     void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
     {
-        Editor_Event* event = Begin(s_editor_state.event_container.events) + s_editor_state.active_event_index;
+        Editor_Event* event = Active_Event(&s_editor_state);
         
         v2f title_scale = v2f{4.f, 4.f};
         Font* font = &context->theme->font;
@@ -1381,7 +1374,6 @@ static void Do_Event_Editor_On_Exit_Popup(GUI_Context* context)
         
         Delete_All_Events(&s_editor_state.event_container, &s_allocator);
         
-        Gather_Editor_Format_Campaigns();
         s_global_data.active_menu = Menus::campaigns_menu;
         
         Close_Popup();
@@ -1391,7 +1383,6 @@ static void Do_Event_Editor_On_Exit_Popup(GUI_Context* context)
     {
         Delete_All_Events(&s_editor_state.event_container, &s_allocator);
         
-        Gather_Editor_Format_Campaigns();
         s_global_data.active_menu = Menus::campaigns_menu;
         
         Close_Popup();
@@ -1454,5 +1445,40 @@ static void Do_Event_Editor_Delete_Event_Popup(GUI_Context* context)
         
         Delete_Event(s_editor_state.event_container.events, &s_allocator, s_editor_state.event_idx_to_delete);
         Close_Popup();
+    }
+}
+
+
+static void Do_Event_Editor_Display_Active_Event_Errors(GUI_Context* context)
+{
+    context->layout.build_direction = GUI_Build_Direction::down_center;
+    context->layout.anchor = GUI_Anchor::center;
+    
+    Editor_Event* event = Active_Event(&s_editor_state);
+    
+    v2f* pos = &GUI_AUTO_MIDDLE;
+    
+    if(event->issues.errors)
+    {
+        GUI_Do_Text(context, pos, "Virheet:");
+        pos = 0;
+        
+        for(u32 i = 0; i < Array_Lenght(Event_Errors::names); ++i)
+        {
+            if(event->issues.errors & (1 << i))
+                GUI_Do_Text(context, AUTO, (char*)Event_Errors::names[i]);
+        }
+        
+    }
+    
+    if(event->issues.warnings)
+    {
+        GUI_Do_Text(context, pos, "Varoitukset:");
+        
+        for(u32 i = 0; i < Array_Lenght(Event_Warnings::names); ++i)
+        {
+            if(event->issues.warnings & (1 << i))
+                GUI_Do_Text(context, AUTO, (char*)Event_Warnings::names[i]);
+        }        
     }
 }

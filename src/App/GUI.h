@@ -23,14 +23,14 @@ static thread_local u32 GUI_NO_CHARACTER_LIMIT  = 0;
 
 struct GUI_Theme
 {
-    Color selected_color = Make_Color(250, 220, 115);
-    Color background_color = Make_Color(20, 20, 20);
-    Color down_color = Make_Color(50, 50, 50);
-    Color outline_color = Make_Color(110, 110, 130);
-    Color text_color = WHITE;
-    Color widget_text_color = MAGENTA;
-    Color title_color = Make_Color(210, 210, 230);
-    Color write_cursor_color = BLACK;
+    Color selected_color        = Make_Color(250, 220, 115);
+    Color background_color      = Make_Color(20, 20, 20);
+    Color down_color            = Make_Color(50, 50, 50);
+    Color outline_color         = Make_Color(110, 110, 130);
+    Color text_color            = WHITE;
+    Color widget_text_color     = MAGENTA;
+    Color title_color           = Make_Color(210, 210, 230);
+    Color write_cursor_color    = BLACK;
     Color write_cursor_limit_color = RED;
     
     u32 outline_thickness = 2;
@@ -202,18 +202,18 @@ namespace GUI_Context_Flags
 {
     enum : u32
     {
-        soft_ignore_selection         = 1 << 0, // Makes it so that nothing is selected, but mouse selection is still possible to exit this state.
-        enable_dynamic_sliders         = 1 << 1,
-        cursor_mask_validation         = 1 << 2,
-        cursor_mask_enabled         = 1 << 3,
-        disable_wrapping             = 1 << 4,
-        disable_kc_navigation         = 1 << 5,
-        disable_mouse_scroll         = 1 << 6,
-        context_ready                 = 1 << 7,
-        maxout_vertical_slider         = 1 << 8,
-        maxout_horizontal_slider    = 1 << 9,
-        hard_ignore_selection        = 1 << 10, // Makes it so that nothing is selected and to leave this state this flag has to manually set to 0.
-        one_time_skip_padding         = 1 << 11
+        soft_ignore_selection           = 1 << 0, // Makes it so that nothing is selected, but mouse selection is still possible to exit this state.
+        enable_dynamic_sliders          = 1 << 1,
+        cursor_mask_validation          = 1 << 2,
+        cursor_mask_enabled             = 1 << 3,
+        disable_wrapping                = 1 << 4,
+        disable_kc_navigation           = 1 << 5,
+        disable_mouse_scroll            = 1 << 6,
+        context_ready                   = 1 << 7,
+        maxout_vertical_slider          = 1 << 8,
+        maxout_horizontal_slider        = 1 << 9,
+        hard_ignore_selection           = 1 << 10, // Makes it so that nothing is selected and to leave this state this flag has to manually set to 0.
+        one_time_skip_padding           = 1 << 11
     }; // max shift is 31
 }
 

@@ -20,7 +20,7 @@
 
 static Allocator_Shell s_allocator;
 static Paged_General_Allocator s_mem;
-static Linear_Allocator s_serialization_lalloc = {};
+static Linear_Allocator s_scrach_buffer = {};
 
 #include "Terminus_Font.h"
 

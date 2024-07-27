@@ -41,17 +41,17 @@ static bool Load_Image_Raw(
 {
     *out_img = {};
     
-    s_serialization_lalloc.clear();
+    s_scrach_buffer.clear();
     
     bool result = false;
     
     u32 buffer_size = 0;
     if(platform->Get_File_Size((const char*)path, &buffer_size))
     {
-        if(s_serialization_lalloc.capacity < buffer_size)
-            s_serialization_lalloc.init(platform, buffer_size);
+        if(s_scrach_buffer.capacity < buffer_size)
+            s_scrach_buffer.init(platform, buffer_size);
         
-        u8* file_buffer = (u8*)s_serialization_lalloc.push(buffer_size);
+        u8* file_buffer = (u8*)s_scrach_buffer.push(buffer_size);
         
         if(platform->Read_File(path, file_buffer, buffer_size))
         {

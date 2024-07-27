@@ -8,6 +8,9 @@ static Color s_banner_background_color  = Make_Color(40, 40, 40);
 static Color s_list_bg_color            = Make_Color(10, 10, 10);
 
 static GUI_Theme s_theme = {};
+static GUI_Theme s_error_theme = {};
+static GUI_Theme s_warning_theme = {};
+
 static GUI_Context s_gui;
 static GUI_Context s_gui_banner;
 static GUI_Context s_gui_pop_up;
@@ -73,16 +76,6 @@ enum class Menus : u32
 };
 
 
-struct Editor_State
-{
-    Events_Container event_container;
-    
-    u32 active_event_index = 0;
-    u32 event_idx_to_delete = 0;
-};
-static Editor_State s_editor_state;
-
-
 struct Global_Data
 {
     Action_Context action_context = Action_Context();
@@ -104,6 +97,7 @@ static Global_Data s_global_data = Global_Data();
 
 
 static Game_State s_game_state = {};
+static Editor_State s_editor_state = {};
 
 
 static inline void Close_Popup()
@@ -337,7 +331,8 @@ static inline void Init_GUI()
     s_theme.font.data_buffer_sc = (u8*)&s_terminus_font_special_characters[0];
     s_theme.font.char_width = s_terminus_font_char_width;
     s_theme.font.char_height = s_terminus_font_char_height;
-
+    
+    // CONSIDER: Why am I doing this like this again??? Just to flext with the lambda call?
     s_global_data.popup_panel_theme = [](GUI_Theme* global_theme)
     { 
         GUI_Theme result = *global_theme;
@@ -345,6 +340,20 @@ static inline void Init_GUI()
         result.outline_color = global_theme->selected_color;
         return result;
     }(&s_theme);
+    
+    s_warning_theme = s_theme;
+    {
+        s_warning_theme.selected_color      = Make_Color(128, 0, 0);
+        s_warning_theme.background_color    = Make_Color(255, 255, 128);
+        s_warning_theme.outline_color       = Make_Color(234, 143, 21);
+    }
+    
+    s_error_theme = s_theme;
+    {
+        s_error_theme.selected_color        = Make_Color(128, 0, 0);
+        s_error_theme.background_color      = Make_Color(180, 70, 70);
+        s_error_theme.outline_color         = Make_Color(255, 235, 235);
+    }
 }
 
 

@@ -86,7 +86,6 @@ static void Do_New_Game_Players()
                 Delete_Game(&s_game_state, &s_allocator);
             
             s_global_data.active_menu = Menus::select_campaign_to_play_menu;
-            Gather_Editor_Format_Campaigns();
             return;
         }
         

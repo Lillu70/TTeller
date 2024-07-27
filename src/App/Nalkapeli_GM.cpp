@@ -640,7 +640,6 @@ static void Generate_Display_Text(Game_State* game)
     Mode mode = Mode::search;
     
     String_View number_view = {};
-    u32 participant_idx = 0;
     u32 player_idx = 0;
     bool a_switch = 0;
     bool a_switch_owerride;
@@ -678,7 +677,7 @@ static void Generate_Display_Text(Game_State* game)
                 {
                     cptr -= 1; // NOTE GO back!
                     
-                    participant_idx = Convert_String_View_Into_U32(number_view) - 1;
+                    u32 participant_idx = Convert_String_View_Into_U32(number_view) - 1;
                     Assert(participant_idx < event_ref->participant_count);
                     
                     player_idx = *(event_ref->player_indices + participant_idx);

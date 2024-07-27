@@ -12,7 +12,7 @@ void Init_App(Platform_Calltable platform_calltable)
     s_platform = platform_calltable;
     Generate_Folder_Hierarchy(&s_platform);
     {
-        s_serialization_lalloc.init(&s_platform, MiB);
+        s_scrach_buffer.init(&s_platform, MiB);
         s_mem.init(&s_platform, 1);
     }
     Init_GUI();
@@ -220,6 +220,32 @@ void Update_App()
         GUI_Reset_Context(&s_gui_banner);
         
         GUI_Activate_Context(&s_gui_banner);
+        
+        // Handle leaving a menu.
+        switch(current_menu)
+        {
+            case Menus::EE_text:
+            {
+                Editor_Event* event = Active_Event(&s_editor_state);
+                Update_Editor_Event_Text_Issues(event);
+            }break;
+            
+            case Menus::select_campaign_to_play_menu:
+            case Menus::campaigns_menu:
+            {
+                Clear_Editor_Format_Campaigns();
+            }break;
+        }
+        
+        // Handle entering a menu.
+        switch(s_global_data.active_menu)
+        {            
+            case Menus::select_campaign_to_play_menu:
+            case Menus::campaigns_menu:
+            {
+                Gather_Editor_Format_Campaigns();
+            }break;
+        }
     }
     
     #if 1
@@ -231,6 +257,8 @@ void Update_App()
     }
     
     #endif
+    
+    s_scrach_buffer.clear();
     
     End_Timing_Block(internal_run_time);
 }

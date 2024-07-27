@@ -2,6 +2,13 @@
 #pragma once
 
 
+static inline Editor_Event* Active_Event(Editor_State* editor)
+{
+    Editor_Event* result = Begin(editor->event_container.events) + editor->active_event_index;
+    return result;
+}
+
+
 static inline void Generate_Folder_Hierarchy(Platform_Calltable* platform)
 {
     if(!platform->Create_Directory(data_folder_path))
@@ -40,7 +47,9 @@ static void Make_Global_Mark_Consequence_Hollow(Global_Mark_Consequence* gmc)
 }
 
 
-static inline Participent* Create_Participent(Dynamic_Array<Participent>** darray, Allocator_Shell* allocator)
+static inline Participent* Create_Participent(
+    Dynamic_Array<Participent>** darray, 
+    Allocator_Shell* allocator)
 {
     Participent* new_parti = Push(darray, allocator);
     new_parti->reqs = Create_Dynamic_Array<Participation_Requirement>(allocator, 3);
@@ -337,6 +346,137 @@ static String Create_Campaign_Full_Path(
 }
 
 
+static void Update_Editor_Event_Text_Issues(Editor_Event* event)
+{
+    Editor_Event_Issues issues = event->issues;
+    
+    u32 text_error_mask = 
+        Event_Errors::text_references_uninvolved_participant |
+        Event_Errors::escape_character_without_valid_followup |
+        Event_Errors::participant_identifier_is_not_a_number;
+    Inverse_Bit_Mask(&issues.errors, text_error_mask);
+    
+    u32 text_warning_mask = 
+        Event_Warnings::text_is_empty | 
+        Event_Warnings::text_does_not_reference_every_participant;
+    Inverse_Bit_Mask(&issues.warnings, text_warning_mask);
+    
+    if(event->event_text.lenght)
+    {
+        u32 array_size = sizeof(bool) * event->participents->count;
+        bool* player_referenced_array = (bool*)s_scrach_buffer.push(array_size);
+        Mem_Zero(player_referenced_array, array_size);
+        
+        enum class Mode
+        {
+            search,
+            seek_number,
+            seek_space,
+            seek_form,
+            seek_bender
+        };
+        Mode mode = Mode::search;
+        String_View number_view = {};
+        
+        for(char* cptr = event->event_text.buffer; *cptr; ++cptr)
+        {
+            char c = *cptr;
+            switch(mode)
+            {
+                case Mode::search:
+                {
+                    if(c == '/')
+                    {
+                        cptr += 1;
+                        switch(*cptr)
+                        {
+                            case 'K':
+                            case 'k':
+                            {
+                                number_view.buffer = cptr + 1;
+                                if(*number_view.buffer >= '0' && *number_view.buffer <= '9')
+                                {
+                                    number_view.lenght = 0;
+                                    mode = Mode::seek_number;                                    
+                                }
+                                else
+                                {
+                                    issues.errors |= Event_Errors::participant_identifier_is_not_a_number;
+                                    mode = Mode::seek_space;
+                                }
+                                
+                            }break;
+                            
+                            default:
+                            {
+                                issues.errors |= Event_Errors::escape_character_without_valid_followup;
+                            }
+                        }
+                    }
+                    
+                }break;
+                
+                case Mode::seek_space:
+                {
+                    if(c == ' ' || c == '\n')
+                    {
+                        mode = Mode::search;
+                    }
+                }break;
+                
+                case Mode::seek_number:
+                {
+                    char c2 = *(cptr + 1);
+                    
+                    if(c < '0' || c > '9' || c2 == 0)
+                    {
+                        if(c2)
+                            cptr -= 1; // NOTE GO back!
+                        else
+                            number_view.lenght += 1;
+                        
+                        u32 participant_idx = Convert_String_View_Into_U32(number_view) - 1;
+                        
+                        if(participant_idx < event->participents->count)
+                            *(player_referenced_array + participant_idx) = true;
+                        else
+                            issues.errors |= Event_Errors::text_references_uninvolved_participant;
+                        
+                        mode = Mode::seek_space;
+                    }
+                    else
+                    {
+                        number_view.lenght += 1;
+                    }
+                }break;
+            }
+        }
+        
+        for(u32 i = 0; i < event->participents->count; ++i)
+        {
+            if(!*(player_referenced_array + i))
+            {
+                issues.warnings |= Event_Warnings::text_does_not_reference_every_participant;
+                break;
+            }
+        }
+    }
+    else
+    {
+        issues.warnings |= Event_Warnings::text_is_empty;
+        issues.warnings |= Event_Warnings::text_does_not_reference_every_participant;
+    }
+    
+    event->issues = issues;
+}
+
+
+static void Update_Editor_Event_Issues(Editor_Event* event)
+{
+    Update_Editor_Event_Text_Issues(event); 
+}
+
+
 static void Serialize_Campaign(
     Events_Container event_container,
     Platform_Calltable* platform)
@@ -351,7 +491,7 @@ static void Serialize_Campaign(
     
     #define WRITE(X, type)\
     {\
-        void* adrs = s_serialization_lalloc.safe_push(sizeof(type));\
+        void* adrs = s_scrach_buffer.safe_push(sizeof(type));\
         if(adrs != 0)\
         {\
             *(type*)adrs = X;\
@@ -364,7 +504,7 @@ static void Serialize_Campaign(
     
     #define WRITE_BLOCK(copy_buffer, copy_amount)\
     {\
-        void* adrs = s_serialization_lalloc.safe_push(copy_amount);\
+        void* adrs = s_scrach_buffer.safe_push(copy_amount);\
         if(adrs != 0)\
         {\
             Mem_Copy((u8*)adrs, copy_buffer, copy_amount);\
@@ -377,7 +517,7 @@ static void Serialize_Campaign(
     
     Assert(event_container.campaign_name.buffer);
     
-    s_serialization_lalloc.clear();
+    s_scrach_buffer.clear();
     
     u32 version = 3;
     WRITE(version, u32);
@@ -514,10 +654,10 @@ static void Serialize_Campaign(
         }
     }
     
-    u32 buffer_size = s_serialization_lalloc.get_used_capacity();
+    u32 buffer_size = s_scrach_buffer.get_used_capacity();
     if(buffer_size)
     {
-        // TODO: Use a part of the s_serialization_lalloc allocation for the full path buffer,
+        // TODO: Use a part of the s_scrach_buffer allocation for the full path buffer,
         // to avoid this allocation bussines.
         
         String full_path = Create_Campaign_Full_Path(
@@ -527,7 +667,7 @@ static void Serialize_Campaign(
         
         bool success = platform->Write_File(
             full_path.buffer, 
-            (u8*)s_serialization_lalloc.memory, 
+            (u8*)s_scrach_buffer.memory, 
             buffer_size);
         
         Assert(success);
@@ -536,9 +676,9 @@ static void Serialize_Campaign(
     return;
     
     OUT_OF_MEMORY:
-    Assert(s_serialization_lalloc.capacity);
+    Assert(s_scrach_buffer.capacity);
     
-    s_serialization_lalloc.init(platform, s_serialization_lalloc.capacity * 2);
+    s_scrach_buffer.init(platform, s_scrach_buffer.capacity * 2);
     Serialize_Campaign(event_container, platform);
 }
 
@@ -746,26 +886,28 @@ static inline void Load_Campaign_V3(
     container->events = Create_Dynamic_Array<Editor_Event>(allocator, Max(u32(4), event_count));
     container->events->count = event_count;
     
-    for(Editor_Event* e = Begin(container->events); e < End(container->events); ++e)
+    for(each(Editor_Event*, event, container->events))
     {
         // -- event name 
         u32 event_name_lenght = READ(u32);
         if(event_name_lenght)
         {
             char* event_name_buffer = READ_TEXT(event_name_lenght);    
-            Init_String(&e->name, allocator, event_name_buffer, event_name_lenght);
+            Init_String(&event->name, allocator, event_name_buffer, event_name_lenght);
         }
         else
         {
-            Init_String(&e->name, allocator, u32(0));
+            Init_String(&event->name, allocator, u32(0));
         }
         
         // -- event reqs
         u32 global_req_count = READ(u32);
-        e->global_mark_reqs 
+        
+        event->global_mark_reqs 
             = Create_Dynamic_Array<Global_Mark_Requirement>(allocator, Max(u32(4), global_req_count));
-        e->global_mark_reqs->count = global_req_count;
-        for(Global_Mark_Requirement* gmr = Begin(e->global_mark_reqs); gmr < End(e->global_mark_reqs); ++gmr)
+        event->global_mark_reqs->count = global_req_count;
+        
+        for(each(Global_Mark_Requirement*, gmr, event->global_mark_reqs))
         {
             gmr->mark_exists = READ(Exists_Statement);
             gmr->relation_target = READ(i8);
@@ -784,10 +926,11 @@ static inline void Load_Campaign_V3(
         
         // -- event cons
         u32 global_con_count = READ(u32);
-        e->global_mark_cons 
+        event->global_mark_cons 
             = Create_Dynamic_Array<Global_Mark_Consequence>(allocator, Max(u32(4), global_con_count));
-        e->global_mark_cons->count = global_con_count;
-        for(Global_Mark_Consequence* gmc = Begin(e->global_mark_cons); gmc < End(e->global_mark_cons); ++gmc)
+        event->global_mark_cons->count = global_con_count;
+        
+        for(each(Global_Mark_Consequence*, gmc, event->global_mark_cons))
         {
             gmc->mark_duration = READ(i8);
             u32 mark_lenght = READ(u32);
@@ -807,18 +950,18 @@ static inline void Load_Campaign_V3(
         if(event_text_lenght)
         {
             char* event_text_buffer = READ_TEXT(event_text_lenght);
-            Init_String(&e->event_text, allocator, event_text_buffer, event_text_lenght);
+            Init_String(&event->event_text, allocator, event_text_buffer, event_text_lenght);
         }
         else
         {
-            Init_String(&e->event_text, allocator, u32(0));
+            Init_String(&event->event_text, allocator, u32(0));
         }
         
         // -- participents
         u32 participent_count = READ(u32);
-        e->participents = Create_Dynamic_Array<Participent>(allocator, Max(u32(4), participent_count));
-        e->participents->count = participent_count;
-        Participent* parti_buffer = Begin(e->participents);
+        event->participents = Create_Dynamic_Array<Participent>(allocator, Max(u32(4), participent_count));
+        event->participents->count = participent_count;
+        Participent* parti_buffer = Begin(event->participents);
         
         for(u32 p = 0; p < participent_count; ++p)
         {
@@ -834,9 +977,7 @@ static inline void Load_Campaign_V3(
                 
                 participent->reqs->count = req_count;
                 
-                Participation_Requirement* begin = Begin(participent->reqs);
-                Participation_Requirement* end = End(participent->reqs);
-                for(Participation_Requirement* req = begin; req < end; ++req)
+                for(each(Participation_Requirement*, req, participent->reqs))
                 {
                     *req = {};
                     req->type = READ(Participation_Requirement_Type);
@@ -943,6 +1084,9 @@ static inline void Load_Campaign_V3(
                 }
             }
         }
+
+        event->issues = {};
+        Update_Editor_Event_Issues(event);
     }
 }
 
@@ -959,12 +1103,12 @@ static bool Load_Campaign(
     bool load_successful = false;
     if(platform->Get_File_Size(full_path.buffer, &buffer_size))
     {
-        s_serialization_lalloc.clear();
+        s_scrach_buffer.clear();
         
-        if(s_serialization_lalloc.get_free_capacity() < buffer_size)
-            s_serialization_lalloc.init(platform, buffer_size);
+        if(s_scrach_buffer.get_free_capacity() < buffer_size)
+            s_scrach_buffer.init(platform, buffer_size);
         
-        u8* buffer = (u8*)s_serialization_lalloc.push(buffer_size);
+        u8* buffer = (u8*)s_scrach_buffer.push(buffer_size);
         u32 read_head = 0;
         
         *container = {};
