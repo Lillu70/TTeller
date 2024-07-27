@@ -188,7 +188,9 @@ struct Game_State
         Event_Header* events_data;
         Table event_table_day;
         Table event_table_night;
-        // -------------------------------------
+    // -------------------------------------
+    
+    
     
     // -------------------------------------------------------------------
     // Player data create after all players have been entered ------------
@@ -221,13 +223,13 @@ struct Game_State
     Dynamic_Array<Event>* active_events;
     
     String display_text;
-    
+    String seed_input;
     // ----------------------------------------
     
     u32 day_counter;
     f64 night_falls_start_time;
     
-    static inline Random_Machine rm;
+    Random_Machine rm;
     static inline f64 night_falls_time = 1.5;
 };
 

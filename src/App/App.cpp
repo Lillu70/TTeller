@@ -15,8 +15,6 @@ void Init_App(Platform_Calltable platform_calltable)
         s_serialization_lalloc.init(&s_platform, MiB);
         s_mem.init(&s_platform, 1);
     }
-    
-    Random_Machine::seed = i32(Round(f32(s_platform.Get_Time_Stamp())));
     Init_GUI();
 }
 

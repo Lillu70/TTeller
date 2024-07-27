@@ -1,24 +1,24 @@
 
 #pragma once
 
-static thread_local v2f GUI_AUTO_FIT             = v2f{0, 0};
-
+static thread_local v2f GUI_AUTO_FIT            = v2f{0, 0};
+    
 static thread_local v2f GUI_AUTO_TOP_CENTER     = v2f{0, 0};
-static thread_local v2f GUI_AUTO_TOP_RIGHT         = v2f{0, 0};
-static thread_local v2f GUI_AUTO_TOP_LEFT         = v2f{0, 0};
-
-static thread_local v2f GUI_AUTO_MIDDLE_RIGHT    = v2f{0, 0};
+static thread_local v2f GUI_AUTO_TOP_RIGHT      = v2f{0, 0};
+static thread_local v2f GUI_AUTO_TOP_LEFT       = v2f{0, 0};
+    
+static thread_local v2f GUI_AUTO_MIDDLE_RIGHT   = v2f{0, 0};
 static thread_local v2f GUI_AUTO_MIDDLE_LEFT    = v2f{0, 0};
-
-static thread_local v2f GUI_AUTO_BOTTOM_CENTER     = v2f{0, 0};
-static thread_local v2f GUI_AUTO_BOTTOM_RIGHT     = v2f{0, 0};
-static thread_local v2f GUI_AUTO_BOTTOM_LEFT     = v2f{0, 0};
-
+    
+static thread_local v2f GUI_AUTO_BOTTOM_CENTER  = v2f{0, 0};
+static thread_local v2f GUI_AUTO_BOTTOM_RIGHT   = v2f{0, 0};
+static thread_local v2f GUI_AUTO_BOTTOM_LEFT    = v2f{0, 0};
+    
 static thread_local v2f GUI_AUTO_MIDDLE         = v2f{0, 0};
-
-static thread_local v2f GUI_DEFAULT_TEXT_SCALE     = v2f{2, 2};
-
-static thread_local u32 GUI_NO_CHARACTER_LIMIT     = 0;
+    
+static thread_local v2f GUI_DEFAULT_TEXT_SCALE  = v2f{2, 2};
+    
+static thread_local u32 GUI_NO_CHARACTER_LIMIT  = 0;
 
 
 struct GUI_Theme

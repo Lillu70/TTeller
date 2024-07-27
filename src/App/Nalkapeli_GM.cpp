@@ -316,6 +316,7 @@ static Event_Consequens_GM Convert_To_GM(Event_Consequens* con, Mark_Hash_Table*
 static bool Convert_Editor_Campaign_Into_Game_Format(
     Game_State* game,
     Events_Container* event_container,
+    Platform_Calltable* platform,
     Allocator_Shell* allocator)
 {
     Assert(game);
@@ -585,6 +586,11 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
     
     Init_String(&game->display_text, allocator, 1);
     
+    char seed_buffer[12] = {0};
+    char* init_seed = U32_To_Char_Buffer((u8*)&seed_buffer, (u32)platform->Get_Time_Stamp());
+    
+    Init_String(&game->seed_input, allocator, init_seed);
+    
     return result;
 }
 
@@ -798,9 +804,15 @@ static inline void Hollow_Game_Player(Game_Player* player, Allocator_Shell* allo
 
 static void Delete_Game(Game_State* game, Allocator_Shell* allocator)
 {
+    if(game->total_player_count)
+    {
+        for(u32 i = 0; i < game->total_player_count; ++i)
+            Hollow_Game_Player(game->players + i, allocator);
+        
+        allocator->free(game->players);
+    }
+    
     allocator->free(game->memory);
-    allocator->free(game->global_marks);
-    game->display_text.free();
     
     for(Player_Image* i = Begin(game->player_images); i < End(game->player_images); ++i)
     {
@@ -817,18 +829,15 @@ static void Delete_Game(Game_State* game, Allocator_Shell* allocator)
 
     allocator->free(game->player_names);
     
-    if(game->total_player_count)
-    {
-        for(u32 i = 0; i < game->total_player_count; ++i)
-            Hollow_Game_Player(game->players + i, allocator);
-        
-        allocator->free(game->players);
-    }
-    
     for(each(Event*, e, game->active_events))
         allocator->free(e->player_indices);
     
     allocator->free(game->active_events);
+    allocator->free(game->global_marks);
+    
+    game->display_text.free();
+    game->seed_input.free();
+    
     *game = {};
 }
 
@@ -847,16 +856,28 @@ static void Reset_Game(Game_State* game, Allocator_Shell* allocator)
     game->player_images->count = game->total_player_count;
     game->player_names->count = game->total_player_count;
     
+    game->total_player_count = 0;
     game->live_player_count = 0;
     game->global_marks->count = 0;
 }
 
 
-static void Begin_Game(Game_State* game, Allocator_Shell* allocator)
+static void Begin_Game(Game_State* game, Platform_Calltable* platform, Allocator_Shell* allocator)
 {
     Assert(!game->live_player_count);
     Assert(!game->players);
     Assert(game->player_images->count);
+    
+    game->rm.noise_position = 0;
+    if(game->seed_input.lenght)
+    {
+        String_View seed_input_view = Create_String_View(&game->seed_input);
+        game->rm.seed = (i32)Convert_String_View_Into_U32(seed_input_view);
+    }
+    else
+    {
+        game->rm.seed = (i32)platform->Get_Time_Stamp();
+    }
     
     // NOTE: Using the images array as that is application language agnostic.
     
@@ -1195,6 +1216,8 @@ static void Assign_Events_To_Participants(
                     parti = (Participant_Header*)((u8*)parti + reqs_size + sizeof(Participant_Header));
                 }
                 
+                
+                // Commit!
                 if(filled_slot_count == req_header->participant_count)
                 {
                     // Remove selected players from the pool.
@@ -1212,6 +1235,7 @@ static void Assign_Events_To_Participants(
                                 unassigned_player_count -= 1;
                                 u32 last_entry = game->player_assignement_table[unassigned_player_count];
                                 game->player_assignement_table[a] = last_entry;
+                                
                                 game->player_assignement_table[unassigned_player_count] = U32_MAX;
                                 
                                 player_found = true;
@@ -1221,7 +1245,6 @@ static void Assign_Events_To_Participants(
                         Assert(player_found);
                         
                     }
-                    // Commit!
                     
                     Event* e = Push(&game->active_events, allocator);
                     
@@ -1335,25 +1358,26 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
             {
                 Mark_GM m;
                 m.type = Mark_Type::global;
-                m.idx = gcon->mark_idx;
                 m.duration = gcon->mark_duration;
+                m.idx = gcon->mark_idx;
                 
                 *Push(&game->global_marks, allocator) = m;
             }
         }
         
         u32 offset = event_header->global_con_count * sizeof(Global_Mark_Consequence_GM);
-            
+        
         Participant_Header* parti_head = (Participant_Header*)((u8*)gcon_begin + offset);
+        // NOTE: parti_head count referes to the amount of consequences per participant.
+        
         for(u32 p = 0; p < event_ref->participant_count; ++p)
         {
             if(parti_head->count)
             {
-                Event_Consequens_GM* cons = (Event_Consequens_GM*)(parti_head + 1);
-                
                 u32 slot = *(event_ref->player_indices + p);
                 Game_Player* player = game->players + slot;
                 
+                Event_Consequens_GM* cons = (Event_Consequens_GM*)(parti_head + 1);
                 for(u32 c = 0; c < parti_head->count; ++c)
                 {
                     Event_Consequens_GM* con = cons + c;
@@ -1362,6 +1386,8 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
                     {
                         case Event_Consequens_Type::death:
                         {
+                            player->alive = false;
+                            
                             // CONSIDER: is there a reason to defer item inheritance?
                             if(con->inheritance_target)
                             {
@@ -1373,14 +1399,12 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
                                 Assert(inheritor);
                                 Assert(inheritor != player);
                                 
-                                for(each(Mark_GM*, m, player->marks))
+                                for(each(Mark_GM*, mark, player->marks))
                                 {
-                                    if(m->type == Mark_Type::item)
-                                        Give_Player_Mark(inheritor, *m, allocator);
+                                    if(mark->type == Mark_Type::item)
+                                        Give_Player_Mark(inheritor, *mark, allocator);
                                 }
                             }
-                            
-                            player->alive = false;
                         }break;
                         
                         case Event_Consequens_Type::stat_change:
@@ -1427,13 +1451,23 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
         }
     }
     
+    
     // Cull dead players.
+    // NOTE: This will sometimes result in incorrect player death display order.
+    // If multiple people die in same set they will show up in creation order not event display order.
+    
+    // CONSIDER: There is no simple fix to this, that I can think of. But is it worth fixing?
+    
     for(u32 i = 0; i < game->live_player_count; ++i)
     {
         Game_Player* player = game->players + i;
         if(!player->alive)
         {
             game->live_player_count -= 1;
+            
+            // Unordered remove of all the player components.
+            // NOTE: The underdered darray function can't be used here, since it does the 
+            // removing based on live player count not the actual array count.
             
             // ---
             Game_Player* last_player = game->players + game->live_player_count;
@@ -1450,6 +1484,7 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
             *player_name = *last_player_name;
             *last_player_name = temp_player_name;
             // ---
+            
             
             // ---
             Player_Image* player_images = Begin(game->player_images); 
@@ -1468,19 +1503,21 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
 
 static void Tickdown_Marks(Game_State* game)
 {
-    Mark_GM* gmarks = Begin(game->global_marks);
-    
-    for(u32 i = 0; i < game->global_marks->count; ++i)
     {
-        Mark_GM* gmark = gmarks + i;
-        if(gmark->duration)
+        Mark_GM* gmarks = Begin(game->global_marks);
+        
+        for(u32 i = 0; i < game->global_marks->count; ++i)
         {
-            gmark->duration -= 1;
-            if(!gmark->duration)
+            Mark_GM* gmark = gmarks + i;
+            if(gmark->duration)
             {
-                Unordered_Remove(game->global_marks, i--);
+                gmark->duration -= 1;
+                if(!gmark->duration)
+                {
+                    Unordered_Remove(game->global_marks, i--);
+                }
             }
-        }
+        }        
     }
     
     
@@ -1492,10 +1529,10 @@ static void Tickdown_Marks(Game_State* game)
         for(u32 i = 0; i < player->marks->count; ++i)
         {
             Mark_GM* mark = marks + i;
-            if(mark->duration)
+            if(mark->duration > 0)
             {
                 mark->duration -= 1;
-                if(!mark->duration)
+                if(mark->duration == 0)
                 {
                     Unordered_Remove(player->marks, i--);
                 }

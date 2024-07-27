@@ -82,11 +82,11 @@ static void Do_New_Game_Players()
         v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
         if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
         {
-            s_global_data.active_menu = Menus::main_menu;
-            
             if(s_game_state.memory)
                 Delete_Game(&s_game_state, &s_allocator);
             
+            s_global_data.active_menu = Menus::select_campaign_to_play_menu;
+            Gather_Editor_Format_Campaigns();
             return;
         }
         
@@ -123,12 +123,27 @@ static void Do_New_Game_Players()
         {
             if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "T\xE4yt\xE4 tyhj\xE4t paikat"))
             {
+                s_game_state.rm.seed = (i32)s_platform.Get_Time_Stamp();
+                
                 if(!Fill_Empty_Names(&s_game_state, &s_allocator))
                 {
                     Set_Popup_Function(Do_Out_Of_Template_Names_Popup);
                 }
             }            
         }
+        
+        GUI_Do_Text(context, AUTO, "Siemennys:", GUI_Highlight_Next(context));
+        context->flags |= GUI_Context_Flags::one_time_skip_padding;
+        
+        f32 width = 100;
+        GUI_Do_SL_Input_Field(
+            context, 
+            AUTO, 
+            &width, 
+            &s_game_state.seed_input, 
+            11, 
+            GUI_DEFAULT_TEXT_SCALE,
+            GUI_Character_Check_Numbers_Only);
         
         // -- title bar buttons --    
         f32 padding = context->theme->padding;
@@ -137,17 +152,14 @@ static void Do_New_Game_Players()
         
         f32 w1 = GUI_Tight_Fit_Text(start_game_text, font).x + padding;
         
-        f32 buttons_width = w1 + context->dynamic_slider_girth + padding * 2;
+        f32 buttons_width = w1 + context->dynamic_slider_girth + padding * 3;
         v2f title_row_pos = Get_Title_Bar_Row_Placement(context, title_max_x, padding, buttons_width);
         
         v2f dim = v2f{w1, title_height};
         
         b32 live_player_count = s_game_state.player_names->count; 
-        if(live_player_count > 1 && 
-            GUI_Do_Button(context, &title_row_pos, &dim, start_game_text))
-        {
+        if(live_player_count > 1 && GUI_Do_Button(context, &title_row_pos, &dim, start_game_text))
             s_global_data.active_menu = Menus::GM_let_the_games_begin;
-        }
         
     }; // ----------------------------------------------------------------------------------------
 
@@ -353,7 +365,7 @@ static void Do_Let_The_Games_Begin_Frame()
         if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Aloita peli!"))
         {
             s_global_data.active_menu = Menus::GM_day_counter;
-            Begin_Game(&s_game_state, &s_allocator);
+            Begin_Game(&s_game_state, &s_platform, &s_allocator);
         }
         
         context->layout.anchor = GUI_Anchor::top_left;
@@ -920,6 +932,7 @@ static void Do_Select_Campagin_To_Play_Frame()
                         if(Convert_Editor_Campaign_Into_Game_Format(
                             &game_state,
                             &editor_format_campagin,
+                            &s_platform,
                             &s_allocator))
                         {
                             if(s_game_state.memory)

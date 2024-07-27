@@ -2241,7 +2241,6 @@ static u32 GUI_Do_Dropdown_Button(
 }
 
 
-// TODO: Scroll bar understanding is much improved, so redo that code: this should also fix the related bug.
 static bool GUI_Do_SL_Input_Field(
     GUI_Context* context, 
     v2f* pos, 

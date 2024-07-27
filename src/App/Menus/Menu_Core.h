@@ -4,8 +4,8 @@
 #define AUTO 0
 
 static Color s_background_color         = Make_Color(20, 20, 20);
-static Color s_banner_background_color     = Make_Color(40, 40, 40);
-static Color s_list_bg_color             = Make_Color(10, 10, 10);
+static Color s_banner_background_color  = Make_Color(40, 40, 40);
+static Color s_list_bg_color            = Make_Color(10, 10, 10);
 
 static GUI_Theme s_theme = {};
 static GUI_Context s_gui;

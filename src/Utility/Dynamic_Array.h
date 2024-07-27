@@ -37,14 +37,14 @@ static Dynamic_Array<T>* Create_Dynamic_Array(Allocator_Shell* allocator, u32 ca
 
 
 template<typename T>
-static T* Begin(Dynamic_Array<T>* darray)
+static inline T* Begin(Dynamic_Array<T>* darray)
 {
     return (T*)(darray + 1);
 }
 
 
 template<typename T>
-static T* End(Dynamic_Array<T>* darray)
+static inline T* End(Dynamic_Array<T>* darray)
 {
     return (T*)(darray + 1) + darray->count;
 }
@@ -91,5 +91,6 @@ static void Unordered_Remove(Dynamic_Array<T>* darray_ptr, u32 idx_to_remove)
     T* slot_to_remove = buffer + idx_to_remove;
     T* last_element = buffer + darray_ptr->count;
     
-    *last_element = *slot_to_remove;
+    *slot_to_remove = *last_element;
+    //*last_element = *slot_to_remove;
 }
