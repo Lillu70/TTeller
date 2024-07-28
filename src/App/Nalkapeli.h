@@ -6,6 +6,8 @@ static constexpr char* campaigns_folder_path = "Tiedostot\\Kampanjat\\";
 static constexpr char* campaign_file_extension = ".nalkmp";
 static constexpr char* campaign_folder_wildcard_path = "Tiedostot\\Kampanjat\\*.nalkmp";
 
+static constexpr i8 STAT_MINIMUM = 0;
+static constexpr i8 STAT_MAXIMUM = 3;
 
 namespace Event_Errors
 {
@@ -16,7 +18,9 @@ namespace Event_Errors
         participant_identifier_is_not_a_number          = 1 << 2,
         has_no_participants                             = 1 << 3,
         contains_impossiple_requirement                 = 1 << 4,
-        death_consequence_with_uninvolved_inheritor     = 1 << 5
+        cotaints_empty_mark_field_in_requirements       = 1 << 5,
+        cotaints_empty_mark_field_in_consequences       = 1 << 6,
+        death_consequence_with_uninvolved_inheritor     = 1 << 7,
     };
     
     char* names[] = 
@@ -26,6 +30,8 @@ namespace Event_Errors
         "Osallistujan tunnistaja ei ole numero!",
         "Tapahtumassa ei ole osallitujia!",
         "Sis\xE4lt\xE4\xE4 mahdottoman vaatimuksen!",
+        "Sis\xE4lt\xE4\xE4 tyhj\xE4n merkki kent\xE4n vaatimuksissa!",
+        "Sis\xE4lt\xE4\xE4 tyhj\xE4n merkki kent\xE4n seuraamuksissa!",
         "Kuolema seuraamus jossa tapahtumaan osallistumaton perij\xE4!"
     };
 }
@@ -39,6 +45,7 @@ namespace Event_Warnings
         text_does_not_reference_every_participant       = 1 << 1,
         contains_irrelevant_requirement                 = 1 << 2,
         death_consequence_with_self_inheriting          = 1 << 3,
+        death_consequence_with_zero_as_inheritor        = 1 << 4,
     };
     
     char* names[] = 
@@ -46,7 +53,8 @@ namespace Event_Warnings
         "Tapahtumateksti on tyhj\xE4.",
         "Tapahtumateksti ei viittaa jokaiseen osallistujaan.",
         "Sis\xE4lt\xE4\xE4 merkitsem\xE4tt\xF6m\xE4n vaatimuksen.",
-        "Kuolema seuraamus jossa perij\xE4n\xE4 on itse kuolija."
+        "Kuolema seuraamus jossa perij\xE4n\xE4 on itse kuolija.",
+        "Kuolema seuraamus jossa perij\xE4n\xE4 on nolla."
     };
 }
 

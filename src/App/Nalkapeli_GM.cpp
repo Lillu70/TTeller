@@ -383,11 +383,11 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
         }
     }
     
-    alloc_size += requirements_data_size;                    // req data
-    alloc_size += events_data_size;                            // events data
+    alloc_size += requirements_data_size;                       // req data
+    alloc_size += events_data_size;                             // events data
     
-    alloc_size += sizeof(u32) * marks.unique_element_count; // mark table
-    alloc_size += marks.total_unique_string_lenght;            // mark data
+    alloc_size += sizeof(u32) * marks.unique_element_count;     // mark table
+    alloc_size += marks.total_unique_string_lenght;             // mark data
     
     game->memory = allocator->push(alloc_size);
     Linear_Allocator mem = Create_Linear_Allocator(game->memory, alloc_size);
@@ -551,18 +551,6 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
         }
     }
     
-    #if 0 // Test Code!
-    {
-        Table mark_table = game->mark_table;
-        char* mark_data = game->mark_data;
-        
-        for(u32 i = 0; i < mark_table.count; ++i)
-        {
-            char* buffer = mark_data + *((u32*)mark_table.memory + i);
-            int a = 0;
-        }
-    }
-    #endif
     Free_Mark_Hash_Table(&marks, allocator);
     
     Assert(!req_data.get_free_capacity());
@@ -1387,21 +1375,21 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
                         {
                             player->alive = false;
                             
-                            // CONSIDER: is there a reason to defer item inheritance?
                             if(con->inheritance_target)
                             {
                                 u32 target_idx = con->inheritance_target - 1;
                                 u32 islot = *(event_ref->player_indices + target_idx);
                                 Game_Player* inheritor = game->players + islot;    
 
-                                
                                 Assert(inheritor);
-                                Assert(inheritor != player);
                                 
-                                for(each(Mark_GM*, mark, player->marks))
+                                if(inheritor != player)
                                 {
-                                    if(mark->type == Mark_Type::item)
-                                        Give_Player_Mark(inheritor, *mark, allocator);
+                                    for(each(Mark_GM*, mark, player->marks))
+                                    {
+                                        if(mark->type == Mark_Type::item)
+                                            Give_Player_Mark(inheritor, *mark, allocator);
+                                    }                                    
                                 }
                             }
                         }break;
@@ -1410,7 +1398,7 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
                         {
                             i8* stat = player->stats + u32(con->stat);
                             *stat += con->change_amount;
-                            *stat = Max(i8(0), Min(*stat, i8(3)));
+                            *stat = Max(STAT_MINIMUM, Min(*stat, STAT_MAXIMUM));
                         }break;
                         
                         case Event_Consequens_Type::gains_mark:
@@ -1465,9 +1453,11 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
             game->live_player_count -= 1;
             
             // Unordered remove of all the player components.
-            // NOTE: The underdered darray function can't be used here, since it does the 
+            // NOTE: The underdered remove darray function can't be used here, since it does the 
             // removing based on live player count not the actual array count.
-            
+            // Additionally The underdered remove function would override data. For replay we don't want that.
+           
+           
             // ---
             Game_Player* last_player = game->players + game->live_player_count;
             Game_Player temp_player = *player;

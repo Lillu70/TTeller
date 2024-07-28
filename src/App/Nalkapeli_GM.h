@@ -262,29 +262,29 @@ struct Game_State
     
     | - Campaign name buffer
     
-    | - mark data -> All referenced tags in a sequence.                ; sizeof(all mark texts combined)
+    | - mark data -> All referenced tags in a sequence.               ; sizeof(all mark texts combined)
     
     | - mark table -> Contains offsets to the beging of each mark.    ; sizeof(u32 * mark count)
     
-    | - req data -> All requirements grouped by event, then by         ; sizeof(Req_GM_Header * Event count + Global_Mark_Requirement_GM * count + Participation_Requirement_GM * count)
+    | - req data -> All requirements grouped by event, then by        ; sizeof(Req_GM_Header * Event count + Global_Mark_Requirement_GM * count + Participation_Requirement_GM * count)
         participant. First is stored a Req_GM_Header, it is
         followed by amount of Global_Mark_Requirement_GM's and 
         Participation_Requirement_GM's defined by the header and
         seperated by Participant_Headers
     
-    | - req table day -> Containts byte offsets from                 ; sizeof(u32 * event_count_day)
+    | - req table day -> Containts byte offsets from                  ; sizeof(u32 * event_count_day)
         the req data ptr to the Req_GM_Headers indexed by event.
         
     
     | - req table night -> Containts offsets to the Req_GM_Headers    ; sizeof(u32 * event_count_night)
         indexed by event.
     
-    | - events data -> All Events_Headers global- and participant    ; sizeof(Event_Header * Event count + event_text_lenght + event_name_lenght + Global_Mark_Consequence_GM * count + Event_Consequens_GM * count)
+    | - events data -> All Events_Headers global- and participant     ; sizeof(Event_Header * Event count + event_text_lenght + event_name_lenght + Global_Mark_Consequence_GM * count + Event_Consequens_GM * count)
         consequences. Event name- and text are listed first.
     
     | - event table day -> Containts offsets to Event_Headers.        ; sizeof(u32 * day event count)
 
-    | - event table night -> Containts offsets to Event_Headers.    ; sizeof(u32 * night event count)
+    | - event table night -> Containts offsets to Event_Headers.      ; sizeof(u32 * night event count)
 */
 
 

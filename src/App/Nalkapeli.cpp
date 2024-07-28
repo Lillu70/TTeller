@@ -354,11 +354,13 @@ static void Update_Editor_Event_Text_Issues(Editor_Event* event)
         Event_Errors::text_references_uninvolved_participant |
         Event_Errors::escape_character_without_valid_followup |
         Event_Errors::participant_identifier_is_not_a_number;
+    
     Inverse_Bit_Mask(&issues.errors, text_error_mask);
     
     u32 text_warning_mask = 
         Event_Warnings::text_is_empty | 
         Event_Warnings::text_does_not_reference_every_participant;
+    
     Inverse_Bit_Mask(&issues.warnings, text_warning_mask);
     
     if(event->event_text.lenght)
@@ -476,10 +478,14 @@ static void Update_Editor_Event_Participant_Issues(Editor_Event* event)
     Editor_Event_Issues issues = event->issues;
     
     u32 text_error_mask = 
-        Event_Errors::contains_impossiple_requirement | Event_Errors::has_no_participants;
+        Event_Errors::contains_impossiple_requirement | 
+        Event_Errors::has_no_participants | 
+        Event_Errors::cotaints_empty_mark_field_in_requirements;
+    
     Inverse_Bit_Mask(&issues.errors, text_error_mask);
     
     u32 text_warning_mask = Event_Warnings::contains_irrelevant_requirement;
+    
     Inverse_Bit_Mask(&issues.warnings, text_warning_mask);
     
     if(event->participents->count)
@@ -488,19 +494,16 @@ static void Update_Editor_Event_Participant_Issues(Editor_Event* event)
         {
             for(each(Participation_Requirement*, req, parti->reqs))
             {
-                bool possible = true;
-                bool relevant = true;
-                
                 switch(req->type)
                 {
                     case Participation_Requirement_Type::character_stat:
                     {
                         if((req->numerical_relation == Numerical_Relation::less_than &&
-                            req->relation_target == 0) ||
+                            req->relation_target == STAT_MINIMUM) ||
                             (req->numerical_relation == Numerical_Relation::greater_than &&
-                            req->relation_target == 3))
+                            req->relation_target == STAT_MAXIMUM))
                         {
-                            possible = false;
+                            issues.errors |= Event_Errors::contains_impossiple_requirement;
                         }
                     }break;
                     
@@ -509,25 +512,15 @@ static void Update_Editor_Event_Participant_Issues(Editor_Event* event)
                     {
                         if(req->mark_exists == Exists_Statement::does_have && 
                             req->numerical_relation == Numerical_Relation::less_than &&
-                            req->relation_target == 1)
+                            req->relation_target == STAT_MINIMUM + 1)
                         {
-                            relevant = false;
+                            issues.warnings |= Event_Warnings::contains_irrelevant_requirement;
                         }
+                        
+                        if(!req->mark.lenght)
+                            issues.errors |= Event_Errors::cotaints_empty_mark_field_in_requirements;
+                    
                     }break;
-                }
-                
-                if(!possible)
-                {
-                    issues.errors |= Event_Errors::contains_impossiple_requirement;
-                    if(issues.warnings & Event_Warnings::contains_irrelevant_requirement)
-                        goto END;
-                }
-                
-                if(!relevant)
-                {
-                    issues.warnings |= Event_Warnings::contains_irrelevant_requirement;
-                    if(issues.errors & Event_Errors::contains_impossiple_requirement)
-                        goto END;
                 }
             }
         }
@@ -535,8 +528,78 @@ static void Update_Editor_Event_Participant_Issues(Editor_Event* event)
     else
         issues.errors |= Event_Errors::has_no_participants;
     
-    END:
+    event->issues = issues;
+}
+
+
+static void Update_Editor_Event_Consequence_Issues(Editor_Event* event)
+{
+    Editor_Event_Issues issues = event->issues;
     
+    u32 text_error_mask = 
+        Event_Errors::cotaints_empty_mark_field_in_consequences | 
+        Event_Errors::death_consequence_with_uninvolved_inheritor;
+    
+    Inverse_Bit_Mask(&issues.errors, text_error_mask);
+    
+    u32 text_warning_mask = 
+        Event_Warnings::death_consequence_with_self_inheriting | 
+        Event_Warnings::death_consequence_with_zero_as_inheritor;
+    
+    Inverse_Bit_Mask(&issues.warnings, text_warning_mask);
+    
+    u32 i = 0;
+    for(each(Participent*, parti, event->participents))
+    {
+        for(each(Event_Consequens*, con, parti->cons))
+        {
+            switch(con->type)
+            {
+                case Event_Consequens_Type::death:
+                {
+                    if(con->items_are_inherited)
+                    {
+                        if(con->str.lenght)
+                        {
+                            String_View number_view = Create_String_View(&con->str);
+                            u32 inheritor = Convert_String_View_Into_U32(number_view);
+                            if(inheritor)
+                            {
+                                u32 inheritor_idx = inheritor - 1;
+                                if(inheritor_idx >= event->participents->count)
+                                {
+                                    issues.errors |= Event_Errors::death_consequence_with_uninvolved_inheritor;
+                                }
+                                else if(inheritor_idx == i)
+                                {
+                                    issues.warnings |= Event_Warnings::death_consequence_with_self_inheriting;
+                                }
+                            }
+                            else
+                            {
+                                issues.warnings |= Event_Warnings::death_consequence_with_zero_as_inheritor;
+                            }
+                        }
+                        else
+                        {
+                            issues.warnings |= Event_Warnings::death_consequence_with_zero_as_inheritor;                    
+                        }                        
+                    }
+                }break;
+                
+                case Event_Consequens_Type::gains_mark:
+                case Event_Consequens_Type::loses_mark:
+                {
+                    if(!con->str.lenght)
+                        issues.errors |= Event_Errors::cotaints_empty_mark_field_in_consequences;
+                    
+                }break;
+            }
+        }
+        
+        i += 1;
+    }
+
     event->issues = issues;
 }
 
@@ -544,7 +607,8 @@ static void Update_Editor_Event_Participant_Issues(Editor_Event* event)
 static void Update_Editor_Event_Issues(Editor_Event* event)
 {
     Update_Editor_Event_Participant_Issues(event);
-    Update_Editor_Event_Text_Issues(event); 
+    Update_Editor_Event_Text_Issues(event);
+    Update_Editor_Event_Consequence_Issues(event);
 }
 
 
