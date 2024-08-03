@@ -13,14 +13,17 @@ namespace Event_Errors
 {
     enum T : u32
     {
-        text_references_uninvolved_participant          = 1 << 0,
-        escape_character_without_valid_followup         = 1 << 1,
-        participant_identifier_is_not_a_number          = 1 << 2,
-        has_no_participants                             = 1 << 3,
-        contains_impossiple_requirement                 = 1 << 4,
-        cotaints_empty_mark_field_in_requirements       = 1 << 5,
-        cotaints_empty_mark_field_in_consequences       = 1 << 6,
-        death_consequence_with_uninvolved_inheritor     = 1 << 7,
+        text_references_uninvolved_participant           = 1 << 0,
+        escape_character_without_valid_followup          = 1 << 1,
+        participant_identifier_is_not_a_number           = 1 << 2,
+        has_no_participants                              = 1 << 3,
+        contains_impossiple_requirement                  = 1 << 4,
+        contains_impossiple_global_requirement           = 1 << 5,
+        cotaints_empty_mark_field_in_requirements        = 1 << 6,
+        cotaints_empty_mark_field_in_global_requirements = 1 << 7,
+        cotaints_empty_mark_field_in_consequences        = 1 << 8,
+        cotaints_empty_mark_field_in_global_consequences = 1 << 9,
+        death_consequence_with_uninvolved_inheritor      = 1 << 10,
     };
     
     char* names[] = 
@@ -30,8 +33,11 @@ namespace Event_Errors
         "Osallistujan tunnistaja ei ole numero!",
         "Tapahtumassa ei ole osallitujia!",
         "Sis\xE4lt\xE4\xE4 mahdottoman vaatimuksen!",
+        "Sis\xE4lt\xE4\xE4 mahdottoman yleis vaatimuksen!",
         "Sis\xE4lt\xE4\xE4 tyhj\xE4n merkki kent\xE4n vaatimuksissa!",
+        "Sis\xE4lt\xE4\xE4 tyhj\xE4n merkki kent\xE4n yleis vaatimuksissa!",
         "Sis\xE4lt\xE4\xE4 tyhj\xE4n merkki kent\xE4n seuraamuksissa!",
+        "Sis\xE4lt\xE4\xE4 tyhj\xE4n merkki kent\xE4n yleis seuraamuksissa!",
         "Kuolema seuraamus jossa tapahtumaan osallistumaton perij\xE4!"
     };
 }
@@ -261,4 +267,11 @@ struct Editor_State
     
     u32 active_event_index = 0;
     u32 event_idx_to_delete = 0;
+};
+
+
+struct Invalid_Event_Filter_Result
+{
+    String name;
+    u32 reasons;
 };

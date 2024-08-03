@@ -7,6 +7,11 @@ static v2f s_player_picture_dim
     = v2f{s_player_creation_text_box_width, s_player_creation_text_box_width};
 
 
+static void Do_Load_Failed_Popup(GUI_Context* context);
+static void Free_Invalid_Event_Filter_Result_Memory();
+static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context);
+
+
 static void Do_Create_Player_FI_Instruction_Popup(GUI_Context* context)
 {
     static String instruction_text = {};
@@ -926,6 +931,18 @@ static void Do_Select_Campagin_To_Play_Frame()
                     Events_Container editor_format_campagin;
                     if(Load_Campaign(&editor_format_campagin, save_name, &s_allocator, &s_platform))
                     {
+                        Dynamic_Array<Invalid_Event_Filter_Result>* filter_results = 
+                            Unordered_Filter_Prolematic_Events(&editor_format_campagin, &s_allocator);
+                        
+                        if(filter_results)
+                        {
+                            Set_Popup_Function(Do_Display_Invalid_Event_Filter_Results_Popup);
+                            s_global_data.on_popup_close = Free_Invalid_Event_Filter_Result_Memory;
+                            
+                            Assert(!s_global_data.IEFR);
+                            s_global_data.IEFR = filter_results;
+                        }
+                        
                         Game_State game_state;
                 
                         if(Convert_Editor_Campaign_Into_Game_Format(
@@ -938,10 +955,16 @@ static void Do_Select_Campagin_To_Play_Frame()
                                 Delete_Game(&s_game_state, &s_allocator);
                             
                             s_game_state = game_state;
-                            s_global_data.active_menu = Menus::GM_players;
+                            
+                            if(!s_global_data.IEFR)
+                                s_global_data.active_menu = Menus::GM_players;
                         }
 
-                        Delete_All_Events(&editor_format_campagin, &s_allocator);
+                        Delete_Event_Container(&editor_format_campagin, &s_allocator);
+                    }
+                    else
+                    {
+                        Set_Popup_Function(Do_Load_Failed_Popup);
                     }
                 }
             }
@@ -950,4 +973,54 @@ static void Do_Select_Campagin_To_Play_Frame()
     }; // ----------------------------------------------------------------------------------------
 
     Do_GUI_Frame_With_Banner(banner_func, menu_func, 100);
+}
+
+
+static void Do_Load_Failed_Popup(GUI_Context* context)
+{
+    context->layout.anchor = GUI_Anchor::bottom;
+    context->layout.build_direction = GUI_Build_Direction::down_center;
+    
+    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, "Jokin meni m\xF6nk\xE4\xE4n!");
+    GUI_Do_Text(context, AUTO, "Kampanjaa ei voitu ladata.");
+    
+    GUI_Do_Spacing(context, v2f{0, 20});
+    
+    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "OK"))
+    {
+        Close_Popup();
+    }
+}
+
+
+static void Free_Invalid_Event_Filter_Result_Memory()
+{
+    Assert(s_global_data.IEFR);
+    
+    Hollow_Invalid_Event_Filter_Results(s_global_data.IEFR);
+    s_allocator.free(s_global_data.IEFR);
+    
+    s_global_data.IEFR = 0;
+}
+
+
+static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
+{
+    Assert(s_global_data.IEFR);
+    
+    context->layout.anchor = GUI_Anchor::bottom;
+    context->layout.build_direction = GUI_Build_Direction::down_left;
+    
+    char* text = "Kamppania sis\xE4lsi viallisia tapahtumia!"; 
+    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, text);
+    
+    for(each(Invalid_Event_Filter_Result*, IEFR, s_global_data.IEFR))
+    {
+        GUI_Do_Text(context, AUTO, IEFR->name.buffer);
+    }
+    
+    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "OK"))
+    {
+        Close_Popup();
+    }
 }

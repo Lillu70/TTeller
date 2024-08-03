@@ -324,260 +324,280 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
     Assert(allocator);
     
     *game = {};
-    bool result = true;
-    
-    u32 alloc_size = 0;
-    u32 requirements_data_size = 0;
-    u32 events_data_size = 0;
-    
-    Mark_Hash_Table marks = Create_Mark_Hash_Table(allocator, 64);
-    
-    // First figure out the memory required for the game state.
+    bool result = false;
+    if(event_container->events->count)
     {
-        alloc_size += event_container->campaign_name.lenght + 1;
-        alloc_size += sizeof(u32) * event_container->events->count * 2;
-        events_data_size += sizeof(Event_Header) * event_container->events->count;
-        requirements_data_size += sizeof(Req_GM_Header) * event_container->events->count;
+        result = true;
+    
+        u32 alloc_size = 0;
+        u32 requirements_data_size = 0;
+        u32 events_data_size = 0;
         
-        for(Editor_Event* e = Begin(event_container->events); e < End(event_container->events); ++e)
+        Mark_Hash_Table marks = Create_Mark_Hash_Table(allocator, 64);
+        
+        // First figure out the memory required for the game state.
         {
-            u32 participant_header_size = sizeof(Participant_Header) * e->participents->count;
+            alloc_size += event_container->campaign_name.lenght + 1;
+            alloc_size += sizeof(u32) * event_container->events->count * 2;
+            events_data_size += sizeof(Event_Header) * event_container->events->count;
+            requirements_data_size += sizeof(Req_GM_Header) * event_container->events->count;
             
-            events_data_size += participant_header_size;
-            events_data_size += sizeof(Global_Mark_Consequence_GM) * e->global_mark_cons->count;
-            events_data_size += e->name.lenght + 1;
-            events_data_size +=    e->event_text.lenght + 1;
-            
-            requirements_data_size += participant_header_size;
-            requirements_data_size += sizeof(Global_Mark_Requirement_GM) * e->global_mark_reqs->count;
-            
-            for(auto gmr = Begin(e->global_mark_reqs); gmr < End(e->global_mark_reqs); ++gmr)
-                marks.push(String_View{gmr->mark.buffer, gmr->mark.lenght}, allocator);
-            
-            for(auto gmc = Begin(e->global_mark_cons); gmc < End(e->global_mark_cons); ++gmc)
-                marks.push(String_View{gmc->mark.buffer, gmc->mark.lenght}, allocator);
-        
-            for(Participent* p = Begin(e->participents); p < End(e->participents); ++p)
-            { 
-                requirements_data_size += sizeof(Participation_Requirement_GM) * p->reqs->count;
-                events_data_size += sizeof(Event_Consequens_GM) * p->cons->count;
-                
-                for(Participation_Requirement* req = Begin(p->reqs); req < End(p->reqs); ++req)
-                {
-                    if(req->type == Participation_Requirement_Type::mark_item ||
-                        req->type ==  Participation_Requirement_Type::mark_personal)
-                    {
-                        marks.push(String_View{req->mark.buffer, req->mark.lenght}, allocator);
-                    }
-                }
-                
-                for(Event_Consequens* con = Begin(p->cons); con < End(p->cons); ++con)
-                {
-                    if(con->type == Event_Consequens_Type::gains_mark ||
-                        con->type ==  Event_Consequens_Type::loses_mark)
-                    {
-                        marks.push(String_View{con->str.buffer, con->str.lenght}, allocator);
-                    }
-                }
-            }
-        }
-    }
-    
-    alloc_size += requirements_data_size;                       // req data
-    alloc_size += events_data_size;                             // events data
-    
-    alloc_size += sizeof(u32) * marks.unique_element_count;     // mark table
-    alloc_size += marks.total_unique_string_lenght;             // mark data
-    
-    game->memory = allocator->push(alloc_size);
-    Linear_Allocator mem = Create_Linear_Allocator(game->memory, alloc_size);
-    
-    // Create mark data and table.
-    {
-        Linear_Allocator mark_data = Create_Linear_Allocator(
-            mem.push(marks.total_unique_string_lenght), 
-            marks.total_unique_string_lenght);
-        
-        game->mark_data = (char*)mark_data.memory;
-    
-        u32 mark_table_size = sizeof(u32) * marks.unique_element_count;
-        Linear_Allocator mark_table = Create_Linear_Allocator(
-            mem.push(mark_table_size), 
-            mark_table_size);
-        
-        game->mark_table = Table{marks.unique_element_count, mark_table.memory};
-        
-        Mark_Hash_Bucket_Header* bucket = marks.first_bucket;
-        u32 table_slot = 1;
-        while(bucket)
-        {
-            Mark_Hash_Element* begin = (Mark_Hash_Element*)(bucket + 1);
-            Mark_Hash_Element* end = begin + marks._bucket_capacity;
-            
-            for(Mark_Hash_Element* element = begin; element < end; ++element)
+            for(each(Editor_Event*, e,event_container->events))
             {
-                if(element->string.buffer)
-                {
-                    element->table_slot = table_slot++;
+                u32 participant_header_size = sizeof(Participant_Header) * e->participents->count;
+                
+                events_data_size += participant_header_size;
+                events_data_size += sizeof(Global_Mark_Consequence_GM) * e->global_mark_cons->count;
+                events_data_size += e->name.lenght + 1;
+                events_data_size +=    e->event_text.lenght + 1;
+                
+                requirements_data_size += participant_header_size;
+                requirements_data_size += sizeof(Global_Mark_Requirement_GM) * e->global_mark_reqs->count;
+                
+                for(auto gmr = Begin(e->global_mark_reqs); gmr < End(e->global_mark_reqs); ++gmr)
+                    marks.push(String_View{gmr->mark.buffer, gmr->mark.lenght}, allocator);
+                
+                for(auto gmc = Begin(e->global_mark_cons); gmc < End(e->global_mark_cons); ++gmc)
+                    marks.push(String_View{gmc->mark.buffer, gmc->mark.lenght}, allocator);
+            
+                for(Participent* p = Begin(e->participents); p < End(e->participents); ++p)
+                { 
+                    requirements_data_size += sizeof(Participation_Requirement_GM) * p->reqs->count;
+                    events_data_size += sizeof(Event_Consequens_GM) * p->cons->count;
                     
-                    char* buffer = (char*)mark_data.push(element->string.lenght + 1);
-                    Mem_Copy(buffer, element->string.buffer, element->string.lenght + 1);
+                    for(Participation_Requirement* req = Begin(p->reqs); req < End(p->reqs); ++req)
+                    {
+                        if(req->type == Participation_Requirement_Type::mark_item ||
+                            req->type ==  Participation_Requirement_Type::mark_personal)
+                        {
+                            marks.push(String_View{req->mark.buffer, req->mark.lenght}, allocator);
+                        }
+                    }
                     
-                    u32 offset = u32(buffer - game->mark_data);
-                    
-                    *mark_table.push<u32>() = offset;
+                    for(Event_Consequens* con = Begin(p->cons); con < End(p->cons); ++con)
+                    {
+                        if(con->type == Event_Consequens_Type::gains_mark ||
+                            con->type ==  Event_Consequens_Type::loses_mark)
+                        {
+                            marks.push(String_View{con->str.buffer, con->str.lenght}, allocator);
+                        }
+                    }
                 }
             }
-            
-            bucket = bucket->next_bucket;
         }
         
-        Assert(!mark_data.get_free_capacity());
-    }
-    
-    game->campaign_name = (char*)mem.push(event_container->campaign_name.lenght + 1);
-    Mem_Copy(
-        game->campaign_name, 
-        event_container->campaign_name.buffer, 
-        event_container->campaign_name.lenght + 1);
-    
-    game->req_data = (Req_GM_Header*)mem.push(requirements_data_size);
-    Linear_Allocator req_data = Create_Linear_Allocator(game->req_data, requirements_data_size);
-    
-    u32 req_table_day_size = sizeof(u32) * event_container->day_event_count;
-    game->req_table_day = Table{event_container->day_event_count, mem.push(req_table_day_size)};
-    
-    Linear_Allocator req_table_day 
-        = Create_Linear_Allocator(game->req_table_day.memory, req_table_day_size);
-    
-    u32 night_event_count = event_container->events->count - event_container->day_event_count;
-    u32 req_table_night_size = sizeof(u32) * night_event_count;
-    game->req_table_night = Table{night_event_count, mem.push(req_table_night_size)};
-    
-    Linear_Allocator req_table_night 
-        = Create_Linear_Allocator(game->req_table_night.memory,req_table_night_size);
-    
-    game->events_data = (Event_Header*)mem.push(events_data_size);
-    Linear_Allocator events_data = Create_Linear_Allocator(game->events_data, events_data_size);
-    
-    game->event_table_day = Table{game->req_table_day.count, mem.push(req_table_day_size)};
-    Linear_Allocator event_table_day 
-        = Create_Linear_Allocator(game->event_table_day.memory, req_table_day_size);
-    
-    
-    game->event_table_night = Table{night_event_count, mem.push(req_table_night_size)};
-    Linear_Allocator event_table_night
-        = Create_Linear_Allocator(game->event_table_night.memory, req_table_night_size);
+        alloc_size += requirements_data_size;                       // req data
+        alloc_size += events_data_size;                             // events data
+        
+        alloc_size += sizeof(u32) * marks.unique_element_count;     // mark table
+        alloc_size += marks.total_unique_string_lenght;             // mark data
+        
+        game->memory = allocator->push(alloc_size);
+        Linear_Allocator mem = Create_Linear_Allocator(game->memory, alloc_size);
+        
+        // Create mark data and table.
+        {
+            if(marks.total_unique_string_lenght)
+            {
+                Linear_Allocator mark_data = Create_Linear_Allocator(
+                    mem.push(marks.total_unique_string_lenght), 
+                    marks.total_unique_string_lenght);
+                
+                game->mark_data = (char*)mark_data.memory;            
+                u32 mark_table_size = sizeof(u32) * marks.unique_element_count;
+                Linear_Allocator mark_table = Create_Linear_Allocator(
+                    mem.push(mark_table_size), 
+                    mark_table_size);
+                
+                game->mark_table = Table{marks.unique_element_count, mark_table.memory};
+                
+                Mark_Hash_Bucket_Header* bucket = marks.first_bucket;
+                u32 table_slot = 1;
+                while(bucket)
+                {
+                    Mark_Hash_Element* begin = (Mark_Hash_Element*)(bucket + 1);
+                    Mark_Hash_Element* end = begin + marks._bucket_capacity;
+                    
+                    for(Mark_Hash_Element* element = begin; element < end; ++element)
+                    {
+                        if(element->string.buffer)
+                        {
+                            element->table_slot = table_slot++;
+                            
+                            char* buffer = (char*)mark_data.push(element->string.lenght + 1);
+                            Mem_Copy(buffer, element->string.buffer, element->string.lenght + 1);
+                            
+                            u32 offset = u32(buffer - game->mark_data);
+                            
+                            *mark_table.push<u32>() = offset;
+                        }
+                    }
+                    
+                    bucket = bucket->next_bucket;
+                }
+                
+                Assert(!mark_data.get_free_capacity());
+            }
+        }
+        
+        game->campaign_name = (char*)mem.push(event_container->campaign_name.lenght + 1);
+        Mem_Copy(
+            game->campaign_name, 
+            event_container->campaign_name.buffer, 
+            event_container->campaign_name.lenght + 1);
+        
+        Linear_Allocator req_data = {};
+        Linear_Allocator req_table_day = {};
+        Linear_Allocator req_table_night = {};
+        
+        if(requirements_data_size)
+        {
+            game->req_data = (Req_GM_Header*)mem.push(requirements_data_size);
+            req_data = Create_Linear_Allocator(game->req_data, requirements_data_size);        
+        }
+        
+        u32 req_table_day_size = sizeof(u32) * event_container->day_event_count;
+        
+        if(req_table_day_size)
+        {
+            game->req_table_day = Table{event_container->day_event_count, mem.push(req_table_day_size)};
+            req_table_day = Create_Linear_Allocator(game->req_table_day.memory, req_table_day_size);        
+        }
+        
+        u32 night_event_count = event_container->events->count - event_container->day_event_count;
+        u32 req_table_night_size = sizeof(u32) * night_event_count;
+        
+        if(req_table_night_size)
+        {
+            game->req_table_night = Table{night_event_count, mem.push(req_table_night_size)};
+            req_table_night = Create_Linear_Allocator(game->req_table_night.memory,req_table_night_size);        
+        }
+        
+        game->events_data = (Event_Header*)mem.push(events_data_size);
+        Linear_Allocator events_data = Create_Linear_Allocator(game->events_data, events_data_size);
+        
+        game->event_table_day = Table{game->req_table_day.count, mem.push(req_table_day_size)};
+        Linear_Allocator event_table_day 
+            = Create_Linear_Allocator(game->event_table_day.memory, req_table_day_size);
+        
+        
+        game->event_table_night = Table{night_event_count, mem.push(req_table_night_size)};
+        Linear_Allocator event_table_night
+            = Create_Linear_Allocator(game->event_table_night.memory, req_table_night_size);
 
-    Assert(!mem.get_free_capacity());
-    
-    // Slot in the data
-    {
-        u32 i = 0;
-        for(Editor_Event* e = Begin(event_container->events); e < End(event_container->events); ++e, ++i)
+        Assert(!mem.get_free_capacity());
+        
+        // Slot in the data
         {
-            Req_GM_Header* req_header = req_data.push<Req_GM_Header>();
-            
+            u32 i = 0;
+            for(each(Editor_Event*, e, event_container->events))
             {
-                u32 offset = u32((u8*)req_header - (u8*)game->req_data);
-                if(i < event_container->day_event_count)
-                    *req_table_day.push<u32>() = offset;
-                else
-                    *req_table_night.push<u32>() = offset;
+                Req_GM_Header* req_header = req_data.push<Req_GM_Header>();
+
+                {
+                    u32 offset = u32((u8*)req_header - (u8*)game->req_data);
+                    if(i < event_container->day_event_count)
+                        *req_table_day.push<u32>() = offset;
+                    else
+                        *req_table_night.push<u32>() = offset;
+                }
+                
+                req_header->participant_count = e->participents->count;
+                req_header->global_req_count = e->global_mark_reqs->count;
+                
+                for(each(Global_Mark_Requirement*, gmr, e->global_mark_reqs))
+                {
+                    *req_data.push<Global_Mark_Requirement_GM>() = Convert_To_GM(gmr, &marks);
+                }
+                
+                Event_Header* event_header = events_data.push<Event_Header>();
+                
+                {
+                    u32 offset = u32((u8*)event_header - (u8*)game->events_data);
+                    if(i < event_container->day_event_count)
+                        *event_table_day.push<u32>() = offset;
+                    else
+                        *event_table_night.push<u32>() = offset;
+                }
+                
+                event_header->event_name = String_View
+                {
+                    (char*)events_data.push(e->name.lenght + 1), 
+                    e->name.lenght
+                };
+                
+                // name and text
+                
+                Mem_Copy(event_header->event_name.buffer, e->name.buffer, e->name.lenght + 1);
+                event_header->event_text 
+                    = String_View{(char*)events_data.push(e->event_text.lenght + 1), e->event_text.lenght};
+                Mem_Copy(event_header->event_text.buffer, e->event_text.buffer, e->event_text.lenght + 1);
+                event_header->size = e->name.lenght + e->event_text.lenght + 2;
+                // ---
+                
+                event_header->global_con_count = e->global_mark_cons->count;
+                for(auto gmc = Begin(e->global_mark_cons); gmc < End(e->global_mark_cons); ++gmc)
+                    *events_data.push<Global_Mark_Consequence_GM>() = Convert_To_GM(gmc, &marks);
+                
+                
+                u32 req_count = 0;
+                u32 con_count = 0;
+                for(each(Participent*, p, e->participents))
+                {
+                    Participant_Header* req_parti_header = req_data.push<Participant_Header>();
+                    
+                    u32 p_req_count = p->reqs->count;
+                    req_parti_header->count = p_req_count;
+                    req_count += p_req_count;
+                    
+                    Participant_Header* con_parti_header = events_data.push<Participant_Header>();
+                    
+                    u32 p_con_count = p->cons->count;
+                    con_parti_header->count = p_con_count;
+                    con_count += p_con_count;
+                    
+                    for(Participation_Requirement* req = Begin(p->reqs); req < End(p->reqs); ++req)
+                        *req_data.push<Participation_Requirement_GM>() = Convert_To_GM(req, &marks);
+                    
+                    for(Event_Consequens* con = Begin(p->cons); con < End(p->cons); ++con)
+                        *events_data.push<Event_Consequens_GM>() = Convert_To_GM(con, &marks);
+                }
+                
+                req_header->req_count = req_count;
+                
+                i += 1;
             }
-            
-            req_header->participant_count = e->participents->count;
-            req_header->global_req_count = e->global_mark_reqs->count;
-            
-            for(each(Global_Mark_Requirement*, gmr, e->global_mark_reqs))
-            {
-                *req_data.push<Global_Mark_Requirement_GM>() = Convert_To_GM(gmr, &marks);
-            }
-            
-            Event_Header* event_header = events_data.push<Event_Header>();
-            
-            {
-                u32 offset = u32((u8*)event_header - (u8*)game->events_data);
-                if(i < event_container->day_event_count)
-                    *event_table_day.push<u32>() = offset;
-                else
-                    *event_table_night.push<u32>() = offset;
-            }
-            
-            event_header->event_name = String_View
-            {
-                (char*)events_data.push(e->name.lenght + 1), 
-                e->name.lenght
-            };
-            
-            // name and text
-            
-            Mem_Copy(event_header->event_name.buffer, e->name.buffer, e->name.lenght + 1);
-            event_header->event_text 
-                = String_View{(char*)events_data.push(e->event_text.lenght + 1), e->event_text.lenght};
-            Mem_Copy(event_header->event_text.buffer, e->event_text.buffer, e->event_text.lenght + 1);
-            event_header->size = e->name.lenght + e->event_text.lenght + 2;
-            // ---
-            
-            event_header->global_con_count = e->global_mark_cons->count;
-            for(auto gmc = Begin(e->global_mark_cons); gmc < End(e->global_mark_cons); ++gmc)
-                *events_data.push<Global_Mark_Consequence_GM>() = Convert_To_GM(gmc, &marks);
-            
-            
-            u32 req_count = 0;
-            u32 con_count = 0;
-            for(each(Participent*, p, e->participents))
-            {
-                Participant_Header* req_parti_header = req_data.push<Participant_Header>();
-                
-                u32 p_req_count = p->reqs->count;
-                req_parti_header->count = p_req_count;
-                req_count += p_req_count;
-                
-                Participant_Header* con_parti_header = events_data.push<Participant_Header>();
-                
-                u32 p_con_count = p->cons->count;
-                con_parti_header->count = p_con_count;
-                con_count += p_con_count;
-                
-                for(Participation_Requirement* req = Begin(p->reqs); req < End(p->reqs); ++req)
-                    *req_data.push<Participation_Requirement_GM>() = Convert_To_GM(req, &marks);
-                
-                for(Event_Consequens* con = Begin(p->cons); con < End(p->cons); ++con)
-                    *events_data.push<Event_Consequens_GM>() = Convert_To_GM(con, &marks);
-            }
-            
-            req_header->req_count = req_count;
         }
+        
+        Free_Mark_Hash_Table(&marks, allocator);
+        
+        Assert(!req_data.get_free_capacity());
+        Assert(!req_table_day.get_free_capacity());
+        Assert(!req_table_night.get_free_capacity());
+        Assert(!events_data.get_free_capacity());
+        Assert(!event_table_day.get_free_capacity());
+        Assert(!event_table_night.get_free_capacity());
+        
+        game->total_player_count = 0;
+        game->live_player_count = 0;
+        game->language = Language::finnish;
+        
+        game->player_names 
+            = Create_Dynamic_Array<Game_Player_Name_FI>(allocator, u32(6));
+        
+        game->player_images = Create_Dynamic_Array<Player_Image>(allocator, u32(6));
+        
+        game->global_marks = Create_Dynamic_Array<Mark_GM>(allocator, 4);
+        game->active_events = Create_Dynamic_Array<Event>(allocator, 4);
+        
+        Init_String(&game->display_text, allocator, 1);
+        
+        char seed_buffer[12] = {0};
+        char* init_seed = U32_To_Char_Buffer((u8*)&seed_buffer, (u32)platform->Get_Time_Stamp());
+        
+        Init_String(&game->seed_input, allocator, init_seed);
+        
     }
-    
-    Free_Mark_Hash_Table(&marks, allocator);
-    
-    Assert(!req_data.get_free_capacity());
-    Assert(!req_table_day.get_free_capacity());
-    Assert(!req_table_night.get_free_capacity());
-    Assert(!events_data.get_free_capacity());
-    Assert(!event_table_day.get_free_capacity());
-    Assert(!event_table_night.get_free_capacity());
-    
-    game->total_player_count = 0;
-    game->live_player_count = 0;
-    game->language = Language::finnish;
-    
-    game->player_names 
-        = Create_Dynamic_Array<Game_Player_Name_FI>(allocator, u32(6));
-    
-    game->player_images = Create_Dynamic_Array<Player_Image>(allocator, u32(6));
-    
-    game->global_marks = Create_Dynamic_Array<Mark_GM>(allocator, 4);
-    game->active_events = Create_Dynamic_Array<Event>(allocator, 4);
-    
-    Init_String(&game->display_text, allocator, 1);
-    
-    char seed_buffer[12] = {0};
-    char* init_seed = U32_To_Char_Buffer((u8*)&seed_buffer, (u32)platform->Get_Time_Stamp());
-    
-    Init_String(&game->seed_input, allocator, init_seed);
     
     return result;
 }

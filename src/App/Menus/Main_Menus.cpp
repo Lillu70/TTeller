@@ -30,9 +30,8 @@ static void Do_Settings_Menu_Frame()
 
 
 static void Do_Default_Quit_Popup(GUI_Context* context)
-{    
-    static constexpr char* text = "Suljetaanko varmasti?";
-    GUI_Do_Text(context, &GUI_AUTO_MIDDLE, text, {}, GUI_DEFAULT_TEXT_SCALE * 1.5f, true);
+{
+    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, "Suljetaanko varmasti?");
     
     context->layout.build_direction = GUI_Build_Direction::down_center;
     
@@ -52,8 +51,7 @@ static void Do_Default_Quit_Popup(GUI_Context* context)
 
 static void Do_Main_Menu_Name_New_Campaign_Popup(GUI_Context* context)
 {
-    static constexpr char* text = "Nime\xE4 uusi kampanja:";
-    GUI_Do_Text(context, &GUI_AUTO_MIDDLE, text, {}, GUI_DEFAULT_TEXT_SCALE * 1.5f, true);
+    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, "Nime\xE4 uusi kampanja:");
     
     bool force_create = GUI_Do_SL_Input_Field(context, AUTO, AUTO, &s_global_data.new_campaign_name);
     
@@ -83,6 +81,8 @@ static void Do_Main_Menu_Name_New_Campaign_Popup(GUI_Context* context)
 
 static void Do_Main_Menu_Frame()
 {
+    Assert(s_mem.push_call_count == s_mem.free_call_count);
+    
     Clear_Canvas(&s_canvas, s_background_color);
     
     v2f def_text_scale = GUI_DEFAULT_TEXT_SCALE;

@@ -17,6 +17,7 @@ static thread_local v2f GUI_AUTO_BOTTOM_LEFT    = v2f{0, 0};
 static thread_local v2f GUI_AUTO_MIDDLE         = v2f{0, 0};
     
 static thread_local v2f GUI_DEFAULT_TEXT_SCALE  = v2f{2, 2};
+static thread_local v2f GUI_DEFAULT_TITLE_SCALER= v2f{1.5f, 1.5f};
     
 static thread_local u32 GUI_NO_CHARACTER_LIMIT  = 0;
 
@@ -213,7 +214,8 @@ namespace GUI_Context_Flags
         maxout_vertical_slider          = 1 << 8,
         maxout_horizontal_slider        = 1 << 9,
         hard_ignore_selection           = 1 << 10, // Makes it so that nothing is selected and to leave this state this flag has to manually set to 0.
-        one_time_skip_padding           = 1 << 11
+        one_time_skip_padding           = 1 << 11,
+        dont_auto_activate              = 1 << 12,
     }; // max shift is 31
 }
 

@@ -84,8 +84,11 @@ struct Global_Data
     
     String new_campaign_name;
     Dynamic_Array<String>* on_disk_campaign_names = 0;
+    Dynamic_Array<Invalid_Event_Filter_Result>* IEFR = 0;
     
     void(*popup_func)(GUI_Context*) = 0;
+    void(*on_popup_close)() = 0;
+    
     GUI_Theme popup_panel_theme;
     v2f popup_panel_dim = v2f{0.f, 0.f};
 
@@ -102,8 +105,28 @@ static Editor_State s_editor_state = {};
 
 static inline void Close_Popup()
 {
+    if(s_global_data.on_popup_close)
+    {
+        s_global_data.on_popup_close();
+        s_global_data.on_popup_close = 0;
+    }
+    
     s_global_data.popup_func = 0;
     GUI_Activate_Context(&s_gui_banner);
+}
+
+
+static inline void Set_Popup_Function(void(*popup_function)(GUI_Context*))
+{
+    if(s_global_data.popup_func)
+        Close_Popup();
+    
+    s_global_data.popup_panel_rect = Create_Rect_Min_Max_HZ(v2f{0,0}, v2f{0,0});
+    s_global_data.popup_panel_dim = v2f{0.f, 0.f};
+    
+    GUI_Reset_Context(&s_gui_pop_up);
+    GUI_Activate_Context(&s_gui_pop_up);
+    s_global_data.popup_func = popup_function;
 }
 
 
@@ -123,17 +146,6 @@ static inline v2f Get_Title_Bar_Row_Placement(
     
     v2f result = v2f{back_button_x, back_button_y};
     return result;
-}
-
-
-static inline void Set_Popup_Function(void(*popup_function)(GUI_Context*))
-{
-    s_global_data.popup_panel_rect = Create_Rect_Min_Max_HZ(v2f{0,0}, v2f{0,0});
-    s_global_data.popup_panel_dim = v2f{0.f, 0.f};
-    
-    GUI_Reset_Context(&s_gui_pop_up);
-    GUI_Activate_Context(&s_gui_pop_up);
-    s_global_data.popup_func = popup_function;
 }
 
 

@@ -1373,7 +1373,7 @@ static void Do_Event_Editor_On_Exit_Popup(GUI_Context* context)
     {
         Serialize_Campaign(s_editor_state.event_container, &s_platform);
         
-        Delete_All_Events(&s_editor_state.event_container, &s_allocator);
+        Delete_Event_Container(&s_editor_state.event_container, &s_allocator);
         
         s_global_data.active_menu = Menus::campaigns_menu;
         
@@ -1382,7 +1382,7 @@ static void Do_Event_Editor_On_Exit_Popup(GUI_Context* context)
     
     if(GUI_Do_Button(context, AUTO, &button_dim, t3))
     {
-        Delete_All_Events(&s_editor_state.event_container, &s_allocator);
+        Delete_Event_Container(&s_editor_state.event_container, &s_allocator);
         
         s_global_data.active_menu = Menus::campaigns_menu;
         
@@ -1444,7 +1444,11 @@ static void Do_Event_Editor_Delete_Event_Popup(GUI_Context* context)
         if(s_editor_state.event_idx_to_delete < s_editor_state.event_container.day_event_count)
             s_editor_state.event_container.day_event_count -= 1;
         
-        Delete_Event(s_editor_state.event_container.events, &s_allocator, s_editor_state.event_idx_to_delete);
+        Delete_Editor_Event(
+            s_editor_state.event_container.events, 
+            &s_allocator, 
+            s_editor_state.event_idx_to_delete);
+        
         Close_Popup();
     }
 }

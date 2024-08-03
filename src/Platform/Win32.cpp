@@ -358,8 +358,6 @@ static void Win32_Flush_Events()
             }
         }
     }
-    
-    s_app.frame_counter += 1;
 }
 
 
@@ -387,6 +385,8 @@ static void Win32_Update_Surface(bool update_from_game)
             SRCCOPY
         );
     }
+    
+    s_app.frame_counter += 1;
 }
 
 

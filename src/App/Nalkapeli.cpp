@@ -78,6 +78,17 @@ static inline void Hollow_Participent(u32 idx_to_delete,
 }
 
 
+static inline void Hollow_Invalid_Event_Filter_Results(
+    Dynamic_Array<Invalid_Event_Filter_Result>* filter_results)
+{
+    if(filter_results)
+    {
+        for(each(Invalid_Event_Filter_Result*, iefr, filter_results))
+            iefr->name.free();
+    }
+}
+
+
 static inline void Delete_Global_Mark_Requirement(
     Dynamic_Array<Global_Mark_Requirement>* darray,
     u32 idx_to_delete)
@@ -144,7 +155,7 @@ static void Delete_All_Participants_From_Event(Editor_Event* event, Allocator_Sh
 }
 
 
-static void Delete_Event(
+static void Delete_Editor_Event(
     Dynamic_Array<Editor_Event>* darray, 
     Allocator_Shell* allocator, 
     u32 idx_to_delete, 
@@ -158,22 +169,17 @@ static void Delete_Event(
     Delete_All_Participants_From_Event(element, allocator);
     allocator->free(element->participents);
     
-    // Free the global reqs:
-    Global_Mark_Requirement* gmr_begin = Begin(element->global_mark_reqs);
-    Global_Mark_Requirement* gmr_end = End(element->global_mark_reqs);
-    for(Global_Mark_Requirement* gmr = gmr_begin; gmr < gmr_end; ++gmr)
+    for(each(Global_Mark_Requirement*, gmr, element->global_mark_reqs))
         Make_Global_Mark_Requirement_Hollow(gmr);
     
-    // Free the global cons:
-    Global_Mark_Consequence* gmc_begin = Begin(element->global_mark_cons);
-    Global_Mark_Consequence* gmc_end = End(element->global_mark_cons);
-    for(Global_Mark_Consequence* gmc = gmc_begin; gmc < gmc_end; ++gmc)
+    for(each(Global_Mark_Consequence*, gmc, element->global_mark_cons))
         Make_Global_Mark_Consequence_Hollow(gmc);
     
     allocator->free(element->global_mark_reqs);
     allocator->free(element->global_mark_cons);
     
-    element->name.free();
+    if(element->name.buffer)
+        element->name.free();
     element->event_text.free();
     
     // Optional toggle, to allow optimization when deleting all events, normaly this should be "true"
@@ -182,12 +188,49 @@ static void Delete_Event(
 }
 
 
-static void Delete_All_Events(Events_Container* event_container, Allocator_Shell* allocator)
+static Dynamic_Array<Invalid_Event_Filter_Result>* Unordered_Filter_Prolematic_Events(
+    Events_Container* event_container, 
+    Allocator_Shell* allocator)
+{
+    Dynamic_Array<Invalid_Event_Filter_Result>* result = 0;
+    
+    Editor_Event* events = Begin(event_container->events);
+    
+    for(u32 i = 0; i < event_container->events->count; ++i)
+    {
+        Editor_Event* event = events + i;
+        
+        if(event->issues.errors)
+        {
+            if(!result)
+            {
+                result = Create_Dynamic_Array<Invalid_Event_Filter_Result>(allocator, 4);
+            }
+            
+            Invalid_Event_Filter_Result IEFI;
+            IEFI.name = event->name;
+            event->name.buffer = 0;
+            IEFI.reasons = event->issues.errors;
+            
+            *Push(&result, allocator) = IEFI;
+            
+            Delete_Editor_Event(event_container->events, allocator, i, false);
+            Unordered_Remove(event_container->events, i);
+            
+            i -= 1;
+        }
+    }
+    
+    return result;
+}
+
+
+static void Delete_Event_Container(Events_Container* event_container, Allocator_Shell* allocator)
 {
     if(event_container->events)
     {
         for(u32 i = 0; i < event_container->events->count; ++i)
-            Delete_Event(event_container->events, allocator, i, false);
+            Delete_Editor_Event(event_container->events, allocator, i, false);
         
         event_container->campaign_name.free();
         allocator->free(event_container->events);
@@ -478,8 +521,10 @@ static void Update_Editor_Event_Participant_Issues(Editor_Event* event)
     Editor_Event_Issues issues = event->issues;
     
     u32 text_error_mask = 
+        Event_Errors::contains_impossiple_global_requirement |
         Event_Errors::contains_impossiple_requirement | 
         Event_Errors::has_no_participants | 
+        Event_Errors::cotaints_empty_mark_field_in_global_requirements |
         Event_Errors::cotaints_empty_mark_field_in_requirements;
     
     Inverse_Bit_Mask(&issues.errors, text_error_mask);
@@ -487,6 +532,28 @@ static void Update_Editor_Event_Participant_Issues(Editor_Event* event)
     u32 text_warning_mask = Event_Warnings::contains_irrelevant_requirement;
     
     Inverse_Bit_Mask(&issues.warnings, text_warning_mask);
+    
+    for(each(Global_Mark_Requirement*, gmark, event->global_mark_reqs))
+    {
+        if(!gmark->mark.lenght)
+        {
+            issues.errors |= Event_Errors::cotaints_empty_mark_field_in_global_requirements;
+        }
+        
+        if(gmark->mark_exists == Exists_Statement::does_have && 
+            (
+                (gmark->numerical_relation == Numerical_Relation::less_than &&
+                gmark->relation_target == 1) 
+                
+                ||
+                
+                (gmark->numerical_relation == Numerical_Relation::greater_than &&
+                gmark->relation_target == 3)
+            ))
+        {
+            issues.errors |= Event_Errors::contains_impossiple_global_requirement;
+        }
+    }
     
     if(event->participents->count)
     {
@@ -538,6 +605,7 @@ static void Update_Editor_Event_Consequence_Issues(Editor_Event* event)
     
     u32 text_error_mask = 
         Event_Errors::cotaints_empty_mark_field_in_consequences | 
+        Event_Errors::cotaints_empty_mark_field_in_global_consequences |
         Event_Errors::death_consequence_with_uninvolved_inheritor;
     
     Inverse_Bit_Mask(&issues.errors, text_error_mask);
@@ -547,6 +615,15 @@ static void Update_Editor_Event_Consequence_Issues(Editor_Event* event)
         Event_Warnings::death_consequence_with_zero_as_inheritor;
     
     Inverse_Bit_Mask(&issues.warnings, text_warning_mask);
+    
+    for(each(Global_Mark_Consequence*, gmark, event->global_mark_cons))
+    {
+        if(!gmark->mark.lenght)
+        {
+            issues.errors |= Event_Errors::cotaints_empty_mark_field_in_global_consequences;
+            break;
+        }
+    }
     
     u32 i = 0;
     for(each(Participent*, parti, event->participents))

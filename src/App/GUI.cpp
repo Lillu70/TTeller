@@ -600,9 +600,22 @@ static inline void GUI_Begin_Context(
     context->selected_element_pos = {};
     context->bounds_rel_anchor_base = { {F32_MAX, F32_MAX}, {-F32_MAX, -F32_MAX} };
     
+    u32 app_flags = context->platform->Get_Flags();
+    
+    if(Is_Flag_Set(app_flags, (u32)App_Flags::window_has_resized) 
+        && context->platform->Get_Frame_Count())
+    {
+        context->flags |= GUI_Context_Flags::dont_auto_activate;
+        context->flags |= GUI_Context_Flags::soft_ignore_selection;
+    }
+    
+    if(Bit_Not_Set(context->flags, GUI_Context_Flags::soft_ignore_selection))
+        Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::dont_auto_activate);
+    
     if(GUI_Context::active_context_id == context->_context_id)
     {
-        Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::soft_ignore_selection);
+        if(Bit_Not_Set(context->flags, GUI_Context_Flags::dont_auto_activate))
+            Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::soft_ignore_selection);
     }
     else
     {
@@ -613,7 +626,7 @@ static inline void GUI_Begin_Context(
     
     context->flags |= GUI_Context_Flags::context_ready;
     
-    if(Is_Flag_Set(context->platform->Get_Flags(), (u32)App_Flags::is_focused))
+    if(Is_Flag_Set(app_flags, (u32)App_Flags::is_focused))
     {
         if(context->flags & GUI_Context_Flags::disable_kc_navigation)
         {
@@ -1525,7 +1538,7 @@ static void GUI_Do_Text(
 static inline void GUI_Do_Title_Text(
     GUI_Context* context, 
     v2f* pos, char* text, 
-    v2f text_scale = GUI_DEFAULT_TEXT_SCALE)
+    v2f text_scale = Hadamar_Product(GUI_DEFAULT_TEXT_SCALE, GUI_DEFAULT_TITLE_SCALER))
 {
     GUI_Do_Text(context, pos, text, {}, text_scale, true);
 }
