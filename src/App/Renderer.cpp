@@ -208,12 +208,15 @@ static inline Color Get_Pixel_HZ(Canvas* canvas, v2i p)
 // TODO: This doesn't work with sub canvases.
 static void Clear_Canvas(Canvas* canvas, Color color)
 {
-    Start_Scope_Timer(clear_canvas);
-    
     Assert(canvas);
+    Assert(canvas->row_stride == canvas->dim.x);
+    
+    Start_Scope_Timer(clear_canvas);
     
     u32 canvas_area = canvas->row_stride * canvas->dim.y;
     
+    
+    //TODO: SIMD???
     for(u32 i = 0; i < canvas_area; ++i)
         Set_Pixel_Idx_HZ(canvas, i, color);
 }
@@ -221,6 +224,8 @@ static void Clear_Canvas(Canvas* canvas, Color color)
 
 static void Clear_Sub_Canvas(Canvas* canvas, Color color)
 {
+    Assert(canvas);
+    
     Start_Scope_Timer(set_sub_canvas);
     
     for(i32 y = 0; y < i32(canvas->dim.y); ++y)

@@ -124,8 +124,11 @@ static inline void Set_Popup_Function(void(*popup_function)(GUI_Context*))
     s_global_data.popup_panel_rect = Create_Rect_Min_Max_HZ(v2f{0,0}, v2f{0,0});
     s_global_data.popup_panel_dim = v2f{0.f, 0.f};
     
-    GUI_Reset_Context(&s_gui_pop_up);
-    GUI_Activate_Context(&s_gui_pop_up);
+    if(!GUI_Is_Context_Ready(&s_gui_pop_up))
+        GUI_Reset_Context(&s_gui_pop_up);
+    
+    GUI_Activate_Context(&s_gui_pop_up);        
+    
     s_global_data.popup_func = popup_function;
 }
 

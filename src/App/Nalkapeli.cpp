@@ -227,12 +227,13 @@ static Dynamic_Array<Invalid_Event_Filter_Result>* Unordered_Filter_Prolematic_E
 
 static void Delete_Event_Container(Events_Container* event_container, Allocator_Shell* allocator)
 {
+    event_container->campaign_name.free();
+    
     if(event_container->events)
     {
         for(u32 i = 0; i < event_container->events->count; ++i)
             Delete_Editor_Event(event_container->events, allocator, i, false);
         
-        event_container->campaign_name.free();
         allocator->free(event_container->events);
         
         *event_container = {};
@@ -1309,6 +1310,9 @@ static bool Load_Campaign(
     Allocator_Shell* allocator,
     Platform_Calltable* platform)
 {
+    Assert(!container->campaign_name.buffer);
+    Assert(!container->events);
+    
     String full_path = Create_Campaign_Full_Path(name, platform, allocator);
     
     u32 buffer_size = 0;
@@ -1321,7 +1325,7 @@ static bool Load_Campaign(
             s_scrach_buffer.init(platform, buffer_size);
         
         u8* buffer = (u8*)s_scrach_buffer.push(buffer_size);
-        u32 read_head = 0;
+        u32 read_head = 0;        
         
         *container = {};
         
@@ -1349,7 +1353,7 @@ static bool Load_Campaign(
             
             if(load_successful)
             {
-                Copy_String(&container->campaign_name, name);
+                Deep_Copy_String(&container->campaign_name, name);
             }
         }
     }

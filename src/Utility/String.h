@@ -72,30 +72,6 @@ static void String_Init_Alloc(String* str, u32 capacity)
 }
 
 
-static void Copy_String(String* dest, String* src)
-{
-    Assert(dest);
-    Assert(src);
-    
-    dest->lenght = src->lenght;
-    dest->alloc = src->alloc;
-    
-    String_Init_Alloc(dest, src->capacity);
-    
-    if(src->lenght)
-        Mem_Copy(dest->buffer, src->buffer, src->lenght);
-}
-
-
-static String Create_Copy_String(String* src)
-{
-    String result;
-    Copy_String(&result, src);
-    
-    return result;
-}
-
-
 // Takes a null terminted C style string, as an argument. Lenght of it, determines capacity.
 static void Init_String(String* str, Allocator_Shell* allocator, char* c_str)
 {
@@ -340,6 +316,37 @@ static void Reserve_String_Memory(String* str, u32 min_capacity, bool copy_into_
         str->lenght = 0;
         str->buffer[0] = 0;        
     }
+}
+
+
+static void Deep_Copy_String(String* dest, String* src)
+{
+    Assert(dest);
+    Assert(src);
+    
+    if(dest->buffer)
+    {
+        Reserve_String_Memory(dest, src->lenght + 1, false);
+    }
+    else
+    {
+        dest->alloc = src->alloc;        
+        String_Init_Alloc(dest, src->capacity);        
+    }
+    
+    dest->lenght = src->lenght;
+    
+    if(src->lenght)
+        Mem_Copy(dest->buffer, src->buffer, src->lenght);
+}
+
+
+static String Create_Deep_Copy_String(String* src)
+{
+    String result;
+    Deep_Copy_String(&result, src);
+    
+    return result;
 }
 
 

@@ -274,12 +274,11 @@ struct GUI_Context
     
     GUI_Layout layout;
     
-    u32 layout_stack_count = 0;
-    GUI_Layout layout_stack[5];
-    
+    GUI_Element_State selection_state = {};
     GUI_Defered_Render_Type defered_render = GUI_Defered_Render_Type::none;
     
-    GUI_Element_State selection_state = {};
+    u32 layout_stack_count = 0;
+    GUI_Layout layout_stack[5];
 };
 
 

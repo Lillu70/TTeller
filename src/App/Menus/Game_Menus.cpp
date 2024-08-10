@@ -10,6 +10,7 @@ static v2f s_player_picture_dim
 static void Do_Load_Failed_Popup(GUI_Context* context);
 static void Free_Invalid_Event_Filter_Result_Memory();
 static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context);
+static void Do_GM_Campaign_Was_Unusable_Popup(GUI_Context* context);
 
 
 static void Do_Create_Player_FI_Instruction_Popup(GUI_Context* context)
@@ -941,26 +942,28 @@ static void Do_Select_Campagin_To_Play_Frame()
                             
                             Assert(!s_global_data.IEFR);
                             s_global_data.IEFR = filter_results;
+                            s_editor_state.event_container = editor_format_campagin;
                         }
-                        
-                        Game_State game_state;
-                
-                        if(Convert_Editor_Campaign_Into_Game_Format(
-                            &game_state,
-                            &editor_format_campagin,
-                            &s_platform,
-                            &s_allocator))
+                        else
                         {
-                            if(s_game_state.memory)
-                                Delete_Game(&s_game_state, &s_allocator);
-                            
-                            s_game_state = game_state;
-                            
-                            if(!s_global_data.IEFR)
+                            Game_State game_state;
+                    
+                            if(Convert_Editor_Campaign_Into_Game_Format(
+                                &game_state,
+                                &editor_format_campagin,
+                                &s_platform,
+                                &s_allocator))
+                            {
+                                if(s_game_state.memory)
+                                    Delete_Game(&s_game_state, &s_allocator);
+                                
+                                s_game_state = game_state;
+                                
                                 s_global_data.active_menu = Menus::GM_players;
-                        }
+                            }
 
-                        Delete_Event_Container(&editor_format_campagin, &s_allocator);
+                            Delete_Event_Container(&editor_format_campagin, &s_allocator);
+                        }
                     }
                     else
                     {
@@ -1001,6 +1004,9 @@ static void Free_Invalid_Event_Filter_Result_Memory()
     s_allocator.free(s_global_data.IEFR);
     
     s_global_data.IEFR = 0;
+    
+    //NOTE: Be aware that if this is removed memory cleanup has to be handeled elsewhere.
+    Delete_Event_Container(&s_editor_state.event_container, &s_allocator);
 }
 
 
@@ -1008,19 +1014,180 @@ static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
 {
     Assert(s_global_data.IEFR);
     
-    context->layout.anchor = GUI_Anchor::bottom;
+    context->layout.anchor = GUI_Anchor::top;
     context->layout.build_direction = GUI_Build_Direction::down_left;
     
-    char* text = "Kamppania sis\xE4lsi viallisia tapahtumia!"; 
-    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, text);
+    f32 sh = f32(context->canvas->dim.y);
+    f32 pf = .5f;
+    f32 offset = sh * (pf / 2);        
     
-    for(each(Invalid_Event_Filter_Result*, IEFR, s_global_data.IEFR))
+    v2f title_pos = {Get_Middle(context->canvas).x, sh - offset};
+    
+    char* text = "Kamppania sis\xE4lsi viallisia tapahtumia!";
+    GUI_Do_Title_Text(context, &title_pos, text);
+    
+    f32 title_width = context->layout.last_element.dim.x;
+    
+    GUI_Do_Text(context, AUTO, "Pelin toimivuuden takia ne oli poistettava.");
+
+    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Jatka siit\xE4 huolimatta"))
     {
-        GUI_Do_Text(context, AUTO, IEFR->name.buffer);
+        Game_State game_state;
+
+        if(Convert_Editor_Campaign_Into_Game_Format(
+            &game_state,
+            &s_editor_state.event_container,
+            &s_platform,
+            &s_allocator))
+        {
+            Close_Popup();
+            
+            if(s_game_state.memory)
+                Delete_Game(&s_game_state, &s_allocator);
+            
+            s_game_state = game_state;
+            
+            s_global_data.active_menu = Menus::GM_players;
+        }
+        else
+        {
+            Set_Popup_Function(Do_GM_Campaign_Was_Unusable_Popup);
+        }
     }
     
-    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "OK"))
+    GUI_Push_Layout(context);
+    
+    context->layout.build_direction = GUI_Build_Direction::right_center;
+    
+    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Peruuta"))
     {
         Close_Popup();
     }
+    
+    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Avaa editorissa"))
+    {
+        
+    }
+    
+    GUI_Pop_Layout(context);
+    
+    GUI_Do_Spacing(context, v2f{0, 30});
+    
+    GUI_Do_Text(context, AUTO, "Seuraavat tapahtumat sis\xE4lsiv\xE4t virheit\xE4:");
+    
+    if(s_global_data.IEFR)
+    {
+        static GUI_Context container = GUI_Create_Context();
+        
+        f32 bot = context->layout.last_element.pos.y - context->anchor_base.y;
+        bot -= context->layout.last_element.dim.y / 2;
+        bot -= f32(context->theme->padding);
+        f32 container_height = bot - offset;
+        f32 container_x_offset = Max(title_pos.x - title_width / 2.f, 0.f);
+        if(container_height >= 1.f)
+        {
+            f32 contents_x = Max(title_width - f32(context->canvas->dim.x), 0.f) * -1;
+            v2f contents_pos = v2f{0, container_height - 1};
+            
+            u32 sub_canvas_width = Min(u32(title_width), context->canvas->dim.x);
+            v2u sub_canvas_dim = v2u{sub_canvas_width, u32(container_height)};
+            
+            
+            v2u sub_canvas_offset = v2u{u32(container_x_offset + context->anchor_base.x), u32(offset + context->anchor_base.y)};
+            Canvas sub_canvas = Create_Sub_Canvas(context->canvas, sub_canvas_dim, sub_canvas_offset);
+            
+            v2f sub_canvas_panel_dim = sub_canvas_dim.As<f32>();
+            GUI_Do_Panel(context, AUTO, &sub_canvas_panel_dim);
+            
+            Clear_Sub_Canvas(&sub_canvas, s_list_bg_color);
+            
+            #if 1
+            container.layout.anchor = GUI_Anchor::top;
+            container.layout.build_direction = GUI_Build_Direction::down_left;
+            container.flags |= GUI_Context_Flags::enable_dynamic_sliders;
+            
+            GUI_Begin_Context(
+                &container,
+                &sub_canvas,
+                &s_global_data.action_context, 
+                &s_theme,
+                sub_canvas_offset.As<i32>());
+            
+            v2f* p = &GUI_AUTO_TOP_LEFT;
+            
+            for(each(Invalid_Event_Filter_Result*, IEFR, s_global_data.IEFR))
+            {
+                GUI_Do_Text(&container, &contents_pos, IEFR->name.buffer);
+                contents_pos.y -= container.layout.last_element.dim.y + f32(context->theme->padding);
+            }
+            
+            GUI_End_Context(&container);            
+            #endif
+        }
+    }
+    
+    #if 0
+    char* text = "Kamppania sis\xE4lsi viallisia tapahtumia!";
+    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, text);
+    GUI_Do_Text(context, AUTO, "Pelin toimivuuden takia ne oli poistettava.");
+    
+    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Jatka siit\xE4 huolimatta"))
+    {
+        Game_State game_state;
+
+        if(Convert_Editor_Campaign_Into_Game_Format(
+            &game_state,
+            &s_editor_state.event_container,
+            &s_platform,
+            &s_allocator))
+        {
+            Close_Popup();
+            
+            if(s_game_state.memory)
+                Delete_Game(&s_game_state, &s_allocator);
+            
+            s_game_state = game_state;
+            
+            s_global_data.active_menu = Menus::GM_players;
+        }
+        else
+        {
+            Set_Popup_Function(Do_GM_Campaign_Was_Unusable_Popup);
+        }
+    }
+    
+    GUI_Push_Layout(context);
+    
+    context->layout.build_direction = GUI_Build_Direction::right_center;
+    
+    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Peruuta"))
+    {
+        Close_Popup();
+    }
+    
+    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Avaa editorissa"))
+    {
+        
+    }
+    
+    GUI_Pop_Layout(context);
+    
+    GUI_Do_Spacing(context, v2f{0, 30});
+    
+    GUI_Do_Text(context, AUTO, "Seuraavat tapahtumat sis\xE4lsiv\xE4t virheit\xE4:");
+    
+    if(s_global_data.IEFR)
+    {
+        for(each(Invalid_Event_Filter_Result*, IEFR, s_global_data.IEFR))
+        {
+            GUI_Do_Text(context, AUTO, IEFR->name.buffer);
+        }        
+    }
+    #endif
+}
+
+
+static void Do_GM_Campaign_Was_Unusable_Popup(GUI_Context* context)
+{
+    GUI_Do_Button(context, &GUI_AUTO_MIDDLE, &GUI_AUTO_FIT, "kampanjaa ei voi pelata.");
 }
