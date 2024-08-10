@@ -1,4 +1,10 @@
 
+
+// ===================================
+// Copyright (c) 2024 by Valtteri Kois
+// All rights reserved.
+// ===================================
+
 #pragma once
 
 static inline void* REALLY_BAD_REALLOC(void* p, u32 newsz)

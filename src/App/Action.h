@@ -1,4 +1,10 @@
 
+
+// ===================================
+// Copyright (c) 2024 by Valtteri Kois
+// All rights reserved.
+// ===================================
+
 #pragma once
 
 enum class Input_Mode : u8

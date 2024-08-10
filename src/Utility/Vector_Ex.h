@@ -1,10 +1,15 @@
 
+
+// ===================================
+// Copyright (c) 2024 by Valtteri Kois
+// All rights reserved.
+// ===================================
+
 #pragma once
 
 #include "Vector.h"
 
 // v2i ----------------------------------------------------------
-
 static inline v2i operator + (v2i a, v2i b)
 {
     v2i result = v2i{a.x + b.x, a.y + b.y};
@@ -19,9 +24,24 @@ static inline v2i operator - (v2i a, v2i b)
 }
 
 
+// v2u ----------------------------------------------------------
+static inline v2u operator + (v2u a, v2u b)
+{
+    v2u result = v2u{a.x + b.x, a.y + b.y};
+    return result;
+}
+
+
+static inline v2u operator - (v2u a, v2u b)
+{
+    v2u result = v2u{a.x - b.x, a.y - b.y};
+    return result;
+}
+
+
+
 // v2f
 // --------------------------------------------------------------
-
 static inline v2f operator * (v2f a, f32 scalar)
 {
     v2f result = v2f{a.x * scalar, a.y * scalar};

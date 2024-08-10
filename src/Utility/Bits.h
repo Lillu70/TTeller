@@ -1,4 +1,11 @@
-# pragma once
+
+
+// ===================================
+// Copyright (c) 2024 by Valtteri Kois
+// All rights reserved.
+// ===================================
+
+#pragma once
 
 
 static inline u32 Inverse_Bit_Mask(u32 bitfield, u32 mask)

@@ -1,4 +1,10 @@
 
+
+// ===================================
+// Copyright (c) 2024 by Valtteri Kois
+// All rights reserved.
+// ===================================
+
 #pragma once
 
 static void Do_Main_Menu_Name_New_Campaign_Popup(GUI_Context*);

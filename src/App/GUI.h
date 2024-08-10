@@ -1,4 +1,10 @@
 
+
+// ===================================
+// Copyright (c) 2024 by Valtteri Kois
+// All rights reserved.
+// ===================================
+
 #pragma once
 
 static thread_local v2f GUI_AUTO_FIT            = v2f{0, 0};
@@ -250,7 +256,7 @@ struct GUI_Context
     Canvas* canvas = 0;
     Action_Context* external_action_context;
     Rect bounds_rel_anchor_base = {};
-    GUI_Theme* theme;
+    GUI_Theme* theme = 0;
     
     u32 _context_id = 0;
     u32 flags = 0;
@@ -259,10 +265,12 @@ struct GUI_Context
     u32 selected_id = 0;
     f32 mouse_scroll_speed = 50.f;
     f32 dynamic_slider_girth = 15.f;
-    
     i32 last_widget_count = 0;
-    v2i last_cursor_position;
-    v2i cursor_position;
+    
+    v2i last_cursor_position = {};
+    v2i cursor_position = {};
+    v2u canvas_space_dim = {};
+    v2f rendering_offset = {};
     v2f cursor_fpos;
     v2i canvas_pos = {};
     v2f anchor_base = {};
@@ -272,7 +280,7 @@ struct GUI_Context
     Rect cursor_mask_area = {};
     Rect canvas_rect = {};
     
-    GUI_Layout layout;
+    GUI_Layout layout = {};
     
     GUI_Element_State selection_state = {};
     GUI_Defered_Render_Type defered_render = GUI_Defered_Render_Type::none;

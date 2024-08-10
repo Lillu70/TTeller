@@ -1,3 +1,11 @@
+
+
+// ===================================
+// Copyright (c) 2024 by Valtteri Kois
+// All rights reserved.
+// ===================================
+
+
 #pragma once
 
 // Capacity is always at least one more than lenght.

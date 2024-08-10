@@ -1,4 +1,10 @@
 
+
+// ===================================
+// Copyright (c) 2024 by Valtteri Kois
+// All rights reserved.
+// ===================================
+
 #pragma once
 
 #define Array_Lenght(array) sizeof(array) / sizeof(array[0])

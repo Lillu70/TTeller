@@ -1,4 +1,10 @@
 
+
+// ===================================
+// Copyright (c) 2024 by Valtteri Kois
+// All rights reserved.
+// ===================================
+
 #pragma once
 
 
@@ -260,8 +266,6 @@ static inline GUI_Placement GUI_Get_Placement(
     
     if(!pos)
     {
-        //Assert(last_element_dim.x * last_element_dim.y > 0);
-        
         v2f half_last_dim = last_element_dim / 2;
         v2f half_out_dim = result.dim / 2;
         
@@ -358,7 +362,7 @@ static inline GUI_Placement GUI_Get_Placement(
         
         v2f p;
         // TODO: Figure out if this should be -1
-        v2f canvas_size = context->canvas->dim.As<f32>() - 0.f;
+        v2f canvas_size = context->canvas_space_dim.As<f32>() - 0.f;
         if(pos == &GUI_AUTO_TOP_CENTER)
         {
             pos = &p;
@@ -483,7 +487,13 @@ static inline GUI_Placement GUI_Get_Placement(
         
         GUI_Update_Bounds(context, result.rect);
     }
-
+    
+    // CONSIDER: BIG CONSIDER!!! Fuck with the true values or leave as is?
+    
+    result.pos += context->rendering_offset;
+    result.rect.min += context->rendering_offset;
+    result.rect.max += context->rendering_offset;
+    
     return result;
 }
 
@@ -592,6 +602,7 @@ static inline void GUI_Begin_Context(
     context->layout.build_direction = build_direction;
     context->layout.anchor = anchor;
     context->widget_count = 0;
+    context->rendering_offset = {};
     
     context->canvas_pos = canvas_pos;
     context->layout.last_element.pos = context->anchor_base;
@@ -599,6 +610,9 @@ static inline void GUI_Begin_Context(
     context->selected_element_dim = {};
     context->selected_element_pos = {};
     context->bounds_rel_anchor_base = { {F32_MAX, F32_MAX}, {-F32_MAX, -F32_MAX} };
+    
+    context->canvas_space_dim = context->canvas->dim;
+    context->canvas_rect = Create_Rect_Min_Dim(v2f{0}, v2u::Cast<f32>(context->canvas->dim));
     
     u32 app_flags = context->platform->Get_Flags();
     
@@ -650,8 +664,6 @@ static inline void GUI_Begin_Context(
         context->cursor_position = context->platform->Get_Cursor_Position() - context->canvas_pos;
         context->cursor_fpos = v2i::Cast<f32>(context->cursor_position);
     }
-    
-    context->canvas_rect = Create_Rect_Min_Dim(v2f{0}, v2u::Cast<f32>(context->canvas->dim));
 }
 
 
@@ -757,7 +769,7 @@ static inline void GUI_End_Context(GUI_Context* context)
     {
         f32 padding = context->theme->padding;
         
-        v2f canvas_dim = v2u::Cast<f32>(context->canvas->dim);
+        v2f canvas_dim = v2u::Cast<f32>(context->canvas_space_dim);
         
         f32 canvas_height = canvas_dim.y;
         f32 canvas_width = canvas_dim.x;
@@ -821,8 +833,8 @@ static inline void GUI_End_Context(GUI_Context* context)
             f32 gui_height = bounds.max.y - bounds.min.y;
             
             bool enable_vertical_slider = gui_height > canvas_height && 
-                context->canvas->dim.x > slider_girth &&
-                context->canvas->dim.y > context->theme->outline_thickness * 2;
+                canvas_dim.x > slider_girth &&
+                canvas_dim.y > context->theme->outline_thickness * 2.f;
             
             if(enable_vertical_slider)
             {
@@ -838,8 +850,8 @@ static inline void GUI_End_Context(GUI_Context* context)
             
             f32 gui_width = bounds.max.x - bounds.min.x;
             bool enable_horizontal_slider = gui_width > canvas_width && 
-                context->canvas->dim.y > slider_girth &&
-                context->canvas->dim.x > context->theme->outline_thickness * 2;
+                canvas_dim.y > slider_girth &&
+                canvas_dim.x > context->theme->outline_thickness * 2.f;
             
             if(enable_horizontal_slider)
             {
@@ -882,8 +894,8 @@ static inline void GUI_End_Context(GUI_Context* context)
                 if(!enable_vertical_slider)
                 {
                     enable_vertical_slider = gui_height > canvas_height && 
-                        context->canvas->dim.x > slider_girth &&
-                        context->canvas->dim.y > context->theme->outline_thickness * 2;
+                        canvas_dim.x > slider_girth &&
+                        canvas_dim.y > context->theme->outline_thickness * 2.f;
                     
                     if(enable_vertical_slider)
                     {
@@ -901,8 +913,8 @@ static inline void GUI_End_Context(GUI_Context* context)
             
             if(enable_vertical_slider && enable_horizontal_slider)
             {
-                v2f min = v2f{canvas_dim.x - slider_girth, 0};
-                v2f dim = v2f{0} + slider_girth;
+                v2f min = v2f{context->canvas->dim.x - 1 - slider_girth, 0};
+                v2f dim = v2f{} + slider_girth;
                 
                 Color color = context->theme->outline_color;
                 Draw_Filled_Rect(context->canvas, Create_Rect_Min_Dim(min, dim), color);
@@ -971,8 +983,9 @@ static inline void GUI_End_Context(GUI_Context* context)
                     
                     // NOTE: This is an unsafe union access!
                     if(context->selection_state.slider.is_held_down)
+                    {
                         window_slider_rect = Create_Rect_Min_Dim(v2f{0}, canvas_dim);
-                    
+                    }
                     else
                     {
                         window_slider_rect = Create_Rect_Center(pos, dim);
@@ -1088,7 +1101,7 @@ static inline void GUI_End_Context(GUI_Context* context)
                 
             }
             
-            f32 padded_e_width     = selected_element_max_x - selected_element_min_x + padding_2;
+            f32 padded_e_width = selected_element_max_x - selected_element_min_x + padding_2;
             if(padded_e_width < canvas_width)
             {
                 // Selection left the canvas.
@@ -1559,6 +1572,27 @@ static void GUI_Do_Panel(GUI_Context* context, v2f* pos, v2f* dim)
             context->canvas, 
             p.rect, 
             context->theme->background_color,
+            context->theme->outline_thickness, 
+            context->theme->outline_color);
+    }
+}
+
+
+static void GUI_Do_Panel(GUI_Context* context, v2f* pos, v2f* dim, Color bg_color)
+{
+    // --------------------------------------------------------------------------
+    GUI_Placement p = GUI_Get_Placement(context, dim, pos);
+    if(!Is_Rect_Valid(p.rect))
+        return;
+    // --------------------------------------------------------------------------
+    
+    // Draw
+    if(Rects_Overlap(p.rect, context->canvas_rect))
+    {
+        Draw_Filled_Rect_With_Outline(
+            context->canvas, 
+            p.rect, 
+            bg_color,
             context->theme->outline_thickness, 
             context->theme->outline_color);
     }
@@ -3577,11 +3611,85 @@ static void GUI_Do_ML_Input_Field(
 }
 
 
-static void GUI_Begin_Sub_Context(
+static bool GUI_Do_Sub_Context(
     GUI_Context* master, 
-    GUI_Context* sub_context, 
+    GUI_Context* sub_context,
+    Canvas* sub_canvas, 
     v2f* pos,
-    v2f* dim)
+    v2f* dim,
+    Color* bg_color = 0,
+    GUI_Link_Direction::Type ld = GUI_Link_Direction::up)
 {
+    if(bg_color)
+    {
+        GUI_Do_Panel(master, pos, dim, *bg_color);
+    }
+    else
+    {
+        GUI_Do_Panel(master, pos, dim);        
+    }
     
+    GUI_Placement p = master->layout.last_element;
+    
+    f32 outline_thickness = f32(master->theme->outline_thickness);
+    p.rect.min += outline_thickness;
+    
+    if(Rects_Overlap(p.rect, master->canvas_rect))
+    {
+        v2f cp = Round(p.rect.min);
+        cp.x = Max(cp.x, 0.f);
+        cp.y = Max(cp.y, 0.f);
+        
+        v2f rendering_offset;
+        rendering_offset.x = (p.rect.min.x < 0)? p.rect.min.x : 0.f;
+        rendering_offset.y = (p.rect.min.y < 0)? p.rect.min.y : 0.f;
+       
+        v2i canvas_pos = cp.As<i32>();
+        v2u buffer_offset = canvas_pos.As<u32>();
+        
+        if(buffer_offset.x < master->canvas->dim.x && buffer_offset.y < master->canvas->dim.y)
+        {
+            v2u sub_dim = Round(p.dim + rendering_offset - outline_thickness * 2).As<u32>();
+            v2u sub_canvas_dim_max = master->canvas->dim - v2u{1, 1} - buffer_offset;
+            v2u sub_canvas_dim;
+            sub_canvas_dim.x = Min(sub_dim.x, sub_canvas_dim_max.x);
+            sub_canvas_dim.y = Min(sub_dim.y, sub_canvas_dim_max.y);
+            
+            *sub_canvas = Create_Sub_Canvas(
+                master->canvas,
+                sub_canvas_dim,
+                buffer_offset);
+            
+            {            
+                if(master->flags & GUI_Context_Flags::hard_ignore_selection)
+                    sub_context->flags |= GUI_Context_Flags::hard_ignore_selection;
+                
+                if(master->flags & GUI_Context_Flags::disable_mouse_scroll)
+                    sub_context->flags |= GUI_Context_Flags::disable_mouse_scroll;
+                
+                if(master->flags & GUI_Context_Flags::disable_kc_navigation)
+                    sub_context->flags |= GUI_Context_Flags::disable_kc_navigation;
+                
+                if(master->flags & GUI_Context_Flags::enable_dynamic_sliders)
+                    sub_context->flags |= GUI_Context_Flags::enable_dynamic_sliders;   
+            }
+            
+            GUI_Begin_Context(
+                sub_context, 
+                sub_canvas, 
+                master->external_action_context,
+                master->theme,
+                canvas_pos,
+                master->layout.anchor,
+                master->layout.build_direction,
+                ld);
+
+            sub_context->canvas_space_dim = sub_dim - Ceil(rendering_offset).As<u32>();
+            sub_context->rendering_offset = rendering_offset;
+            
+            return true;
+        }
+    }
+    
+    return false;
 }

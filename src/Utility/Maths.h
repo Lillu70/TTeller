@@ -1,9 +1,16 @@
 
+
+// ===================================
+// Copyright (c) 2024 by Valtteri Kois
+// All rights reserved.
+// ===================================
+
 #pragma once
 
 #include "math.h"
 
 #if 1
+
 template<typename T>
 static inline T Max(T value, T max)
 {

@@ -1,4 +1,10 @@
 
+
+// ===================================
+// Copyright (c) 2024 by Valtteri Kois
+// All rights reserved.
+// ===================================
+
 #pragma once
 
 static f32 s_player_creation_collumn_min_width = 300;
@@ -1014,6 +1020,8 @@ static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
 {
     Assert(s_global_data.IEFR);
     
+    #if 1
+    
     context->layout.anchor = GUI_Anchor::top;
     context->layout.build_direction = GUI_Build_Direction::down_left;
     
@@ -1077,56 +1085,50 @@ static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
     
     if(s_global_data.IEFR)
     {
-        static GUI_Context container = GUI_Create_Context();
+        f32 padding = f32(context->theme->padding);
         
         f32 bot = context->layout.last_element.pos.y - context->anchor_base.y;
         bot -= context->layout.last_element.dim.y / 2;
-        bot -= f32(context->theme->padding);
+        bot -= padding;
         f32 container_height = bot - offset;
-        f32 container_x_offset = Max(title_pos.x - title_width / 2.f, 0.f);
+
         if(container_height >= 1.f)
         {
-            f32 contents_x = Max(title_width - f32(context->canvas->dim.x), 0.f) * -1;
-            v2f contents_pos = v2f{0, container_height - 1};
+            v2f sub_canvas_dim = v2f{title_width, container_height};
+            v2f sub_canvas_pos = context->layout.last_element.pos - context->anchor_base; 
+            sub_canvas_pos.x -= context->layout.last_element.dim.x / 2;
+            sub_canvas_pos.y -= 
+                context->layout.last_element.dim.y / 2 + padding + sub_canvas_dim.y / 2;
             
-            u32 sub_canvas_width = Min(u32(title_width), context->canvas->dim.x);
-            v2u sub_canvas_dim = v2u{sub_canvas_width, u32(container_height)};
+            Canvas canvas;
+            static GUI_Context container = GUI_Create_Context();
             
+            context->layout.anchor = GUI_Anchor::left;
             
-            v2u sub_canvas_offset = v2u{u32(container_x_offset + context->anchor_base.x), u32(offset + context->anchor_base.y)};
-            Canvas sub_canvas = Create_Sub_Canvas(context->canvas, sub_canvas_dim, sub_canvas_offset);
-            
-            v2f sub_canvas_panel_dim = sub_canvas_dim.As<f32>();
-            GUI_Do_Panel(context, AUTO, &sub_canvas_panel_dim);
-            
-            Clear_Sub_Canvas(&sub_canvas, s_list_bg_color);
-            
-            #if 1
-            container.layout.anchor = GUI_Anchor::top;
-            container.layout.build_direction = GUI_Build_Direction::down_left;
-            container.flags |= GUI_Context_Flags::enable_dynamic_sliders;
-            
-            GUI_Begin_Context(
-                &container,
-                &sub_canvas,
-                &s_global_data.action_context, 
-                &s_theme,
-                sub_canvas_offset.As<i32>());
-            
-            v2f* p = &GUI_AUTO_TOP_LEFT;
-            
-            for(each(Invalid_Event_Filter_Result*, IEFR, s_global_data.IEFR))
+            if(GUI_Do_Sub_Context(
+                context, 
+                &container, 
+                &canvas, 
+                &sub_canvas_pos, 
+                &sub_canvas_dim,
+                &s_list_bg_color))
             {
-                GUI_Do_Text(&container, &contents_pos, IEFR->name.buffer);
-                contents_pos.y -= container.layout.last_element.dim.y + f32(context->theme->padding);
+                container.layout.anchor = GUI_Anchor::top_left;
+                
+                v2f* p = &GUI_AUTO_TOP_LEFT;
+                
+                for(each(Invalid_Event_Filter_Result*, IEFR, s_global_data.IEFR))
+                {
+                    GUI_Do_Text(&container, p, IEFR->name.buffer);
+                    p = 0;
+                }
+                
+                GUI_End_Context(&container);
             }
-            
-            GUI_End_Context(&container);            
-            #endif
         }
     }
     
-    #if 0
+    #else
     char* text = "Kamppania sis\xE4lsi viallisia tapahtumia!";
     GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, text);
     GUI_Do_Text(context, AUTO, "Pelin toimivuuden takia ne oli poistettava.");
