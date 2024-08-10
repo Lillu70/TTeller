@@ -1019,9 +1019,7 @@ static void Free_Invalid_Event_Filter_Result_Memory()
 static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
 {
     Assert(s_global_data.IEFR);
-    
-    #if 1
-    
+
     context->layout.anchor = GUI_Anchor::top;
     context->layout.build_direction = GUI_Build_Direction::down_left;
     
@@ -1074,7 +1072,21 @@ static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
     
     if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Avaa editorissa"))
     {
+        Events_Container ec;
         
+        if(Load_Campaign(
+            &ec, 
+            &s_editor_state.event_container.campaign_name, 
+            &s_allocator, 
+            &s_platform))
+        {
+            Close_Popup();
+            
+            s_editor_state.event_container = ec;
+            s_global_data.active_menu = Menus::EE_all_events;
+            GUI_Pop_Layout(context);
+            return;
+        }
     }
     
     GUI_Pop_Layout(context);
@@ -1119,73 +1131,43 @@ static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
                 
                 for(each(Invalid_Event_Filter_Result*, IEFR, s_global_data.IEFR))
                 {
-                    GUI_Do_Text(&container, p, IEFR->name.buffer);
+                    GUI_Do_Title_Text(&container, p, "-", GUI_DEFAULT_TEXT_SCALE);
+                    GUI_Push_Layout(&container);
+                    
+                    container.flags |= GUI_Context_Flags::one_time_skip_padding;
+                    
+                    container.layout.build_direction = GUI_Build_Direction::right_center;
+                    GUI_Do_Title_Text(&container, AUTO, IEFR->name.buffer, GUI_DEFAULT_TEXT_SCALE);
+                    
+                    container.flags |= GUI_Context_Flags::one_time_skip_padding;
+                    GUI_Do_Title_Text(&container, AUTO, ":", GUI_DEFAULT_TEXT_SCALE);
+                    
+                    GUI_Pop_Layout(&container);
                     p = 0;
+                    
+                    f32 x = container.layout.last_element.pos.x - container.anchor_base.x;
+                    
+                    for(u32 i = 0; i < Array_Lenght(Event_Errors::names); ++i)
+                    {
+                        if(IEFR->reasons & (1 << i))
+                        {
+                            GUI_Do_Spacing(&container, v2f{50, container.layout.last_element.dim.y});
+                            
+                            GUI_Push_Layout(&container);
+                            
+                            container.layout.build_direction = GUI_Build_Direction::right_center;
+                            
+                            GUI_Do_Text(&container, AUTO, (char*)Event_Errors::names[i]);
+                            
+                            GUI_Pop_Layout(&container);
+                        }
+                    }
                 }
                 
                 GUI_End_Context(&container);
             }
         }
     }
-    
-    #else
-    char* text = "Kamppania sis\xE4lsi viallisia tapahtumia!";
-    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, text);
-    GUI_Do_Text(context, AUTO, "Pelin toimivuuden takia ne oli poistettava.");
-    
-    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Jatka siit\xE4 huolimatta"))
-    {
-        Game_State game_state;
-
-        if(Convert_Editor_Campaign_Into_Game_Format(
-            &game_state,
-            &s_editor_state.event_container,
-            &s_platform,
-            &s_allocator))
-        {
-            Close_Popup();
-            
-            if(s_game_state.memory)
-                Delete_Game(&s_game_state, &s_allocator);
-            
-            s_game_state = game_state;
-            
-            s_global_data.active_menu = Menus::GM_players;
-        }
-        else
-        {
-            Set_Popup_Function(Do_GM_Campaign_Was_Unusable_Popup);
-        }
-    }
-    
-    GUI_Push_Layout(context);
-    
-    context->layout.build_direction = GUI_Build_Direction::right_center;
-    
-    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Peruuta"))
-    {
-        Close_Popup();
-    }
-    
-    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Avaa editorissa"))
-    {
-        
-    }
-    
-    GUI_Pop_Layout(context);
-    
-    GUI_Do_Spacing(context, v2f{0, 30});
-    
-    GUI_Do_Text(context, AUTO, "Seuraavat tapahtumat sis\xE4lsiv\xE4t virheit\xE4:");
-    
-    if(s_global_data.IEFR)
-    {
-        for(each(Invalid_Event_Filter_Result*, IEFR, s_global_data.IEFR))
-        {
-            GUI_Do_Text(context, AUTO, IEFR->name.buffer);
-        }        
-    }
-    #endif
 }
 
 
