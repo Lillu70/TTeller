@@ -772,6 +772,60 @@ static void Do_All_Players_Are_Dead_Frame()
 {
     Assert(s_game_state.live_player_count == 0);
     
+    
+    static bool skip_frame;
+    skip_frame = false;
+    
+    void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
+    {
+        v2f title_scale = v2f{4.f, 4.f};
+        
+        context->layout.anchor = GUI_Anchor::top;
+        context->layout.build_direction = GUI_Build_Direction::down_center;
+        
+        char* title_text = "Kaikki osallistujat makavat kuolleina...";
+        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, title_text, title_scale);
+        GUI_Do_Text(context, AUTO, "Kukaan ei selviytynyt!");
+        
+        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Pelaa uudelleen"))
+        {
+            skip_frame = true;
+            Reset_Game(&s_game_state, &s_allocator);
+            s_global_data.active_menu = Menus::GM_let_the_games_begin;
+        }
+        
+        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lopeta peli"))
+        {
+            skip_frame = true;
+            Delete_Game(&s_game_state, &s_allocator);
+            s_global_data.active_menu = Menus::main_menu;
+        }
+    }; // ----------------------------------------------------------------------------------------
+
+    void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
+    {
+        if(skip_frame)
+            return;
+        
+        Player_Image* images = Begin(s_game_state.player_images);
+        Game_Player_Name_FI* names = Begin(s_game_state.player_names);
+        
+        context->layout.anchor = GUI_Anchor::top;
+        context->layout.build_direction = GUI_Build_Direction::down_center;
+        
+        GUI_Do_Text(context, &GUI_AUTO_TOP_CENTER, "Kuolleet:");
+        
+        for(u32 i = 0; i < s_game_state.total_player_count; ++i)
+        {
+            GUI_Do_Text(context, AUTO, (names + i)->full_name.buffer);
+            GUI_Do_Image_Panel(context, AUTO, &s_player_picture_dim, &((images + i)->image));
+        }
+        
+    }; // ----------------------------------------------------------------------------------------
+
+    Do_GUI_Frame_With_Banner(banner_func, menu_func, 230);
+    
+    #if 0
     static bool skip_frame;
     
     skip_frame = false;
@@ -822,6 +876,7 @@ static void Do_All_Players_Are_Dead_Frame()
     }; // ----------------------------------------------------------------------------------------
 
     Do_GUI_Frame_With_Banner(banner_func, menu_func);
+    #endif
 }
 
 
@@ -888,7 +943,7 @@ static void Do_We_Have_A_Winner_Frame()
         
     }; // ----------------------------------------------------------------------------------------
 
-    Do_GUI_Frame_With_Banner(banner_func, menu_func, 210);
+    Do_GUI_Frame_With_Banner(banner_func, menu_func, 230);
 }
 
 
@@ -935,7 +990,7 @@ static void Do_Select_Campagin_To_Play_Frame()
             {
                 if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, save_name->buffer))
                 {
-                    Events_Container editor_format_campagin;
+                    Events_Container editor_format_campagin = {};
                     if(Load_Campaign(&editor_format_campagin, save_name, &s_allocator, &s_platform))
                     {
                         Dynamic_Array<Invalid_Event_Filter_Result>* filter_results = 
@@ -953,12 +1008,14 @@ static void Do_Select_Campagin_To_Play_Frame()
                         else
                         {
                             Game_State game_state;
-                    
-                            if(Convert_Editor_Campaign_Into_Game_Format(
+                            
+                            u32 errors = Convert_Editor_Campaign_Into_Game_Format(
                                 &game_state,
                                 &editor_format_campagin,
                                 &s_platform,
-                                &s_allocator))
+                                &s_allocator);
+                            
+                            if(!errors)
                             {
                                 if(s_game_state.memory)
                                     Delete_Game(&s_game_state, &s_allocator);
@@ -966,6 +1023,11 @@ static void Do_Select_Campagin_To_Play_Frame()
                                 s_game_state = game_state;
                                 
                                 s_global_data.active_menu = Menus::GM_players;
+                            }
+                            else
+                            {
+                                s_global_data.GM_conversion_errors = errors;
+                                Set_Popup_Function(Do_GM_Campaign_Was_Unusable_Popup);
                             }
 
                             Delete_Event_Container(&editor_format_campagin, &s_allocator);
@@ -1025,7 +1087,7 @@ static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
     
     f32 sh = f32(context->canvas->dim.y);
     f32 pf = .5f;
-    f32 offset = sh * (pf / 2);        
+    f32 offset = sh * (pf / 2);
     
     v2f title_pos = {Get_Middle(context->canvas).x, sh - offset};
     
@@ -1039,12 +1101,14 @@ static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
     if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Jatka siit\xE4 huolimatta"))
     {
         Game_State game_state;
-
-        if(Convert_Editor_Campaign_Into_Game_Format(
+        
+        u32 errors = Convert_Editor_Campaign_Into_Game_Format(
             &game_state,
             &s_editor_state.event_container,
             &s_platform,
-            &s_allocator))
+            &s_allocator);
+        
+        if(!errors)
         {
             Close_Popup();
             
@@ -1057,6 +1121,7 @@ static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
         }
         else
         {
+            s_global_data.GM_conversion_errors = errors;
             Set_Popup_Function(Do_GM_Campaign_Was_Unusable_Popup);
         }
     }
@@ -1113,58 +1178,58 @@ static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
                 context->layout.last_element.dim.y / 2 + padding + sub_canvas_dim.y / 2;
             
             Canvas canvas;
-            static GUI_Context container = GUI_Create_Context();
+            GUI_Context* sub_context = Get_GUI_Context_From_Pool();
             
             context->layout.anchor = GUI_Anchor::left;
             
             if(GUI_Do_Sub_Context(
                 context, 
-                &container, 
+                sub_context, 
                 &canvas, 
                 &sub_canvas_pos, 
                 &sub_canvas_dim,
                 &s_list_bg_color))
             {
-                container.layout.anchor = GUI_Anchor::top_left;
+                sub_context->layout.anchor = GUI_Anchor::top_left;
                 
                 v2f* p = &GUI_AUTO_TOP_LEFT;
                 
                 for(each(Invalid_Event_Filter_Result*, IEFR, s_global_data.IEFR))
                 {
-                    GUI_Do_Title_Text(&container, p, "-", GUI_DEFAULT_TEXT_SCALE);
-                    GUI_Push_Layout(&container);
+                    GUI_Do_Title_Text(sub_context, p, "-", GUI_DEFAULT_TEXT_SCALE);
+                    GUI_Push_Layout(sub_context);
                     
-                    container.flags |= GUI_Context_Flags::one_time_skip_padding;
+                    sub_context->flags |= GUI_Context_Flags::one_time_skip_padding;
                     
-                    container.layout.build_direction = GUI_Build_Direction::right_center;
-                    GUI_Do_Title_Text(&container, AUTO, IEFR->name.buffer, GUI_DEFAULT_TEXT_SCALE);
+                    sub_context->layout.build_direction = GUI_Build_Direction::right_center;
+                    GUI_Do_Title_Text(sub_context, AUTO, IEFR->name.buffer, GUI_DEFAULT_TEXT_SCALE);
                     
-                    container.flags |= GUI_Context_Flags::one_time_skip_padding;
-                    GUI_Do_Title_Text(&container, AUTO, ":", GUI_DEFAULT_TEXT_SCALE);
+                    sub_context->flags |= GUI_Context_Flags::one_time_skip_padding;
+                    GUI_Do_Title_Text(sub_context, AUTO, ":", GUI_DEFAULT_TEXT_SCALE);
                     
-                    GUI_Pop_Layout(&container);
+                    GUI_Pop_Layout(sub_context);
                     p = 0;
                     
-                    f32 x = container.layout.last_element.pos.x - container.anchor_base.x;
+                    f32 x = sub_context->layout.last_element.pos.x - sub_context->anchor_base.x;
                     
                     for(u32 i = 0; i < Array_Lenght(Event_Errors::names); ++i)
                     {
                         if(IEFR->reasons & (1 << i))
                         {
-                            GUI_Do_Spacing(&container, v2f{50, container.layout.last_element.dim.y});
+                            GUI_Do_Spacing(sub_context, v2f{50, sub_context->layout.last_element.dim.y});
                             
-                            GUI_Push_Layout(&container);
+                            GUI_Push_Layout(sub_context);
                             
-                            container.layout.build_direction = GUI_Build_Direction::right_center;
+                            sub_context->layout.build_direction = GUI_Build_Direction::right_center;
                             
-                            GUI_Do_Text(&container, AUTO, (char*)Event_Errors::names[i]);
+                            GUI_Do_Text(sub_context, AUTO, (char*)Event_Errors::names[i]);
                             
-                            GUI_Pop_Layout(&container);
+                            GUI_Pop_Layout(sub_context);
                         }
                     }
                 }
                 
-                GUI_End_Context(&container);
+                GUI_End_Context(sub_context);
             }
         }
     }
@@ -1173,5 +1238,54 @@ static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
 
 static void Do_GM_Campaign_Was_Unusable_Popup(GUI_Context* context)
 {
-    GUI_Do_Button(context, &GUI_AUTO_MIDDLE, &GUI_AUTO_FIT, "kampanjaa ei voi pelata.");
+    context->layout.build_direction = GUI_Build_Direction::down_left;
+    context->layout.anchor = GUI_Anchor::center;
+    
+    v2f panel_dim = v2f
+        {
+            900,
+            500
+        };
+        
+    v2f panel_center = Get_Middle(context->canvas);
+    
+    GUI_Get_Placement(context, &panel_dim, &GUI_AUTO_MIDDLE);
+    
+    context->layout.anchor = GUI_Anchor::top_left;
+    
+    v2f title_pos = panel_center + v2f{panel_dim.x * -1, panel_dim.y} / 2;
+    GUI_Do_Title_Text(context, &title_pos, "Virhe raportti:");
+    GUI_Do_Text(context, AUTO, "Peli ei ole pelattavissa:");
+    
+    Canvas sub_canvas;
+    GUI_Context* sub_context = Get_GUI_Context_From_Pool();
+    
+    v2f sub_space_dim = v2f
+        {
+            panel_dim.x, 
+            (context->layout.last_element.pos.y - context->layout.last_element.dim.y / 2) - 
+                (panel_center.y - panel_dim.y / 2)
+        };
+    
+    if(GUI_Do_Sub_Context(context, sub_context, &sub_canvas, AUTO, &sub_space_dim, &s_list_bg_color))
+    {
+        GUI_Do_Title_Text(sub_context, &GUI_AUTO_TOP_LEFT, "Virheet:", GUI_DEFAULT_TEXT_SCALE);
+
+        for(u32 i = 0; i < Array_Lenght(Game_Errors::names); ++i)
+        {
+            if(s_global_data.GM_conversion_errors & (1 << i))
+                GUI_Do_Text(sub_context, AUTO, (char*)Game_Errors::names[i]);
+        }
+    
+        GUI_End_Context(sub_context);
+    }
+    
+    
+    context->layout.anchor = GUI_Anchor::top_right;
+    
+    v2f close_pos = panel_center + panel_dim / 2;
+    if(GUI_Do_Button(context, &close_pos, &GUI_AUTO_FIT, "X"))
+    {
+        Close_Popup();
+    }
 }

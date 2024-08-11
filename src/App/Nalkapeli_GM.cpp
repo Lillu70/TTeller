@@ -318,7 +318,7 @@ static Event_Consequens_GM Convert_To_GM(Event_Consequens* con, Mark_Hash_Table*
 
 
 
-static bool Convert_Editor_Campaign_Into_Game_Format(
+static u32 Convert_Editor_Campaign_Into_Game_Format(
     Game_State* game,
     Events_Container* event_container,
     Platform_Calltable* platform,
@@ -329,11 +329,20 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
     Assert(allocator);
     
     *game = {};
-    bool result = false;
-    if(event_container->events->count)
-    {
-        result = true;
     
+    u32 errors = 0;
+    
+    if(event_container->events->count == 0)
+        errors |= Game_Errors::does_not_contain_any_events;
+    
+    if(event_container->events->count == event_container->day_event_count)
+        errors |= Game_Errors::does_not_contain_a_night_event;
+    
+    if(event_container->day_event_count == 0)
+        errors |= Game_Errors::does_not_contain_a_day_event;
+    
+    if(!errors)
+    {
         u32 alloc_size = 0;
         u32 requirements_data_size = 0;
         u32 events_data_size = 0;
@@ -604,7 +613,7 @@ static bool Convert_Editor_Campaign_Into_Game_Format(
         
     }
     
-    return result;
+    return errors;
 }
 
 

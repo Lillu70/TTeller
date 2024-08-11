@@ -21,6 +21,14 @@ static GUI_Context s_gui;
 static GUI_Context s_gui_banner;
 static GUI_Context s_gui_pop_up;
 
+
+struct Pooled_GUI_Context
+{
+    GUI_Context context;
+    u32 last_used_ID;
+};
+static Pooled_GUI_Context s_context_pool[4] = {};
+
 static constexpr f32 s_post_title_y_spacing = 20;
 
 
@@ -101,6 +109,9 @@ struct Global_Data
     Rect popup_panel_rect = {};
     
     bool force_quit_popup = false;
+    
+    u32 pooled_contexes_in_use_count = 0;
+    u32 GM_conversion_errors = 0;
 };
 static Global_Data s_global_data = Global_Data();
 
@@ -130,8 +141,7 @@ static inline void Set_Popup_Function(void(*popup_function)(GUI_Context*))
     s_global_data.popup_panel_rect = Create_Rect_Min_Max_HZ(v2f{0,0}, v2f{0,0});
     s_global_data.popup_panel_dim = v2f{0.f, 0.f};
     
-    if(!GUI_Is_Context_Ready(&s_gui_pop_up))
-        GUI_Reset_Context(&s_gui_pop_up);
+    GUI_Try_Reset_Context(&s_gui_pop_up);
     
     GUI_Activate_Context(&s_gui_pop_up);        
     
@@ -316,6 +326,10 @@ static inline void Init_GUI()
     s_gui_banner = GUI_Create_Context();
     s_gui_pop_up = GUI_Create_Context();
     
+    for(u32 i = 0; i < Array_Lenght(s_context_pool); ++i)
+        s_context_pool[i].context = GUI_Create_Context();
+    
+    
     GUI_Activate_Context(&s_gui_banner);
     
     s_gui_pop_up.flags |= GUI_Context_Flags::enable_dynamic_sliders;
@@ -424,4 +438,20 @@ static inline void Gather_Editor_Format_Campaigns()
             }
         }
     }
+}
+
+
+static GUI_Context* Get_GUI_Context_From_Pool()
+{
+    Assert(s_global_data.pooled_contexes_in_use_count < Array_Lenght(s_context_pool));
+    
+    Pooled_GUI_Context* result = s_context_pool + s_global_data.pooled_contexes_in_use_count;
+    if(result->last_used_ID != result->context._context_id)
+        GUI_Reset_Context(&result->context);
+    
+    result->last_used_ID = result->context._context_id;
+    
+    s_global_data.pooled_contexes_in_use_count += 1;
+    
+    return &result->context;
 }

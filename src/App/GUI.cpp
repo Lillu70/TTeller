@@ -549,6 +549,13 @@ static inline void GUI_Reset_Context(GUI_Context* context)
 }
 
 
+static inline void GUI_Try_Reset_Context(GUI_Context* context)
+{
+    if(!GUI_Is_Context_Ready(context) && context->last_widget_count)
+        GUI_Reset_Context(context);
+}
+
+
 static inline void GUI_Update_Actions()
 {
     Assert(GUI_Context::platform);
@@ -565,6 +572,8 @@ static inline void GUI_Activate_Context(GUI_Context* context)
 {
     Assert(context->_context_id);
     GUI_Context::active_context_id = context->_context_id;
+    
+    //Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::hard_ignore_selection);
 }
 
 
@@ -3660,7 +3669,7 @@ static bool GUI_Do_Sub_Context(
                 sub_canvas_dim,
                 buffer_offset);
             
-            {            
+            {
                 if(master->flags & GUI_Context_Flags::hard_ignore_selection)
                     sub_context->flags |= GUI_Context_Flags::hard_ignore_selection;
                 

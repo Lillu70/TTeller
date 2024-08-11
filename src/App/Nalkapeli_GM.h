@@ -14,6 +14,7 @@
     This is done to make iteration fast. Especially important for requirements.
 */
 
+
 enum class Event_List : u8
 {
     day,
@@ -292,6 +293,24 @@ struct Game_State
 
     | - event table night -> Containts offsets to Event_Headers.      ; sizeof(u32 * night event count)
 */
+
+
+namespace Game_Errors
+{
+    enum T : u32
+    {
+        does_not_contain_a_day_event    = 1 << 0,
+        does_not_contain_a_night_event  = 1 << 1,
+        does_not_contain_any_events     = 1 << 2,
+    };
+    
+    char* names[] = 
+    {
+        "Peli ei sis\xE4ll\xE4 p\xE4iv\xE4 tapahtumaa!",
+        "Peli ei sis\xE4ll\xE4 y\xF6 tapahtumaa!",
+        "Peli ei sis\xE4ll\xE4 yht\xE4\xE4n tapahtumaa!",
+    };
+}
 
 
 struct Filler_Name_Data_FI

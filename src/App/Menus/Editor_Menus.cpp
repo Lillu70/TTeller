@@ -136,8 +136,8 @@ static void Do_Event_Editor_All_Events_Frame()
     
     void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
     {
-        static GUI_Context gui_event_list_day = GUI_Create_Context();
-        static GUI_Context gui_event_list_night = GUI_Create_Context();
+        GUI_Context* gui_event_list_day     = Get_GUI_Context_From_Pool();
+        GUI_Context* gui_event_list_night   = Get_GUI_Context_From_Pool();
         
         u32 day_event_count = s_editor_state.event_container.day_event_count;
         u32 night_event_count = s_editor_state.event_container.events->count - day_event_count;
@@ -147,41 +147,41 @@ static void Do_Event_Editor_All_Events_Frame()
             if(s_hotkeys[Editor_Hotkeys::active_pannel_toggle].Is_Released() &&
                 Bit_Not_Set(s_gui_banner.flags, GUI_Context_Flags::hard_ignore_selection))
             {
-                if(GUI_Is_Context_Active(&gui_event_list_day))
+                if(GUI_Is_Context_Active(gui_event_list_day))
                 {
                     if(night_event_count > 0)
-                        GUI_Activate_Context(&gui_event_list_night);
+                        GUI_Activate_Context(gui_event_list_night);
                     else
                         GUI_Activate_Context(&s_gui_banner);
                 }
-                else if(GUI_Is_Context_Active(&gui_event_list_night))
+                else if(GUI_Is_Context_Active(gui_event_list_night))
                     GUI_Activate_Context(&s_gui_banner);
             }
             
             if(!s_editor_state.event_container.events->count && (
-                GUI_Is_Context_Active(&gui_event_list_day) || 
-                GUI_Is_Context_Active(&gui_event_list_night)))
+                GUI_Is_Context_Active(gui_event_list_day) || 
+                GUI_Is_Context_Active(gui_event_list_night)))
             {
                 GUI_Activate_Context(&s_gui_banner);
             }
             
-            else if(GUI_Is_Context_Active(&gui_event_list_day) && !day_event_count)
+            else if(GUI_Is_Context_Active(gui_event_list_day) && !day_event_count)
             {
-                GUI_Activate_Context(&gui_event_list_night);
+                GUI_Activate_Context(gui_event_list_night);
             }
             
-            else if(GUI_Is_Context_Active(&gui_event_list_night) && !night_event_count)
+            else if(GUI_Is_Context_Active(gui_event_list_night) && !night_event_count)
             {
-                GUI_Activate_Context(&gui_event_list_day);
+                GUI_Activate_Context(gui_event_list_day);
             }
 
             else if(GUI_Is_Context_Active(&s_gui))            
             {
                 if(day_event_count == 0)
-                    GUI_Activate_Context(&gui_event_list_night);
+                    GUI_Activate_Context(gui_event_list_night);
                 
                 else
-                    GUI_Activate_Context(&gui_event_list_day);
+                    GUI_Activate_Context(gui_event_list_day);
             }            
         }
         // ------------------------------------------------------------------------------------------
@@ -284,13 +284,13 @@ static void Do_Event_Editor_All_Events_Frame()
             Canvas event_list_day_canvas = Create_Sub_Canvas(&s_canvas, sub_dim, day_list_buffer_offset);
             Clear_Sub_Canvas(&event_list_day_canvas, s_list_bg_color);
             
-            Inverse_Bit_Mask(&gui_event_list_day.flags,  GUI_Context_Flags::hard_ignore_selection);
+            Inverse_Bit_Mask(&gui_event_list_day->flags,  GUI_Context_Flags::hard_ignore_selection);
             u32 set_mask = GUI_Context_Flags::enable_dynamic_sliders;
             set_mask |= (context->flags &  GUI_Context_Flags::hard_ignore_selection);
-            gui_event_list_day.flags |= set_mask;
+            gui_event_list_day->flags |= set_mask;
             
             GUI_Begin_Context(
-                &gui_event_list_day,
+                gui_event_list_day,
                 &event_list_day_canvas,
                 &s_global_data.action_context,
                 &s_theme,
@@ -301,11 +301,11 @@ static void Do_Event_Editor_All_Events_Frame()
                 v2f* pos = &GUI_AUTO_TOP_LEFT;
                 for(u32 i = 0; i < s_editor_state.event_container.day_event_count; ++i)
                 {
-                    do_event_list(&gui_event_list_day, events, &pos, i);
+                    do_event_list(gui_event_list_day, events, &pos, i);
                 }
                 
             }
-            GUI_End_Context(&gui_event_list_day);
+            GUI_End_Context(gui_event_list_day);
         }
         
         // Night list sub gui
@@ -314,13 +314,13 @@ static void Do_Event_Editor_All_Events_Frame()
             Canvas event_list_night_canvas = Create_Sub_Canvas(&s_canvas, sub_dim, night_list_buffer_offset);
             Clear_Sub_Canvas(&event_list_night_canvas, s_list_bg_color);
             
-            Inverse_Bit_Mask(&gui_event_list_night.flags,  GUI_Context_Flags::hard_ignore_selection);
+            Inverse_Bit_Mask(&gui_event_list_night->flags,  GUI_Context_Flags::hard_ignore_selection);
             u32 set_mask = GUI_Context_Flags::enable_dynamic_sliders;
             set_mask |= (context->flags &  GUI_Context_Flags::hard_ignore_selection);
-            gui_event_list_night.flags |= set_mask;
+            gui_event_list_night->flags |= set_mask;
             
             GUI_Begin_Context(
-                &gui_event_list_night,
+                gui_event_list_night,
                 &event_list_night_canvas,
                 &s_global_data.action_context,
                 &s_theme,
@@ -332,16 +332,12 @@ static void Do_Event_Editor_All_Events_Frame()
                 for(u32 i = s_editor_state.event_container.day_event_count; 
                     i < s_editor_state.event_container.events->count; ++i)
                 {
-                    do_event_list(&gui_event_list_night, events, &pos, i);
+                    do_event_list(gui_event_list_night, events, &pos, i);
                 }
                 
             }
-            GUI_End_Context(&gui_event_list_night);
+            GUI_End_Context(gui_event_list_night);
         }
-        
-        // Solves an edge case that would otherwise leave no active context.
-        if(s_global_data.active_menu != Menus::EE_all_events)
-            GUI_Activate_Context(&s_gui_banner);
         
     }; // ----------------------------------------------------------------------------------------
     
@@ -1332,12 +1328,12 @@ static void Do_Event_Editor_Campaigns_Menu_Frame()
         GUI_Do_Text(context, AUTO, "\" jossa * on kampanjan nimi.)", {}, v2f{1.f, 1.f});
         
         GUI_Pop_Layout(context);
-        GUI_Do_Text(context, AUTO, "Lataa tallenus:", {}, GUI_DEFAULT_TEXT_SCALE);
+        GUI_Do_Text(context, AUTO, "Lataa tallenus:");
         
         Dynamic_Array<String>* on_disk_names = s_global_data.on_disk_campaign_names;
         if(on_disk_names)
         {
-            for(String* save_name = Begin(on_disk_names); save_name < End(on_disk_names); ++save_name)
+            for(each(String*, save_name, on_disk_names))
             {
                 if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, save_name->buffer))
                 {
@@ -1360,7 +1356,7 @@ static void Do_Event_Editor_Campaigns_Menu_Frame()
 static void Do_Event_Editor_On_Exit_Popup(GUI_Context* context)
 {
     static constexpr char* text = "Tallenetaanko kampanja?";
-    GUI_Do_Text(context, &GUI_AUTO_MIDDLE, text, {}, GUI_DEFAULT_TEXT_SCALE * 1.5f, true);
+    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, text);
     
     context->layout.build_direction = GUI_Build_Direction::down_center;
     
@@ -1400,7 +1396,7 @@ static void Do_Event_Editor_On_Exit_Popup(GUI_Context* context)
 static void Do_Event_Editor_Quit_Popup(GUI_Context* context)
 {    
     static constexpr char* text = "Suljetaanko varmasti?";
-    GUI_Do_Text(context, &GUI_AUTO_MIDDLE, text, {}, GUI_DEFAULT_TEXT_SCALE * 1.5f, true);
+    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, text);
     
     context->layout.build_direction = GUI_Build_Direction::down_center;
     
@@ -1431,7 +1427,7 @@ static void Do_Event_Editor_Quit_Popup(GUI_Context* context)
 static void Do_Event_Editor_Delete_Event_Popup(GUI_Context* context)
 {
     static constexpr char* text = "Poistetaanko varmasti?";
-    GUI_Do_Text(context, &GUI_AUTO_MIDDLE, text, {}, GUI_DEFAULT_TEXT_SCALE * 1.5f, true);
+    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, text);
     
     context->layout.build_direction = GUI_Build_Direction::down_center;
     
@@ -1462,38 +1458,77 @@ static void Do_Event_Editor_Delete_Event_Popup(GUI_Context* context)
 
 static void Do_Event_Editor_Display_Active_Event_Errors(GUI_Context* context)
 {
-    context->layout.build_direction = GUI_Build_Direction::down_center;
-    context->layout.anchor = GUI_Anchor::center;
-    
     Editor_Event* event = Active_Event(&s_editor_state);
     
-    v2f* pos = &GUI_AUTO_MIDDLE;
+    context->layout.build_direction = GUI_Build_Direction::down_left;
+    context->layout.anchor = GUI_Anchor::center;
     
-    if(event->issues.errors)
-    {
-        GUI_Do_Text(context, pos, "Virheet:");
-        pos = 0;
-        
-        for(u32 i = 0; i < Array_Lenght(Event_Errors::names); ++i)
+    v2f panel_dim = v2f
         {
-            if(event->issues.errors & (1 << i))
-                GUI_Do_Text(context, AUTO, (char*)Event_Errors::names[i]);
+            900,
+            500
+        };
+        
+    v2f panel_center = Get_Middle(context->canvas);
+    
+    GUI_Get_Placement(context, &panel_dim, &GUI_AUTO_MIDDLE);
+    
+    context->layout.anchor = GUI_Anchor::top_left;
+    
+    v2f title_pos = panel_center + v2f{panel_dim.x * -1, panel_dim.y} / 2;
+    GUI_Do_Title_Text(context, &title_pos, "Virhe raportti:");
+    GUI_Do_Text(context, AUTO, "Tapahtuma sis\xE4lt\xE4\xE4 seuraavat ongelmat:");
+    
+    Canvas sub_canvas;
+    GUI_Context* sub_context = Get_GUI_Context_From_Pool();
+    
+    v2f sub_space_dim = v2f
+        {
+            panel_dim.x, 
+            (context->layout.last_element.pos.y - context->layout.last_element.dim.y / 2) - 
+                (panel_center.y - panel_dim.y / 2)
+        };
+    
+    if(GUI_Do_Sub_Context(context, sub_context, &sub_canvas, AUTO, &sub_space_dim, &s_list_bg_color))
+    {
+        v2f* pos = &GUI_AUTO_TOP_LEFT;
+        
+        if(event->issues.errors)
+        {
+            GUI_Do_Title_Text(sub_context, pos, "Virheet:", GUI_DEFAULT_TEXT_SCALE);
+            pos = 0;
+            
+            for(u32 i = 0; i < Array_Lenght(Event_Errors::names); ++i)
+            {
+                if(event->issues.errors & (1 << i))
+                    GUI_Do_Text(sub_context, AUTO, (char*)Event_Errors::names[i]);
+            }
         }
         
-    }
-    
-    if(event->issues.warnings)
-    {
-        GUI_Do_Text(context, pos, "Varoitukset:");
-        
-        for(u32 i = 0; i < Array_Lenght(Event_Warnings::names); ++i)
+        if(event->issues.warnings)
         {
-            if(event->issues.warnings & (1 << i))
-                GUI_Do_Text(context, AUTO, (char*)Event_Warnings::names[i]);
-        }        
+            if(!pos)
+            {
+                GUI_Do_Spacing(sub_context, v2f{0.f, sub_context->layout.last_element.dim.y});
+            }
+            
+            GUI_Do_Title_Text(sub_context, pos, "Varoitukset:", GUI_DEFAULT_TEXT_SCALE);
+            
+            for(u32 i = 0; i < Array_Lenght(Event_Warnings::names); ++i)
+            {
+                if(event->issues.warnings & (1 << i))
+                    GUI_Do_Text(sub_context, AUTO, (char*)Event_Warnings::names[i]);
+            }        
+        }
+        
+        GUI_End_Context(sub_context);
     }
     
-    if(GUI_Context::actions[GUI_Menu_Actions::mouse].Is_Pressed())
+    
+    context->layout.anchor = GUI_Anchor::top_right;
+    
+    v2f close_pos = panel_center + panel_dim / 2;
+    if(GUI_Do_Button(context, &close_pos, &GUI_AUTO_FIT, "X"))
     {
         Close_Popup();
     }

@@ -224,7 +224,6 @@ void Update_App()
     {
         GUI_Reset_Context(&s_gui);
         GUI_Reset_Context(&s_gui_banner);
-        
         GUI_Activate_Context(&s_gui_banner);
         
         // Handle leaving a menu.
@@ -277,6 +276,8 @@ void Update_App()
     #endif
     
     s_scrach_buffer.clear();
+    
+    s_global_data.pooled_contexes_in_use_count = 0;
     
     End_Timing_Block(internal_run_time);
 }
