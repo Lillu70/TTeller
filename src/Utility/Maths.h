@@ -48,6 +48,14 @@ static inline T Abs(T v)
 }
 #endif
 
+
+static inline f64 Sin(f64 value)
+{
+    f64 result = sin(value);
+    return result;    
+}
+
+
 static inline f32 Sin(f32 value)
 {
     f32 result = sinf(value);

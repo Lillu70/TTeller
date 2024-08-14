@@ -174,6 +174,11 @@ void Update_App()
             Do_We_Have_A_Winner_Frame();
         }break;
         
+        case Menus::GM_event_assignement_failed:
+        {
+            Do_Event_Assignement_Failed_Frame();
+        }break;
+        
         default:
         {
             Terminate;
@@ -239,6 +244,9 @@ void Update_App()
             {
                 Editor_Event* event = Active_Event(&s_editor_state);
                 Update_Editor_Event_Participant_Issues(event);
+                
+                if(event->issues.errors || event->issues.warnings)
+                    Update_Editor_Event_Text_Issues(event);
             }break;
             
             case Menus::EE_consequences:

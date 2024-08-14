@@ -566,8 +566,14 @@ static void Do_Day_Counter_Display_Frame()
         
         if(GUI_Do_Button(context, AUTO, &title_dim, "Jatka"))
         {
-            s_global_data.active_menu = Menus::GM_event_display;
-            Assign_Events_To_Participants(&s_game_state, Event_List::day, &s_allocator);
+            if(!Assign_Events_To_Participants(&s_game_state, Event_List::day, &s_allocator))
+            {
+                s_global_data.active_menu = Menus::GM_event_assignement_failed;
+            }
+            else
+            {            
+                s_global_data.active_menu = Menus::GM_event_display;
+            }
         }
         
         context->layout.anchor = GUI_Anchor::top_left;
@@ -758,8 +764,14 @@ static void Do_Night_Falls_Frame()
         GUI_Context::actions[GUI_Menu_Actions::enter].Is_Released() ||
         (cursor_on_canvas && GUI_Context::actions[GUI_Menu_Actions::mouse].Is_Released()))
     {
-        s_global_data.active_menu = Menus::GM_event_display;
-        Assign_Events_To_Participants(&s_game_state, Event_List::night, &s_allocator);
+        if(!Assign_Events_To_Participants(&s_game_state, Event_List::night, &s_allocator))
+        {
+            s_global_data.active_menu = Menus::GM_event_assignement_failed;
+        }
+        else
+        {            
+            s_global_data.active_menu = Menus::GM_event_display;
+        }
     }
     
     GUI_End_Context(context);
@@ -944,6 +956,85 @@ static void Do_We_Have_A_Winner_Frame()
     }; // ----------------------------------------------------------------------------------------
 
     Do_GUI_Frame_With_Banner(banner_func, menu_func, 230);
+}
+
+
+static void Do_Event_Assignement_Failed_Frame()
+{
+    static bool skip_frame;
+    skip_frame = false;
+    
+    void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
+    {
+        v2f title_scale = v2f{4.f, 4.f};
+        
+        context->layout.anchor = GUI_Anchor::top;
+        context->layout.build_direction = GUI_Build_Direction::down_center;
+        
+        char* title_text = "Tapahtuma virhe :(";
+        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, title_text, title_scale);
+        GUI_Do_Text(context, AUTO, "Kaikia osallistujia ei saatu mahtumaan tapahtumaan.");
+        
+        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lopeta peli"))
+        {
+            skip_frame = true;
+            Delete_Game(&s_game_state, &s_allocator);
+            s_global_data.active_menu = Menus::main_menu;
+        }
+        
+        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Pelaa uudelleen"))
+        {
+            skip_frame = true;
+            Reset_Game(&s_game_state, &s_allocator);
+            s_global_data.active_menu = Menus::GM_let_the_games_begin;
+        }
+        
+    }; // ----------------------------------------------------------------------------------------
+
+    void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
+    {
+        if(skip_frame)
+            return;
+        
+        f64 time = s_platform.Get_Time_Stamp();
+        
+        f32 c = f32(s_game_state.total_player_count);
+        f32 padding = f32(context->theme->padding);
+        
+        v2f screen_middle = Get_Middle(context->canvas);
+        
+        f32 pos_x = (c * (padding + s_player_picture_dim.x) - padding) * -0.5f;
+       
+        context->layout.anchor = GUI_Anchor::left;
+        
+        for(each(Player_Image*, img, s_game_state.player_images))
+        {
+            f32 y_offset;
+            if(context->canvas->dim.y > s_player_picture_dim.y + padding * 2)
+            {
+                f32 y_span = 0.5f * (f32(context->canvas->dim.y) - s_player_picture_dim.y) - padding;
+                y_offset = f32(Sin(time)) * y_span;                
+            }
+            else
+            {
+                y_offset = 0;
+            }
+            
+            v2f pos = {screen_middle.x + pos_x, screen_middle.y + y_offset};
+            
+            GUI_Do_Image_Panel(context, &pos, &s_player_picture_dim, &img->image);
+            pos_x += padding + s_player_picture_dim.x;
+            time += 0.5;
+        }
+        
+    }; // ----------------------------------------------------------------------------------------
+    
+    u32 flags = s_gui.flags;
+    Inverse_Bit_Mask(&s_gui.flags, GUI_Context_Flags::enable_dynamic_sliders);
+    
+    Do_GUI_Frame_With_Banner(banner_func, menu_func, 230);
+    
+    s_gui.flags = flags;
 }
 
 

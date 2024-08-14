@@ -1097,18 +1097,22 @@ static inline bool Player_Satisfies_Requirement(
 }
 
 
-static void Assign_Events_To_Participants(
+static inline void Hollow_Active_Events(Game_State* game, Allocator_Shell* allocator)
+{
+    for(each(Event*, e, game->active_events))
+            allocator->free(e->player_indices);
+        
+    game->active_events->count = 0;
+}
+
+
+static bool Assign_Events_To_Participants(
     Game_State* game,
     Event_List event_list,
     Allocator_Shell* allocator)
 {
-    // Cleanup any previous events list data.
-    {
-        for(each(Event*, e, game->active_events))
-            allocator->free(e->player_indices);
-        
-        game->active_events->count = 0;
-    }
+    Hollow_Active_Events(game, allocator);
+    
     game->active_event_list = event_list;
     
     Assert(game->live_player_count);
@@ -1151,10 +1155,10 @@ static void Assign_Events_To_Participants(
             Req_GM_Header* req_header = (Req_GM_Header*)((u8*)game->req_data + offset);
             
             // Test event ------------
-            
+            bool not_rejected = true;
             // Test player count
             if(unassigned_player_count < req_header->participant_count)
-                goto REJECTED;
+                not_rejected = false;
             
             // Test global reqs
             for(u32 i = 0; i < req_header->global_req_count; ++i)
@@ -1172,7 +1176,7 @@ static void Assign_Events_To_Participants(
                 
                 if(global_req->mark_exists != exists)
                 {
-                    goto REJECTED;
+                    not_rejected = false;
                     break;
                 }
                 
@@ -1183,119 +1187,130 @@ static void Assign_Events_To_Participants(
                         global_req->relation_target, 
                         global_req->numerical_relation))
                     {
-                        goto REJECTED;
+                        not_rejected = false;
+                        break;
                     }
                 }
             }
             
-            // Test players against participant requirements.
-            u8* parti_req_memory =
-                ((u8*)(req_header + 1)) + req_header->global_req_count * sizeof(Global_Mark_Requirement_GM);
-            
-            u32 filled_slot_count = 0;
-            u32 slots_size = sizeof(u32) * req_header->participant_count;
-            u32* slots = (u32*)allocator->push(slots_size);
-            Mem_Zero(slots, slots_size);
-            
             bool commited = false;
-            for(u32 p = 0; p < unassigned_player_count; ++p)
+            u32* slots = 0;
+            
+            if(not_rejected)
             {
-                u32 player_idx = game->player_assignement_table[p];
-                Game_Player* player = game->players + player_idx;
+                // Test players against participant requirements.
+                u32 parti_req_mem_size = 
+                    req_header->global_req_count * sizeof(Global_Mark_Requirement_GM);
                 
-                Participant_Header* parti = (Participant_Header*)parti_req_memory;
-                for(u32 s = 0; s < req_header->participant_count; ++s)
+                u8* parti_req_memory = ((u8*)(req_header + 1)) + parti_req_mem_size;
+                
+                u32 filled_slot_count = 0;
+                u32 slots_size = sizeof(u32) * req_header->participant_count;
+                slots = (u32*)allocator->push(slots_size);
+                Mem_Zero(slots, slots_size);
+                
+                for(u32 p = 0; p < unassigned_player_count; ++p)
                 {
-                    if(!slots[s]) // NOTE: skip filled slots
+                    u32 player_idx = game->player_assignement_table[p];
+                    Game_Player* player = game->players + player_idx;
+                    
+                    Participant_Header* parti = (Participant_Header*)parti_req_memory;
+                    for(u32 s = 0; s < req_header->participant_count; ++s)
                     {
-                        Participation_Requirement_GM* reqs_begin 
-                            = (Participation_Requirement_GM*)(parti + 1);
-                        
-                        Participation_Requirement_GM* reqs_end = reqs_begin + parti->count;
-                        
-                        bool satisfies_reqs = true;
-                        
-                        for(auto req = reqs_begin; req < reqs_end; ++req)
+                        if(!slots[s]) // NOTE: skip filled slots
                         {
-                            bool satisfies = Player_Satisfies_Requirement(player, req);
-                            if(!satisfies)
+                            Participation_Requirement_GM* reqs_begin 
+                                = (Participation_Requirement_GM*)(parti + 1);
+                            
+                            Participation_Requirement_GM* reqs_end = reqs_begin + parti->count;
+                            
+                            bool satisfies_reqs = true;
+                            
+                            for(auto req = reqs_begin; req < reqs_end; ++req)
                             {
-                                satisfies_reqs = false;
+                                bool satisfies = Player_Satisfies_Requirement(player, req);
+                                if(!satisfies)
+                                {
+                                    satisfies_reqs = false;
+                                    break;
+                                }
+                            }
+                            
+                            if(satisfies_reqs)
+                            {
+                                slots[s] = player_idx + 1;
+                                filled_slot_count += 1;
                                 break;
                             }
                         }
                         
-                        if(satisfies_reqs)
-                        {
-                            slots[s] = player_idx + 1;
-                            filled_slot_count += 1;
-                            break;
-                        }
+                        u32 reqs_size = sizeof(Participation_Requirement_GM) * parti->count;
+                        parti = (Participant_Header*)((u8*)parti + reqs_size + sizeof(Participant_Header));
                     }
                     
-                    u32 reqs_size = sizeof(Participation_Requirement_GM) * parti->count;
-                    parti = (Participant_Header*)((u8*)parti + reqs_size + sizeof(Participant_Header));
-                }
-                
-                
-                // Commit!
-                if(filled_slot_count == req_header->participant_count)
-                {
-                    // Remove selected players from the pool.
-                    for(u32 i = 0; i < req_header->participant_count; ++i)
+                    
+                    // Commit!
+                    if(filled_slot_count == req_header->participant_count)
                     {
-                        u32 player_idx = slots[i] - 1;
-                        slots[i] = player_idx;
-                        
-                        // Find player idx in the assignement table and nuke it.
-                        bool player_found = false;
-                        for(u32 a = 0; a < unassigned_player_count; ++a)
+                        // Remove selected players from the pool.
+                        for(u32 i = 0; i < req_header->participant_count; ++i)
                         {
-                            if(game->player_assignement_table[a] == player_idx)
+                            u32 player_idx = slots[i] - 1;
+                            slots[i] = player_idx;
+                            
+                            // Find player idx in the assignement table and nuke it.
+                            bool player_found = false;
+                            for(u32 a = 0; a < unassigned_player_count; ++a)
                             {
-                                unassigned_player_count -= 1;
-                                u32 last_entry = game->player_assignement_table[unassigned_player_count];
-                                game->player_assignement_table[a] = last_entry;
-                                
-                                game->player_assignement_table[unassigned_player_count] = U32_MAX;
-                                
-                                player_found = true;
+                                if(game->player_assignement_table[a] == player_idx)
+                                {
+                                    unassigned_player_count -= 1;
+                                    u32 last_entry = game->player_assignement_table[unassigned_player_count];
+                                    game->player_assignement_table[a] = last_entry;
+                                    
+                                    game->player_assignement_table[unassigned_player_count] = U32_MAX;
+                                    
+                                    player_found = true;
+                                }
                             }
+                            
+                            Assert(player_found);                         
                         }
                         
-                        Assert(player_found);
+                        Event* e = Push(&game->active_events, allocator);
                         
+                        Assert(event_to_test_idx < event_count);
+                        
+                        e->event_idx = event_to_test_idx;
+                        e->participant_count = filled_slot_count;
+                        
+                        // NOTE: Takes owenership of the ptr!
+                        e->player_indices = slots;
+                        commited = true;
+                        break;
                     }
-                    
-                    Event* e = Push(&game->active_events, allocator);
-                    
-                    Assert(event_to_test_idx < event_count);
-                    
-                    e->event_idx = event_to_test_idx;
-                    e->participant_count = filled_slot_count;
-                    
-                    // NOTE: Takes owenership of the ptr!
-                    e->player_indices = slots;
-                    commited = true;
-                    break;
                 }
             }
             
-            if(commited)
-                break;
-            
-            allocator->free(slots);
-            
+            // REJECTED!
+            if(!commited)
             {
-                REJECTED:
-                
+                if(slots)
+                    allocator->free(slots);
+
                 // NOTE: Unordered remove from table.
                 untested_event_count -= 1;
                 
                 u32 last_table_entry = game->event_assignement_table[untested_event_count];
                 game->event_assignement_table[event_to_test_table_idx] = last_table_entry;
                 
-                Assert(untested_event_count);
+                // There are no more events that could be tested.
+                if(!untested_event_count)
+                    return false;
+            }
+            else
+            {
+                break;
             }
         }
     }
@@ -1304,6 +1319,8 @@ static void Assign_Events_To_Participants(
     
     game->display_event_idx = 0;
     Generate_Display_Text(game);
+    
+    return true;
 }
 
 

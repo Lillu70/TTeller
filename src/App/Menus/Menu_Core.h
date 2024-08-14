@@ -82,6 +82,7 @@ enum class Menus : u32
         GM_players,
         GM_let_the_games_begin,
         GM_event_display,
+        GM_event_assignement_failed,
         GM_day_counter,
         GM_night_falls,
         GM_everyone_is_dead,
@@ -170,6 +171,7 @@ static inline v2f Get_Title_Bar_Row_Placement(
 
 // Usage
 /*
+
 void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
 {
     
@@ -181,6 +183,7 @@ void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
 }; // ----------------------------------------------------------------------------------------
 
 Do_GUI_Frame_With_Banner(banner_func, menu_func);
+
 */
 
 static u32 DEFAULT_BANNER_HEIGHT = 200;
