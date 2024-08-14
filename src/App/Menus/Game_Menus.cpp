@@ -996,6 +996,9 @@ static void Do_Event_Assignement_Failed_Frame()
         if(skip_frame)
             return;
         
+        // Why are we doing this?
+        // No idea- was just funny and didnt know what to put in this frame xD
+        
         f64 time = s_platform.Get_Time_Stamp();
         
         f32 c = f32(s_game_state.total_player_count);

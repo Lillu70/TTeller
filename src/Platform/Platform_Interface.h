@@ -104,4 +104,6 @@ struct Platform_Calltable
     
     bool (*Get_Executable_Path)(char* result_buffer, u32 result_buffer_size) = 0;
     
+    bool (*Delete_File)(char* path) = 0;
+    
 };

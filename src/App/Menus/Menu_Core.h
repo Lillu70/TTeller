@@ -113,6 +113,7 @@ struct Global_Data
     
     u32 pooled_contexes_in_use_count = 0;
     u32 GM_conversion_errors = 0;
+    u32 campaing_idx_to_delete = 0;
 };
 static Global_Data s_global_data = Global_Data();
 

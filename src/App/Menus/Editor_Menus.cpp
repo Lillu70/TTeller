@@ -11,6 +11,9 @@ static void Do_Main_Menu_Name_New_Campaign_Popup(GUI_Context*);
 static void Do_Event_Editor_On_Exit_Popup(GUI_Context*);
 static void Do_Event_Editor_Delete_Event_Popup(GUI_Context*);
 static void Do_Event_Editor_Display_Active_Event_Errors(GUI_Context*);
+static void Do_Name_New_Campaign_Popup(GUI_Context* context);
+static void Do_Are_You_Sure_You_Want_To_Delete_Campaing_Popup(GUI_Context* context);
+
 
 static void Do_Event_Editor_All_Events_Frame()
 {
@@ -1310,7 +1313,7 @@ static void Do_Event_Editor_Campaigns_Menu_Frame()
             
             }
             
-            Set_Popup_Function(Do_Main_Menu_Name_New_Campaign_Popup);
+            Set_Popup_Function(Do_Name_New_Campaign_Popup);
         }
     
     }; // ----------------------------------------------------------------------------------------
@@ -1333,8 +1336,19 @@ static void Do_Event_Editor_Campaigns_Menu_Frame()
         Dynamic_Array<String>* on_disk_names = s_global_data.on_disk_campaign_names;
         if(on_disk_names)
         {
+            int i = 0;
             for(each(String*, save_name, on_disk_names))
             {
+                if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "X"))
+                {
+                    s_global_data.campaing_idx_to_delete = i;
+                    Set_Popup_Function(Do_Are_You_Sure_You_Want_To_Delete_Campaing_Popup);
+                }
+                
+                GUI_Push_Layout(context);
+                
+                context->layout.build_direction = GUI_Build_Direction::right_center;
+                
                 if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, save_name->buffer))
                 {
                     Events_Container ec;
@@ -1344,6 +1358,10 @@ static void Do_Event_Editor_Campaigns_Menu_Frame()
                         s_global_data.active_menu = Menus::EE_all_events;
                     }
                 }
+                
+                GUI_Pop_Layout(context);
+                
+                i += 1;
             }
         }
         
@@ -1530,6 +1548,96 @@ static void Do_Event_Editor_Display_Active_Event_Errors(GUI_Context* context)
     v2f close_pos = panel_center + panel_dim / 2;
     if(GUI_Do_Button(context, &close_pos, &GUI_AUTO_FIT, "X"))
     {
+        Close_Popup();
+    }
+}
+
+
+static void Do_Name_Already_In_Use_Popup(GUI_Context* context)
+{
+    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, "Nimi on jo k\xE4yt\xF6ss\xE4.");
+    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Ok"))
+    {
+        Set_Popup_Function(Do_Name_New_Campaign_Popup);
+    }
+}
+
+
+static void Do_Name_New_Campaign_Popup(GUI_Context* context)
+{
+    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, "Nime\xE4 uusi kampanja:");
+    
+    bool force_create = GUI_Do_SL_Input_Field(context, AUTO, AUTO, &s_global_data.new_campaign_name);
+    
+    v2f last_element_dim = context->layout.last_element.dim;
+    last_element_dim.x -= context->theme->padding;
+    last_element_dim.x *= 0.5f;
+    
+    if(GUI_Do_Button(context, AUTO, &last_element_dim, "Luo") || force_create)
+    {
+        bool name_not_in_use = true;
+        
+        for(each(String*, on_disk_name, s_global_data.on_disk_campaign_names))
+        {
+            if(String_Compare(on_disk_name, &s_global_data.new_campaign_name))
+            {
+                name_not_in_use = false;
+                break;
+            }
+        }
+        
+        if(name_not_in_use)
+        {
+            s_global_data.active_menu = Menus::EE_all_events;
+            Init_Event_Container_Takes_Name_Ownership(
+                &s_editor_state.event_container, 
+                &s_allocator, 
+                &s_global_data.new_campaign_name);
+            
+            Serialize_Campaign(s_editor_state.event_container, &s_platform);
+            
+            Close_Popup();            
+        }
+        else
+        {
+            Set_Popup_Function(Do_Name_Already_In_Use_Popup);
+        }
+    }
+    
+    context->layout.build_direction = GUI_Build_Direction::right_center;
+    
+    if(GUI_Do_Button(context, AUTO, &last_element_dim, "Peruuta"))
+        Close_Popup();
+}
+
+
+static void Do_Are_You_Sure_You_Want_To_Delete_Campaing_Popup(GUI_Context* context)
+{
+    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, "Oletko varma ett\xE4 haluat poistaa kampanjan?");
+    
+    context->layout.build_direction = GUI_Build_Direction::down_center;
+   
+   
+    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Peruuta"))
+    {
+        Close_Popup();
+    }
+    
+    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Poista"))
+    {
+        String* save_names = Begin(s_global_data.on_disk_campaign_names);
+        
+        String full_path = Create_Campaign_Full_Path(
+            save_names + s_global_data.campaing_idx_to_delete,
+            &s_platform,
+            &s_allocator);
+
+        s_platform.Delete_File(full_path.buffer);
+        
+        full_path.free();
+        
+        Gather_Editor_Format_Campaigns();
+        
         Close_Popup();
     }
 }

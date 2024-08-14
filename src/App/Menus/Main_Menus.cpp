@@ -55,36 +55,6 @@ static void Do_Default_Quit_Popup(GUI_Context* context)
 }
 
 
-static void Do_Main_Menu_Name_New_Campaign_Popup(GUI_Context* context)
-{
-    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, "Nime\xE4 uusi kampanja:");
-    
-    bool force_create = GUI_Do_SL_Input_Field(context, AUTO, AUTO, &s_global_data.new_campaign_name);
-    
-    v2f last_element_dim = context->layout.last_element.dim;
-    last_element_dim.x -= context->theme->padding;
-    last_element_dim.x *= 0.5f;
-    
-    if(GUI_Do_Button(context, AUTO, &last_element_dim, "Luo") || force_create)
-    {
-        s_global_data.active_menu = Menus::EE_all_events;
-        Init_Event_Container_Takes_Name_Ownership(
-            &s_editor_state.event_container, 
-            &s_allocator, 
-            &s_global_data.new_campaign_name);
-        
-        Serialize_Campaign(s_editor_state.event_container, &s_platform);
-        
-        Close_Popup();
-    }
-    
-    context->layout.build_direction = GUI_Build_Direction::right_center;
-    
-    if(GUI_Do_Button(context, AUTO, &last_element_dim, "Peruuta"))
-        Close_Popup();
-}
-
-
 static void Do_Main_Menu_Frame()
 {
     Assert(s_mem.push_call_count == s_mem.free_call_count);

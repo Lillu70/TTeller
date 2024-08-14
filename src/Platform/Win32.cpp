@@ -845,7 +845,7 @@ static Dynamic_Array<String>* Win32_Search_Directory_For_Maching_Names(
 }
 
 
-static f64 Wi32_Get_Frame_Time()
+static f64 Win32_Get_Frame_Time()
 {
     return s_app.frame_time;
 }
@@ -917,6 +917,13 @@ static bool Win32_Get_Executable_Path(char* result_buffer, u32 result_buffer_siz
 }
 
 
+static bool Win32_Delete_File(char* path)
+{
+    BOOL result = DeleteFile(path);
+    return result;
+}
+
+
 static Platform_Calltable Win32_Get_Calltable()
 {
     Platform_Calltable ct = {};
@@ -947,7 +954,8 @@ static Platform_Calltable Win32_Get_Calltable()
     ct.Search_Directory_For_Maching_Names = Win32_Search_Directory_For_Maching_Names;
     ct.Open_Select_File_Dialog = Win32_Open_Select_File_Dialog;
     ct.Get_Executable_Path = Win32_Get_Executable_Path;
-    ct.Get_Frame_Time = Wi32_Get_Frame_Time;
+    ct.Get_Frame_Time = Win32_Get_Frame_Time;
+    ct.Delete_File = Win32_Delete_File;
     
     return ct;
 }
