@@ -346,6 +346,8 @@ static void Deep_Copy_String(String* dest, String* src)
     
     if(src->lenght)
         Mem_Copy(dest->buffer, src->buffer, src->lenght);
+    
+    dest->buffer[dest->lenght] = 0;
 }
 
 

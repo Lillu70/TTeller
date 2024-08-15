@@ -13,6 +13,13 @@ static void Do_Event_Editor_Delete_Event_Popup(GUI_Context*);
 static void Do_Event_Editor_Display_Active_Event_Errors(GUI_Context*);
 static void Do_Name_New_Campaign_Popup(GUI_Context* context);
 static void Do_Are_You_Sure_You_Want_To_Delete_Campaing_Popup(GUI_Context* context);
+static void Do_Rename_Campaing_Popup(GUI_Context* context);
+
+
+static void Free_New_Campaing_Name()
+{
+    s_global_data.new_campaign_name.free();
+}
 
 
 static void Do_Event_Editor_All_Events_Frame()
@@ -32,6 +39,12 @@ static void Do_Event_Editor_All_Events_Frame()
         
         char* title_text = s_editor_state.event_container.campaign_name.buffer;
         GUI_Do_Title_Text(context, AUTO, title_text, title_scale);
+        
+        v2f img_dim = v2f{1.f, 1.f} * context->layout.last_element.dim.y;
+        if(GUI_Do_Image_Button(context, AUTO, &img_dim, &s_global_data.edit_image))
+        {
+            Set_Popup_Function(Do_Rename_Campaing_Popup, Free_New_Campaing_Name);
+        }
         
         f32 title_height = context->layout.last_element.dim.y;
         f32 title_max_x = context->layout.last_element.rect.max.x - context->anchor_base.x;
@@ -1285,7 +1298,7 @@ static void Do_Event_Editor_Campaigns_Menu_Frame()
         f32 title_max_x = context->layout.last_element.rect.max.x - context->anchor_base.x;
         
         // -- title bar buttons --    
-        static constexpr char* create_new_text = "Luo uusi kampanja";
+        constexpr char* create_new_text = "Luo uusi kampanja";
         
         f32 padding = context->theme->padding;
         f32 w1 = GUI_Tight_Fit_Text(create_new_text, font).x + padding;    
@@ -1298,22 +1311,8 @@ static void Do_Event_Editor_Campaigns_Menu_Frame()
         v2f dim = v2f{w1, title_height};
         
         if(GUI_Do_Button(context, &title_row_pos, &dim, create_new_text))
-        {
-            char* def_name = "Uusi kampanja";
-            if(!s_global_data.new_campaign_name.buffer)
-            {
-                Init_String(&s_global_data.new_campaign_name, &s_allocator, def_name);
-            }
-            else
-            {
-                Mem_Copy(
-                    s_global_data.new_campaign_name.buffer, 
-                    def_name, 
-                    Null_Terminated_Buffer_Lenght(def_name));
-            
-            }
-            
-            Set_Popup_Function(Do_Name_New_Campaign_Popup);
+        {           
+            Set_Popup_Function(Do_Name_New_Campaign_Popup, Free_New_Campaing_Name);
         }
     
     }; // ----------------------------------------------------------------------------------------
@@ -1378,11 +1377,12 @@ static void Do_Event_Editor_On_Exit_Popup(GUI_Context* context)
     
     context->layout.build_direction = GUI_Build_Direction::down_center;
     
-    static constexpr char* t1 = "Peruuta";
-    static constexpr char* t2 = "Tallena ja jatka";
-    static constexpr char* t3 = "Jatka tallentamatta";
+    constexpr char* t1 = "Peruuta";
+    constexpr char* t2 = "Tallena ja jatka";
+    constexpr char* t3 = "Jatka tallentamatta";
     
-    v2f button_dim = GUI_Tight_Fit_Text(t3, &s_theme.font) + s_theme.padding;
+    char* t = Get_Longest_CSTR(t1, t2, t3);
+    v2f button_dim = GUI_Tight_Fit_Text(t, &context->theme->font) + context->theme->padding;
     
     if(GUI_Do_Button(context, AUTO, &button_dim, t1))
     {
@@ -1422,7 +1422,8 @@ static void Do_Event_Editor_Quit_Popup(GUI_Context* context)
     static constexpr char* t2 = "Tallenna ja sulje";
     static constexpr char* t3 = "Sulje tallentamatta";
     
-    v2f button_dim = GUI_Tight_Fit_Text(t3, &s_theme.font) + s_theme.padding;
+    char* t = Get_Longest_CSTR(t1, t2, t3);
+    v2f button_dim = GUI_Tight_Fit_Text(t, &context->theme->font) + context->theme->padding;
     
     if(GUI_Do_Button(context, AUTO, &button_dim, t1))
     {
@@ -1452,7 +1453,8 @@ static void Do_Event_Editor_Delete_Event_Popup(GUI_Context* context)
     static constexpr char* t1 = "Peruuta";
     static constexpr char* t2 = "Poista";
 
-    v2f button_dim = GUI_Tight_Fit_Text(t1, &s_theme.font) + s_theme.padding;
+    char* t = Get_Longest_CSTR(t1, t2);
+    v2f button_dim = GUI_Tight_Fit_Text(t, &context->theme->font) + context->theme->padding;
     
     if(GUI_Do_Button(context, AUTO, &button_dim, t1))
     {
@@ -1553,12 +1555,22 @@ static void Do_Event_Editor_Display_Active_Event_Errors(GUI_Context* context)
 }
 
 
-static void Do_Name_Already_In_Use_Popup(GUI_Context* context)
+static void Do_New_Name_Already_In_Use_Popup(GUI_Context* context)
 {
     GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, "Nimi on jo k\xE4yt\xF6ss\xE4.");
     if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Ok"))
     {
-        Set_Popup_Function(Do_Name_New_Campaign_Popup);
+        Set_Popup_Function(Do_Name_New_Campaign_Popup, Free_New_Campaing_Name);
+    }
+}
+
+
+static void Do_Rename_Name_Already_In_Use_Popup(GUI_Context* context)
+{
+    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, "Nimi on jo k\xE4yt\xF6ss\xE4.");
+    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Ok"))
+    {
+        Set_Popup_Function(Do_Rename_Campaing_Popup, Free_New_Campaing_Name);
     }
 }
 
@@ -1567,7 +1579,18 @@ static void Do_Name_New_Campaign_Popup(GUI_Context* context)
 {
     GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, "Nime\xE4 uusi kampanja:");
     
-    bool force_create = GUI_Do_SL_Input_Field(context, AUTO, AUTO, &s_global_data.new_campaign_name);
+    constexpr char* def_name = "Uusi kampanja";
+    if(!s_global_data.new_campaign_name.buffer)
+    {
+        Init_String(&s_global_data.new_campaign_name, &s_allocator, def_name);
+    }
+    
+    bool force_create = GUI_Do_SL_Input_Field(
+        context, 
+        AUTO, 
+        AUTO, 
+        &s_global_data.new_campaign_name);
+    
     
     v2f last_element_dim = context->layout.last_element.dim;
     last_element_dim.x -= context->theme->padding;
@@ -1600,7 +1623,7 @@ static void Do_Name_New_Campaign_Popup(GUI_Context* context)
         }
         else
         {
-            Set_Popup_Function(Do_Name_Already_In_Use_Popup);
+            Set_Popup_Function(Do_New_Name_Already_In_Use_Popup);
         }
     }
     
@@ -1613,17 +1636,23 @@ static void Do_Name_New_Campaign_Popup(GUI_Context* context)
 
 static void Do_Are_You_Sure_You_Want_To_Delete_Campaing_Popup(GUI_Context* context)
 {
-    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, "Oletko varma ett\xE4 haluat poistaa kampanjan?");
+    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, "Poistetaanko varmasti?");
+    GUI_Do_Text(context, AUTO, "Kampanja poistetaan lopullisesti.");
     
     context->layout.build_direction = GUI_Build_Direction::down_center;
+    
+    constexpr char* t1 = "Peruuta";
+    constexpr char* t2 = "Poista";
+    
+    char* t = Get_Longest_CSTR(t1, t2);
+    v2f button_dim = GUI_Tight_Fit_Text(t, &context->theme->font) + context->theme->padding;
    
-   
-    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Peruuta"))
+    if(GUI_Do_Button(context, AUTO, &button_dim, t1))
     {
         Close_Popup();
     }
     
-    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Poista"))
+    if(GUI_Do_Button(context, AUTO, &button_dim, t2))
     {
         String* save_names = Begin(s_global_data.on_disk_campaign_names);
         
@@ -1640,4 +1669,87 @@ static void Do_Are_You_Sure_You_Want_To_Delete_Campaing_Popup(GUI_Context* conte
         
         Close_Popup();
     }
+}
+
+
+static void Do_Rename_Campaing_Popup(GUI_Context* context)
+{
+   GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, "Nime\xE4 kampanja uudellen:");
+
+    if(!s_global_data.new_campaign_name.buffer)
+    {
+        Deep_Copy_String(
+            &s_global_data.new_campaign_name, 
+            &s_editor_state.event_container.campaign_name);
+    }
+    
+    bool force_create = GUI_Do_SL_Input_Field(
+        context, 
+        AUTO, 
+        AUTO, 
+        &s_global_data.new_campaign_name);
+    
+    
+    v2f last_element_dim = context->layout.last_element.dim;
+    last_element_dim.x -= context->theme->padding;
+    last_element_dim.x *= 0.5f;
+    
+    if(GUI_Do_Button(context, AUTO, &last_element_dim, "Nime\xE4") || force_create)
+    {
+        bool name_not_in_use = true;
+        
+        Dynamic_Array<String>* on_disk_names = s_global_data.on_disk_campaign_names;
+        if(!on_disk_names)
+            Gather_Editor_Format_Campaigns();
+        
+        for(each(String*, on_disk_name, s_global_data.on_disk_campaign_names))
+        {
+            if(String_Compare(on_disk_name, &s_global_data.new_campaign_name))
+            {
+                name_not_in_use = false;
+                break;
+            }
+        }
+        
+        if(!on_disk_names)
+            Clear_Editor_Format_Campaigns();
+        
+        if(name_not_in_use)
+        {
+            String full_path_old = Create_Campaign_Full_Path(
+                &s_editor_state.event_container.campaign_name,
+                &s_platform,
+                &s_allocator);
+
+            String full_path_new = Create_Campaign_Full_Path(
+                &s_global_data.new_campaign_name,
+                &s_platform,
+                &s_allocator);
+
+            if(s_platform.Move_File(full_path_old.buffer, full_path_new.buffer))
+            {
+                Deep_Copy_String(
+                    &s_editor_state.event_container.campaign_name,
+                    &s_global_data.new_campaign_name);
+            }
+            else
+            {
+                // TODO: Handle error, with popup or something.
+            }
+            
+            full_path_old.free();
+            full_path_new.free();
+            
+            Close_Popup();
+        }
+        else
+        {
+            Set_Popup_Function(Do_Rename_Name_Already_In_Use_Popup);
+        }
+    }
+    
+    context->layout.build_direction = GUI_Build_Direction::right_center;
+    
+    if(GUI_Do_Button(context, AUTO, &last_element_dim, "Peruuta"))
+        Close_Popup();
 }

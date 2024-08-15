@@ -176,6 +176,13 @@ static inline v2f Hadamar_Product(v2f a, v2f b)
 }
 
 
+static inline v3f Hadamar_Product(v3f a, v3f b)
+{
+    v3f result = {a.x * b.x, a.y * b.y, a.z * b.z};
+    return result;
+}
+
+
 static inline f32 Componentwise_Mult(v2f v)
 {
     f32 result = v.x * v.y;

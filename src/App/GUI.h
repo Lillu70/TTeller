@@ -87,6 +87,12 @@ namespace GUI_Link_Direction
     };    
 }
 
+enum class GUI_Theme_Coloring : u8
+{
+    do_not_apply = 0,
+    apply
+};
+
 
 enum class GUI_Build_Direction : u8
 {

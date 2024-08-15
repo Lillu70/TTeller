@@ -819,14 +819,13 @@ static Dynamic_Array<String>* Win32_Search_Directory_For_Maching_Names(
     char* file_name, 
     Allocator_Shell* allocator)
 {
-    Dynamic_Array<String>* result = 0;
+    Dynamic_Array<String>* result = Create_Dynamic_Array<String>(allocator, 4);
     
     WIN32_FIND_DATAA find_data;
     
     HANDLE search_handle = FindFirstFileA(file_name, &find_data);
     if(search_handle != INVALID_HANDLE_VALUE)
     {
-        result = Create_Dynamic_Array<String>(allocator, 4);
         {
             String* file_name = Push(&result, allocator);
             Init_String(file_name, allocator, &find_data.cFileName[0]);
@@ -924,6 +923,17 @@ static bool Win32_Delete_File(char* path)
 }
 
 
+static bool Win32_Move_File(char* path_old, char* path_new)
+{
+    BOOL result = MoveFile(
+        path_old,
+        path_new
+    );
+    
+    return result;
+}
+
+
 static Platform_Calltable Win32_Get_Calltable()
 {
     Platform_Calltable ct = {};
@@ -956,6 +966,7 @@ static Platform_Calltable Win32_Get_Calltable()
     ct.Get_Executable_Path = Win32_Get_Executable_Path;
     ct.Get_Frame_Time = Win32_Get_Frame_Time;
     ct.Delete_File = Win32_Delete_File;
+    ct.Move_File = Win32_Move_File;
     
     return ct;
 }

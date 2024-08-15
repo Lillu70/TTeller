@@ -1407,3 +1407,288 @@ static void Draw_Image(Canvas* canvas, Image* img, Rect rect)
     }
     #endif
 }
+
+
+static void Draw_Image(Canvas* canvas, Image* img, Rect rect, v3f color_mult)
+{
+    // TODO: SIMD this routine.
+    
+    Rect _rect = rect;
+    if(!Verify_Rect_(canvas, &_rect))
+        return;
+    
+    i32 xclip = i32(Ceil(_rect.min.x) - Ceil(rect.min.x));
+    i32 yclip = i32(Ceil(_rect.min.y) - Ceil(rect.min.y));
+    
+    f32 w = rect.max.x - rect.min.x;
+    f32 h = rect.max.y - rect.min.y;
+    
+    i32 x_min = (i32)Ceil(_rect.min.x);
+    i32 y_min = (i32)Ceil(_rect.min.y);
+    
+    i32 x_max = (i32)Floor(_rect.max.x);
+    i32 y_max = (i32)Floor(_rect.max.y);
+    
+    // NOTE: Using the unclipped min to get the fractional part into the internal pixels.
+    f32 fx_min = 1.f - (rect.min.x - f32(i32(rect.min.x)));
+    f32 fy_min = 1.f - (rect.min.y - f32(i32(rect.min.y)));
+    
+    f32 fx_max = _rect.max.x - f32(i32(_rect.max.x));
+    f32 fy_max = _rect.max.y - f32(i32(_rect.max.y));
+    
+    if(fx_min < 1.f)
+    {
+        if(rect.min.x > 0)
+        {
+            // Draw left ribbon.
+            for(i32 y = y_min; y < y_max; ++y)
+            {
+                i32 ry = y - y_min + yclip;
+                f32 v = (ry) / h;
+                f32 sy = v * f32(img->dim.y - 1);
+                
+                Assert(i32(sy) + 1 < img->dim.y);
+            
+                Color* c1 = (Color*)img->buffer + i32(sy) * img->dim.x;
+                Color* c2 = c1 + img->dim.x;
+                
+                v4f c1_up = Unpack_Color_With_Alpha(*c1);
+                c1_up.rgb = Hadamar_Product(c1_up.rgb, color_mult);
+                
+                v4f c2_up = Unpack_Color_With_Alpha(*c2);
+                c2_up.rgb = Hadamar_Product(c2_up.rgb, color_mult);
+                
+                f32 yblend = (sy - f32(i32(sy)));
+                v4f yb = Lerp(c1_up, c2_up, yblend);
+                
+                v2i p = v2i{x_min - 1, y};
+                f32 f = f32(yb.a) / 255.f * fx_min;
+                Blend_Pixel_With_Color(canvas, p, yb.rgb, f);
+            }            
+        }
+    }
+    else
+    {
+        fx_min = 0;
+    }
+    
+    if(fy_min < 1.f)
+    {
+        if(rect.min.y > 0)
+        {
+            // Draw bottom ribbon.
+            for(i32 x = x_min; x < x_max; ++x)
+            {
+                i32 rx = x - x_min + xclip;
+                f32 u = (rx) / w;
+                f32 sx = u * f32(img->dim.x - 1);
+                
+                Assert(i32(sx) + 1 < img->dim.x);
+                
+                Color* c1 = (Color*)img->buffer + i32(sx);
+                Color* c2 = c1 + 1;
+                
+                v4f c1_up = Unpack_Color_With_Alpha(*c1);
+                c1_up.rgb = Hadamar_Product(c1_up.rgb, color_mult);
+                
+                v4f c2_up = Unpack_Color_With_Alpha(*c2);
+                c2_up.rgb = Hadamar_Product(c2_up.rgb, color_mult);
+                
+                f32 xblend = (sx - f32(i32(sx)));
+                v4f xb  = Lerp(c1_up, c2_up, xblend);
+                
+                v2i p = v2i{x, y_min - 1};
+                f32 f = f32(xb.a) / 255.f * fy_min;
+                Blend_Pixel_With_Color(canvas, p, xb.rgb, f);
+            }
+        }
+    }
+    else
+    {
+        fy_min = 0;
+    }
+    
+    i32 dim_x_s1 = img->dim.x - 1;
+    i32 dim_y_s1 = img->dim.y - 1;
+    if(fx_max)
+    {
+        // Draw right ribbon.
+        for(i32 y = y_min; y < y_max; ++y)
+        {
+            i32 ry = y - y_min + yclip;
+            f32 v = (ry) / h;
+            f32 sy = v * f32(img->dim.y - 1);
+            
+            Assert(i32(sy) + 1 < img->dim.y);
+            
+            Color* c1 = (Color*)img->buffer + (i32(sy) * img->dim.x + dim_x_s1);
+            Color* c2 = c1 + img->dim.x;
+            
+            v4f c1_up = Unpack_Color_With_Alpha(*c1);
+            c1_up.rgb = Hadamar_Product(c1_up.rgb, color_mult);
+            
+            v4f c2_up = Unpack_Color_With_Alpha(*c2);
+            c2_up.rgb = Hadamar_Product(c2_up.rgb, color_mult);
+            
+            f32 yblend = (sy - f32(i32(sy)));
+            v4f yb = Lerp(c1_up, c2_up, yblend);
+            
+            v2i p = v2i{x_max, y};
+            f32 f = f32(yb.a) / 255.f * fx_max;
+            Blend_Pixel_With_Color(canvas, p, yb.rgb, f);
+        }
+    }
+    
+    if(fy_max)
+    {
+        // Draw top ribbon.
+        for(i32 x = x_min; x < x_max; ++x)
+        {
+            i32 rx = x - x_min + xclip;
+            f32 u = (rx) / w;
+            f32 sx = u * f32(img->dim.x - 1);
+            
+            Assert(i32(sx) + 1 < img->dim.x);
+            
+            Color* c1 = (Color*)img->buffer + (dim_y_s1 * img->dim.x  + i32(sx));
+            Color* c2 = c1 + 1;
+            
+            v4f c1_up = Unpack_Color_With_Alpha(*c1);
+            c1_up.rgb = Hadamar_Product(c1_up.rgb, color_mult);
+            
+            v4f c2_up = Unpack_Color_With_Alpha(*c2);
+            c2_up.rgb = Hadamar_Product(c2_up.rgb, color_mult);
+            
+            f32 xblend = (sx - f32(i32(sx)));
+            v4f xb  = Lerp(c1_up, c2_up, xblend);
+            
+            v2i p = v2i{x, y_max};
+            f32 f = f32(xb.a) / 255.f * fy_max;
+            Blend_Pixel_With_Color(canvas, p, xb.rgb, f);
+        }
+    }
+    
+    // Draw bottom left corner
+    if(fy_min > 0 && fx_min > 0)
+    {
+        Color* c1 = (Color*)img->buffer;
+        v4f c1_up = Unpack_Color_With_Alpha(*c1);
+        c1_up.rgb = Hadamar_Product(c1_up.rgb, color_mult);
+        
+        v2i p = v2i{x_min - 1, y_min - 1};
+        if(Is_Point_On_Canvas(canvas, p))
+        {
+            f32 fa = fx_min * fy_min;
+            f32 f = f32(c1_up.a) / 255.f * fa;
+            Blend_Pixel_With_Color(canvas, p, c1_up.rgb, f);
+        }
+    }
+    
+    // Draw top left corner
+    if(fy_min > 0 && fx_min > 0)
+    {
+        Color* c1 = (Color*)img->buffer + (dim_y_s1 * img->dim.x);
+        v4f c1_up = Unpack_Color_With_Alpha(*c1);
+        c1_up.rgb = Hadamar_Product(c1_up.rgb, color_mult);
+        
+        v2i p = v2i{x_min - 1, y_max};
+        if(Is_Point_On_Canvas(canvas, p))
+        {
+            f32 fa = fx_min * fy_max;
+            f32 f = f32(c1_up.a) / 255.f * fa;
+            Blend_Pixel_With_Color(canvas, p, c1_up.rgb, f);
+        }
+    }
+    
+    // Draw bottom right corner
+    if(fy_min > 0 && fx_max > 0)
+    {
+        Color* c1 = (Color*)img->buffer + dim_x_s1;
+        v4f c1_up = Unpack_Color_With_Alpha(*c1);
+        c1_up.rgb = Hadamar_Product(c1_up.rgb, color_mult);
+        
+        v2i p = v2i{x_max, y_min - 1};
+        if(Is_Point_On_Canvas(canvas, p))
+        {
+            f32 fa =  fx_max * fy_min;
+            f32 f = f32(c1_up.a) / 255.f * fa;
+            Blend_Pixel_With_Color(canvas, p, c1_up.rgb, f);
+        }
+    }
+    
+    // Draw top right corner
+    if(fy_min > 0 && fx_max > 0)
+    {
+        Color* c1 = (Color*)img->buffer + (dim_y_s1 * img->dim.x +  dim_x_s1);
+        v4f c1_up = Unpack_Color_With_Alpha(*c1);
+        c1_up.rgb = Hadamar_Product(c1_up.rgb, color_mult);
+        
+        v2i p = v2i{x_max, y_max};
+        if(Is_Point_On_Canvas(canvas, p))
+        {
+            f32 fa =  fx_max * fy_max;
+            f32 f = f32(c1_up.a) / 255.f * fa;
+            Blend_Pixel_With_Color(canvas, p, c1_up.rgb, f);
+        }
+    }
+    
+    #if 1
+    // Draw internal whole pixels.
+    for(i32 y = y_min; y < y_max; ++y)
+    {
+        i32 ry = y - y_min + yclip;
+        f32 v = (ry + fy_min) / h;
+        f32 sy = v * f32(img->dim.y - 1);
+        f32 yblend = (sy - f32(i32(sy)));
+        
+        Assert(i32(sy) + 1 < img->dim.y);
+        
+        for(i32 x = x_min; x < x_max; ++x)
+        {
+            Start_Scope_Timer(img2_pixel);
+            
+            i32 rx = x - x_min + xclip;
+            f32 u = (rx + fx_min) / w;
+            f32 sx = u * f32(img->dim.x - 1);
+            
+            Assert(i32(sx) + 1 < img->dim.x);
+            
+            Color* c1 = (Color*)img->buffer + i32(sy) * img->dim.x + i32(sx);
+            Color* c2 = c1 + 1;
+            Color* c3 = c1 + img->dim.x;
+            Color* c4 = c3 + 1;
+            
+            v4f c1_up = Unpack_Color_With_Alpha(*c1);
+            c1_up.rgb = Hadamar_Product(c1_up.rgb, color_mult);
+            
+            v4f c2_up = Unpack_Color_With_Alpha(*c2);
+            c2_up.rgb = Hadamar_Product(c2_up.rgb, color_mult);
+            
+            v4f c3_up = Unpack_Color_With_Alpha(*c3);
+            c3_up.rgb = Hadamar_Product(c3_up.rgb, color_mult);
+            
+            v4f c4_up = Unpack_Color_With_Alpha(*c4);
+            c4_up.rgb = Hadamar_Product(c4_up.rgb, color_mult);
+            
+            f32 xblend = (sx - f32(i32(sx)));
+         
+            v4f xb1 = Lerp(c1_up, c2_up, xblend);
+            v4f xb2 = Lerp(c3_up, c4_up, xblend);
+            v4f yb  = Lerp(xb1, xb2, yblend);
+            
+            v2i p = v2i{x, y};
+            if(yb.a < 250.f)
+            {
+                f32 f = f32(yb.a) / 255.f;
+                Blend_Pixel_With_Color(canvas, p, yb.rgb, f);
+            }
+            else if(yb.a > 5.f)
+            {
+                Color c = Pack_Color(yb);
+                Set_Pixel_HZ(canvas, p, c);
+            }
+        }
+    }
+    #endif
+}
+

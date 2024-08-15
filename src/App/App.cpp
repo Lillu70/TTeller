@@ -264,11 +264,34 @@ void Update_App()
         
         // Handle entering a menu.
         switch(s_global_data.active_menu)
-        {            
+        {
             case Menus::select_campaign_to_play_menu:
             case Menus::campaigns_menu:
             {
                 Gather_Editor_Format_Campaigns();
+            }break;
+            
+            case Menus::main_menu:
+            {
+                // CONSIDER: Think about this.
+                // Only reason to free this here is so that we can maintin 0 allocations when in the main menu,
+                // This is usefull so it's possible to assert on memory leaks.
+                if(s_global_data.edit_image.buffer)
+                {
+                    s_allocator.free(s_global_data.edit_image.buffer);
+                    s_global_data.edit_image.buffer = 0;
+                }
+            }break;
+            
+            case Menus::EE_all_events:
+            {
+                if(!s_global_data.edit_image.buffer)
+                {
+                    Load_Image_From_Memory(
+                        &s_global_data.edit_image, 
+                        (void*)s_edit_icon, 
+                        Array_Lenght(s_edit_icon));
+                }
             }break;
         }
     }

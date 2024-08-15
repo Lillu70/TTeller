@@ -1092,8 +1092,9 @@ static void Do_Select_Campagin_To_Play_Frame()
                         
                         if(filter_results)
                         {
-                            Set_Popup_Function(Do_Display_Invalid_Event_Filter_Results_Popup);
-                            s_global_data.on_popup_close = Free_Invalid_Event_Filter_Result_Memory;
+                            Set_Popup_Function(
+                                Do_Display_Invalid_Event_Filter_Results_Popup, 
+                                Free_Invalid_Event_Filter_Result_Memory);
                             
                             Assert(!s_global_data.IEFR);
                             s_global_data.IEFR = filter_results;

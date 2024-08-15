@@ -98,6 +98,7 @@ struct Global_Data
     Menus active_menu = Menus::main_menu;
     
     String new_campaign_name;
+    
     Dynamic_Array<String>* on_disk_campaign_names = 0;
     Dynamic_Array<Invalid_Event_Filter_Result>* IEFR = 0;
     
@@ -114,6 +115,8 @@ struct Global_Data
     u32 pooled_contexes_in_use_count = 0;
     u32 GM_conversion_errors = 0;
     u32 campaing_idx_to_delete = 0;
+    
+    Image edit_image = {};
 };
 static Global_Data s_global_data = Global_Data();
 
@@ -148,6 +151,13 @@ static inline void Set_Popup_Function(void(*popup_function)(GUI_Context*))
     GUI_Activate_Context(&s_gui_pop_up);        
     
     s_global_data.popup_func = popup_function;
+}
+
+
+static inline void Set_Popup_Function(void(*popup_function)(GUI_Context*), void(*on_popup_close)())
+{
+    Set_Popup_Function(popup_function);
+    s_global_data.on_popup_close = on_popup_close;
 }
 
 

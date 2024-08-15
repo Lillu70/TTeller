@@ -53,3 +53,40 @@ static u32 Convert_String_View_Into_U32(String_View view)
     
     return result;
 }
+
+
+static inline char* Get_Longest_CSTR(char* a, char* b)
+{
+    u32 a_len = Null_Terminated_Buffer_Lenght(a);
+    u32 b_len = Null_Terminated_Buffer_Lenght(b);
+    
+    char* result = a_len > b_len? a : b;
+    return result;
+}
+
+
+static inline char* Get_Longest_CSTR(char* a, char* b, char* c)
+{
+    char* a_to_b = Get_Longest_CSTR(a, b);
+    char* result = Get_Longest_CSTR(a_to_b, c);
+    
+    return result;
+}
+
+
+static inline char* Get_Longest_CSTR(char* a, char* b, char* c, char* d)
+{
+    char* a_to_c = Get_Longest_CSTR(a, b, c);
+    char* result = Get_Longest_CSTR(a_to_c, d);
+    
+    return result;
+}
+
+
+static inline char* Get_Longest_CSTR(char* a, char* b, char* c, char* d, char* f)
+{
+    char* a_to_d = Get_Longest_CSTR(a, b, c, d);
+    char* result = Get_Longest_CSTR(a_to_d, f);
+    
+    return result;
+}

@@ -106,4 +106,5 @@ struct Platform_Calltable
     
     bool (*Delete_File)(char* path) = 0;
     
+    bool (*Move_File)(char* path, char* new_path) = 0;
 };

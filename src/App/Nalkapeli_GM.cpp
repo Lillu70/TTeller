@@ -960,9 +960,6 @@ static inline bool Numerical_Relation_Match(i8 value, i8 relation_target, Numeri
 {
     bool result = false;
     
-    if(!value)
-        value = I8_MAX;
-    
     switch(relation)
     {
         case Numerical_Relation::equal_to:
@@ -1051,6 +1048,10 @@ static inline bool Player_Satisfies_Requirement(
             }
             else if(exists == Exists_Statement::does_have)
             {
+                // Note: Zero is infinite in this context!
+                if(!duration)
+                    duration = I8_MAX;
+                
                 result = Numerical_Relation_Match(
                     duration, 
                     req->relation_target, 
@@ -1075,6 +1076,10 @@ static inline bool Player_Satisfies_Requirement(
             }
             else if(exists == Exists_Statement::does_have)
             {
+                // Note: Zero is infinite in this context!
+                if(!duration)
+                    duration = I8_MAX;
+                
                 result = Numerical_Relation_Match(
                     duration, 
                     req->relation_target, 
@@ -1182,6 +1187,10 @@ static bool Assign_Events_To_Participants(
                 
                 if(exists == Exists_Statement::does_have)
                 {
+                    // Note: Zero is infinite in this context!
+                    if(!duration)
+                        duration = I8_MAX;
+                    
                     if(!Numerical_Relation_Match(
                         duration, 
                         global_req->relation_target, 

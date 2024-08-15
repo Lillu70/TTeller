@@ -128,6 +128,8 @@ static void Draw_Image(Canvas* canvas, Image* img);
 
 static void Draw_Image(Canvas* canvas, Image* img, Rect rect);
 
+static void Draw_Image(Canvas* canvas, Image* img, Rect rect, v3f color_mult);
+
 static void Draw_Image_Badly(Canvas* canvas, Image* img, Rect rect);
 
 static void Convert_From_RGB_To_Color_And_Flip_Y(Image* img);

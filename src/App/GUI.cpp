@@ -1725,6 +1725,93 @@ static bool GUI_Do_Button(
 }
 
 
+static bool GUI_Do_Image_Button(
+    GUI_Context* context, 
+    v2f* pos, 
+    v2f* dim, 
+    Image* img,
+    GUI_Theme_Coloring apply_theme_color_to_image = GUI_Theme_Coloring::apply)
+{
+    Assert(GUI_Is_Context_Ready(context));
+    
+    // --------------------------------------------------------------------------
+    
+    GUI_Theme* theme = context->theme;
+    if(dim == &GUI_AUTO_FIT)
+    {
+        Assert(img);
+        
+        *dim = v2f{
+            f32(img->dim.x + context->theme->outline_thickness), 
+            f32(img->dim.y + context->theme->outline_thickness),    
+            };
+    }
+    
+    GUI_Placement p = GUI_Get_Placement(context, dim, pos);
+    if(!Is_Rect_Valid(p.rect))
+        return false;
+    
+    u32 id = GUI_Generate_ID(p.rect, __LINE__);
+    
+    bool cursor_on_selection = Is_Point_Inside_Rect(context->cursor_fpos, p.rect);
+    bool is_selected = GUI_Is_Element_Selected(context, cursor_on_selection, id);
+    
+    // --------------------------------------------------------------------------
+    
+    bool result = false;
+    
+    Color outline_color = outline_color = theme->outline_color;
+    
+    if(is_selected)
+    {
+        GUI_Button_State* state = &context->selection_state.button;
+        
+        // Handle input.
+        if(GUI_On_Release_Action(context, cursor_on_selection, &state->is_pressed_down))
+        {
+            result = true;
+        }
+        
+        if(state->is_pressed_down)
+            outline_color = theme->down_color;
+        else
+            outline_color = theme->selected_color;
+    }
+    
+    // Draw
+    if(Rects_Overlap(p.rect, context->canvas_rect))
+    {
+        Draw_Filled_Rect_With_Outline(
+            context->canvas, 
+            p.rect, 
+            theme->background_color,
+            theme->outline_thickness, 
+            outline_color);
+        
+        if(img)
+        {
+            if(apply_theme_color_to_image == GUI_Theme_Coloring::apply)
+            {
+                Draw_Image(
+                    context->canvas, 
+                    img, 
+                    Shink_Rect(p.rect, f32(context->theme->outline_thickness)),
+                    Unpack_Color(outline_color) / 255.f);                
+            }
+            else
+            {
+                Draw_Image(
+                    context->canvas, 
+                    img, 
+                    Shink_Rect(p.rect, f32(context->theme->outline_thickness)));
+            }
+        }
+    }
+    
+    return result;
+}
+
+
 static bool GUI_Do_Fill_Slider(
     GUI_Context* context, 
     v2f* pos, 
@@ -2167,6 +2254,9 @@ static u32 GUI_Do_Dropdown_Button(
         
         if(state->is_open)
         {
+            if(context->external_action_context)
+                context->external_action_context->disable_for_one_frame = true;
+            
             if(context->actions[GUI_Menu_Actions::back].Is_Pressed() || 
                 (context->actions[GUI_Menu_Actions::mouse].Is_Pressed() && !cursor_is_in_open_rect))
             {

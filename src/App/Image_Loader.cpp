@@ -98,3 +98,34 @@ static bool Load_Image(
     
     return false;
 }
+
+static bool Load_Image_From_Memory(Image* out_img, void* memory, u32 memory_size)
+{
+    bool result = false;
+    
+    i32 out_x;
+    i32 out_y;
+    i32 out_c;
+    
+    u8* img_buffer = (u8*)stbi_load_from_memory(
+        (u8*)memory, 
+        memory_size, 
+        &out_x, 
+        &out_y, 
+        &out_c, 
+        sizeof(Color));
+    
+    if(img_buffer)
+    {
+        *out_img = {img_buffer, v2i{out_x, out_y}};
+        result = true;
+        
+        Convert_From_RGB_To_Color_And_Flip_Y(out_img);
+    }
+    else
+    {
+        *out_img = {};
+    }
+    
+    return result;
+}

@@ -41,10 +41,11 @@ static void Do_Default_Quit_Popup(GUI_Context* context)
     
     context->layout.build_direction = GUI_Build_Direction::down_center;
     
-    static constexpr char* t1 = "Peruuta ja jatka";
-    static constexpr char* t2 = "Sulje";
+    constexpr char* t1 = "Peruuta ja jatka";
+    constexpr char* t2 = "Sulje";
     
-    v2f button_dim = GUI_Tight_Fit_Text(t1, &s_theme.font) + s_theme.padding;
+    char* t = Get_Longest_CSTR(t1, t2);
+    v2f button_dim = GUI_Tight_Fit_Text(t, &context->theme->font) + context->theme->padding;
     
     if(GUI_Do_Button(context, AUTO, &button_dim, t1))
         Close_Popup();
@@ -75,7 +76,7 @@ static void Do_Main_Menu_Frame()
         GUI_Anchor::top);
     
     v2f title_scale = v2f{7.f, 7.f};
-    GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, "Tarina Kuolemaan", title_scale);
+    GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, "T-TELLER", title_scale);
     
     
     GUI_Do_Spacing(context, AUTO);

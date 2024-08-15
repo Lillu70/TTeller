@@ -28,6 +28,7 @@ static Allocator_Shell s_allocator;
 static Paged_General_Allocator s_mem;
 static Linear_Allocator s_scrach_buffer = {};
 
+#include "Build_In_Assets.cpp"
 #include "Terminus_Font.h"
 
 #include "Renderer.h"

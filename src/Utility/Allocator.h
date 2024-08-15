@@ -11,7 +11,7 @@
 #include "Assert.h"
 
 #define Exhaustive_Memory_Verification
-#undef Exhaustive_Memory_Verification
+//#undef Exhaustive_Memory_Verification
 
 #ifdef Exhaustive_Memory_Verification
 

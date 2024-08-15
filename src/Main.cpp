@@ -20,7 +20,7 @@
 
 #include "App\Main_App.h"
 
-static const wchar_t* APP_TITLE = L"StoryToTheDeath";
+static const wchar_t* APP_TITLE = L"TTELLER";
 
 Declare_Timing_Tables();
 
