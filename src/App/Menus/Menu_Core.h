@@ -25,9 +25,10 @@ static GUI_Context s_gui_pop_up;
 struct Pooled_GUI_Context
 {
     GUI_Context context;
-    u32 last_used_ID;
+    u64 last_used_line;
+    u64 last_used_func;
 };
-static Pooled_GUI_Context s_context_pool[4] = {};
+static Pooled_GUI_Context s_context_pool[3] = {};
 
 static constexpr f32 s_post_title_y_spacing = 20;
 
@@ -107,6 +108,7 @@ struct Global_Data
     
     GUI_Theme popup_panel_theme;
     v2f popup_panel_dim = v2f{0.f, 0.f};
+    v2f title_scale = v2f{2.f, 2.f};
 
     Rect popup_panel_rect = {};
     
@@ -352,7 +354,7 @@ static inline void Init_GUI()
     
     GUI_Set_Default_Menu_Actions();
 
-    GUI_DEFAULT_TEXT_SCALE = v2f{2, 2};
+    GUI_DEFAULT_TEXT_SCALE = v2f{5.f, 5.f};
     
     v3<u8> c;
     f32 g;
@@ -455,17 +457,42 @@ static inline void Gather_Editor_Format_Campaigns()
 }
 
 
-static GUI_Context* Get_GUI_Context_From_Pool()
+// DOC: Gives back next available gui context, but if the given context is different that the one
+// resived by this caller before, the context is reseted.
+// CONSIDER: Is this a crazy way of doing this??? 
+#define Get_GUI_Context_From_Pool() Get_GUI_Context_From_Pool_(__LINE__, u64(__func__))
+
+static GUI_Context* Get_GUI_Context_From_Pool_(u64 line_id, u64 func_id)
 {
-    Assert(s_global_data.pooled_contexes_in_use_count < Array_Lenght(s_context_pool));
+    GUI_Context* result = 0;
     
-    Pooled_GUI_Context* result = s_context_pool + s_global_data.pooled_contexes_in_use_count;
-    if(result->last_used_ID != result->context._context_id)
-        GUI_Reset_Context(&result->context);
+    for(u32 i = 0; i < s_global_data.pooled_contexes_in_use_count; ++i)
+    {
+        Pooled_GUI_Context* pgc = s_context_pool + i;
+        if(pgc->last_used_line == line_id && 
+            pgc->last_used_func == func_id &&
+            !GUI_Is_Context_Ready(&pgc->context))
+        {
+            result = &pgc->context;
+            break;
+        }
+    }
     
-    result->last_used_ID = result->context._context_id;
+    if(!result)
+    {
+        Assert(s_global_data.pooled_contexes_in_use_count < Array_Lenght(s_context_pool));
+        
+        Pooled_GUI_Context* pgc = s_context_pool + s_global_data.pooled_contexes_in_use_count;
+        result = &pgc->context;
+        
+        if(pgc->last_used_line != line_id || pgc->last_used_func != func_id)
+            GUI_Reset_Context(&pgc->context);
+        
+        pgc->last_used_line = line_id;
+        pgc->last_used_func = func_id;
+        
+        s_global_data.pooled_contexes_in_use_count += 1;
+    }
     
-    s_global_data.pooled_contexes_in_use_count += 1;
-    
-    return &result->context;
+    return result;
 }

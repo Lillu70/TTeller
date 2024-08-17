@@ -143,6 +143,8 @@ static inline void Init_Event_Takes_Name_Ownership(
     Allocator_Shell* allocator, 
     String* name)
 {
+    event->issues = {};
+    
     event->participents = Create_Dynamic_Array<Participent>(allocator, 4);
     event->global_mark_reqs = Create_Dynamic_Array<Global_Mark_Requirement>(allocator, 4);
     event->global_mark_cons = Create_Dynamic_Array<Global_Mark_Consequence>(allocator, 4);
@@ -483,9 +485,7 @@ static void Update_Editor_Event_Text_Issues(Editor_Event* event)
                     if(c < '0' || c > '9' || c2 == 0)
                     {
                         if(c2)
-                            cptr -= 1; // NOTE GO back!
-                        else
-                            number_view.lenght += 1;
+                            cptr -= 1; // NOTE GO back!                        
                         
                         u32 participant_idx = Convert_String_View_Into_U32(number_view) - 1;
                         

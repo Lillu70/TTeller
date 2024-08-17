@@ -7,6 +7,13 @@
 
 #pragma once
 
+struct Settings
+{
+    bool allow_non_uniform_text_scale;
+    v2f text_scale;
+};
+static Settings s_settings = {};
+
 
 static void Do_Settings_Menu_Frame()
 {
@@ -28,6 +35,68 @@ static void Do_Settings_Menu_Frame()
 
     void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
     {
+        GUI_Highlight highlight = GUI_Highlight_Next(context, 2);
+        if(s_settings.allow_non_uniform_text_scale)
+            highlight = {};
+        
+        GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "Tekstin koko:", highlight);
+        
+        v2f check_box_dim = v2f{1.f, 1.f} * context->layout.last_element.dim.y;
+        
+        GUI_Do_Checkbox(context, AUTO, &check_box_dim, &s_settings.allow_non_uniform_text_scale);
+        v2f slider_dim = v2f{300, context->layout.last_element.dim.y};
+        
+        s_settings.text_scale = GUI_DEFAULT_TEXT_SCALE;
+        
+        if(s_settings.allow_non_uniform_text_scale)
+        {
+            context->flags |= GUI_Context_Flags::one_time_ignore_id;
+            if(GUI_Do_Fill_Slider(
+                context, 
+                AUTO, 
+                &slider_dim, 
+                &s_settings.
+                text_scale.x, 
+                5.f, 
+                1.f, 
+                0.1f))
+            { 
+                GUI_DEFAULT_TEXT_SCALE.x = s_settings.text_scale.x;
+            }
+            
+            context->flags |= GUI_Context_Flags::one_time_ignore_id;
+            if(GUI_Do_Fill_Slider(
+                context, 
+                AUTO, 
+                &slider_dim, 
+                &s_settings.
+                text_scale.y, 
+                5.f, 
+                1.f, 
+                0.1f))
+            {
+                GUI_DEFAULT_TEXT_SCALE.y = s_settings.text_scale.y;
+            }
+        }
+        else
+        {
+            GUI_DEFAULT_TEXT_SCALE.y = GUI_DEFAULT_TEXT_SCALE.x;
+            s_settings.text_scale.y = s_settings.text_scale.x;
+            
+            context->flags |= GUI_Context_Flags::one_time_ignore_id;
+            if(GUI_Do_Fill_Slider(
+                context, 
+                AUTO, 
+                &slider_dim, 
+                &s_settings.text_scale.x, 
+                5.f, 
+                1.f, 
+                0.1f))
+            {
+                s_settings.text_scale.y = s_settings.text_scale.x;
+                GUI_DEFAULT_TEXT_SCALE = s_settings.text_scale;
+            }            
+        }
         
     }; // ----------------------------------------------------------------------------------------
 
@@ -62,10 +131,6 @@ static void Do_Main_Menu_Frame()
     
     Clear_Canvas(&s_canvas, s_background_color);
     
-    v2f def_text_scale = GUI_DEFAULT_TEXT_SCALE;
-    
-    GUI_DEFAULT_TEXT_SCALE = v2f{3, 3};
-    
     GUI_Context* context = &s_gui_banner;
     GUI_Begin_Context(
         context,
@@ -75,11 +140,10 @@ static void Do_Main_Menu_Frame()
         v2i{0, 0},
         GUI_Anchor::top);
     
-    v2f title_scale = v2f{7.f, 7.f};
-    GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, "T-TELLER", title_scale);
+    GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, "T-TELLER", GUI_Scale_Default(2.f));
     
-    
-    GUI_Do_Spacing(context, AUTO);
+    f32 last_half_height = context->layout.last_element.dim.y / 2;
+    GUI_Do_Spacing(context, v2f{0, last_half_height});
     
     context->layout.build_direction = GUI_Build_Direction::down_center;
     
@@ -97,8 +161,8 @@ static void Do_Main_Menu_Frame()
         &context->theme->font, 
         (char**)button_texts, 
         Array_Lenght(button_texts));
-    dim += context->theme->padding;
     
+    dim += context->theme->padding;
     
     u32 i = 0;
     // Continue
@@ -140,6 +204,4 @@ static void Do_Main_Menu_Frame()
     }
     
     GUI_End_Context(context);
-    
-    GUI_DEFAULT_TEXT_SCALE = def_text_scale;
 }

@@ -313,7 +313,7 @@ static inline bool Is_Point_Inside_Rect(v2f p, Rect rect)
 
 static inline v2f Get_Rect_Dimensions(Rect rect)
 {
-    v2f result = v2f{rect.max.x - rect.min.x, rect.max.y - rect.min.y};
+    v2f result = rect.max - rect.min;
     
     return result;
 }

@@ -31,7 +31,18 @@ static void Do_Event_Editor_All_Events_Frame()
         v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
         
         if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
-            Set_Popup_Function(Do_Event_Editor_On_Exit_Popup);
+        {
+            if(s_editor_state.dirty)
+            {
+                Set_Popup_Function(Do_Event_Editor_On_Exit_Popup);
+            }
+            else
+            {
+                Delete_Event_Container(&s_editor_state.event_container, &s_allocator);
+                s_global_data.active_menu = Menus::campaigns_menu;
+                return;
+            }
+        }
         
         GUI_Push_Layout(context);
         
@@ -152,6 +163,9 @@ static void Do_Event_Editor_All_Events_Frame()
     
     void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
     {
+        if(!s_editor_state.event_container.events)
+            return;
+      
         GUI_Context* gui_event_list_day     = Get_GUI_Context_From_Pool();
         GUI_Context* gui_event_list_night   = Get_GUI_Context_From_Pool();
         
@@ -201,10 +215,8 @@ static void Do_Event_Editor_All_Events_Frame()
             }            
         }
         // ------------------------------------------------------------------------------------------
-        
-        if(s_global_data.active_menu != Menus::EE_all_events)
-            return;
-        
+
+
         u32 border_width = 30;
         u32 border_width_x2 = border_width * 2;
         u32 canvas_half_width = context->canvas->dim.x / 2;
@@ -350,8 +362,8 @@ static void Do_Event_Editor_All_Events_Frame()
                 {
                     do_event_list(gui_event_list_night, events, &pos, i);
                 }
-                
             }
+            
             GUI_End_Context(gui_event_list_night);
         }
         
@@ -1403,7 +1415,6 @@ static void Do_Event_Editor_On_Exit_Popup(GUI_Context* context)
     if(GUI_Do_Button(context, AUTO, &button_dim, t3))
     {
         Delete_Event_Container(&s_editor_state.event_container, &s_allocator);
-        
         s_global_data.active_menu = Menus::campaigns_menu;
         
         Close_Popup();

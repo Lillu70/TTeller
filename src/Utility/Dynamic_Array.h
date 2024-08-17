@@ -81,6 +81,8 @@ static T* Push(Dynamic_Array<T>** darray_ptr, Allocator_Shell* allocator)
     T* result = Begin(*darray_ptr) + (*darray_ptr)->count;
     (*darray_ptr)->count += 1;
     
+    *result = {};
+    
     return result;
 }
 

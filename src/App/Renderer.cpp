@@ -402,11 +402,13 @@ static void Draw_Filled_Rect(Canvas* canvas, Rect rect, Color fill_color)
 
 
 static inline void Draw_Filled_Rect_Outline_Step(
-    Canvas* canvas, 
-    Rect rect, 
-    f32 outlinef, 
+    Canvas* canvas,
+    Rect rect,
+    v2f outline,
     Color outline_color)
 {
+    Assert(outline.x > 0 && outline.y > 0);
+    
     v2f ceil_min = Ceil(rect.min); 
     v2f floor_min = Trunc(rect.min);
     v2f floor_max = Trunc(rect.max);
@@ -414,20 +416,20 @@ static inline void Draw_Filled_Rect_Outline_Step(
     // This looks funky, but trying to walk the memory in cache friendy way.
     
     // Bottom
-    i32 y_max = (i32)Min(ceil_min.y + outlinef, (f32)canvas->dim.y - 1);
+    i32 y_max = (i32)Min(ceil_min.y + outline.y, (f32)canvas->dim.y - 1);
     for(i32 y = (i32)ceil_min.y; y < y_max; ++y)
         for(i32 x = (i32)ceil_min.x; x < (i32)floor_max.x; ++x)
             Set_Pixel_HZ(canvas, v2i{x, y}, outline_color);
     
     // Top
-    i32 y_min = (i32)Max(floor_max.y - outlinef, 0.f);
+    i32 y_min = (i32)Max(floor_max.y - outline.y, 0.f);
     for(i32 y = y_min; y < (i32)floor_max.y; ++y)
         for(i32 x = (i32)ceil_min.x; x < (i32)floor_max.x; ++x)
             Set_Pixel_HZ(canvas, v2i{x, y}, outline_color);
 
     
-    i32 x_min = (i32)Max(floor_max.x - outlinef, 0.f);
-    i32 x_max = (i32)Min(ceil_min.x + outlinef, (f32)canvas->dim.x - 1);
+    i32 x_min = (i32)Max(floor_max.x - outline.x, 0.f);
+    i32 x_max = (i32)Min(ceil_min.x + outline.x, (f32)canvas->dim.x - 1);
     
     for(i32 y = y_max; y < y_min; ++y)
     {
@@ -466,14 +468,24 @@ static void Draw_Filled_Rect_With_Outline(
     if(!Verify_Rect_(canvas, &rect2))
         return;
     
-    f32 outlinef = (f32)outline_thickness;
-    Draw_Filled_Rect_Outline_Step(canvas, rect2, outlinef, outline_color);
+    v2f dim = Get_Rect_Dimensions(rect);
+    f32 outline_width = f32(outline_thickness);
+    v2f outline = v2f{outline_width, outline_width};
     
-    Rect internal = {rect.min + outlinef, rect.max - outlinef};
+    if(dim.x < outline_width)
+        outline.x = dim.x;
     
-    Assert(Is_Rect_Valid(internal)); // CONSIDER: Just return out?
+    if(dim.y < outline_width)
+        outline.y = dim.y;
     
-    Draw_Filled_Rect(canvas, internal, fill_color);
+    Draw_Filled_Rect_Outline_Step(canvas, rect2, outline, outline_color);
+    
+    Rect internal = {rect.min + outline, rect.max - outline};
+    
+    if(Is_Rect_Valid(internal))
+    {
+        Draw_Filled_Rect(canvas, internal, fill_color);        
+    }
 }
 
 
@@ -490,48 +502,40 @@ static void Draw_Percentile_Bar(
     
     fill_percent = Clamp_To_Barycentric(fill_percent);
 
-    f32 outlinef = (f32)outline_thickness;
+    v2f dim = Get_Rect_Dimensions(rect);
+    f32 outline_width = (f32)outline_thickness;
+    v2f outline = v2f{outline_width, outline_width};
+    
+    if(dim.x < outline_width)
+        outline.x = dim.x;
+    
+    if(dim.y < outline_width)
+        outline.y = dim.y;
     
     {
         Rect rect2 = rect;
         
         if(outline_thickness && Verify_Rect_(canvas, &rect2))
         {
-            Draw_Filled_Rect_Outline_Step(canvas, rect2, outlinef, outline_color);
+            Draw_Filled_Rect_Outline_Step(canvas, rect2, outline, outline_color);
         }
     }
     
-    Rect internal = {rect.min + outlinef, rect.max - outlinef};
-    f32 bar_width = internal.max.x - internal.min.x; 
-    
-    f32 x = internal.min.x + bar_width * fill_percent;
-    
-    Draw_Filled_Rect(canvas, internal, fill_color);
-    
-    if(fill_percent > 0)
+    Rect internal = {rect.min + outline, rect.max - outline};
+    if(Is_Rect_Valid(internal))
     {
-        Rect bar = {internal.min, {x, internal.max.y}};
-        Draw_Filled_Rect(canvas, bar, bar_color);
+        f32 bar_width = internal.max.x - internal.min.x; 
+        
+        f32 x = internal.min.x + bar_width * fill_percent;
+        
+        Draw_Filled_Rect(canvas, internal, fill_color);
+        
+        if(fill_percent > 0)
+        {
+            Rect bar = {internal.min, {x, internal.max.y}};
+            Draw_Filled_Rect(canvas, bar, bar_color);
+        }        
     }
-}
-
-// CONSIDER: Just delete these functions?
-//TODO: Give this thing a real name.
-static b32 Sample_Font(Font* font, i32 table_idx, u32 x, u32 y)
-{
-    i32 row = table_idx + (font->char_height - y);
-    b32 is_pixel = (font->data_buffer[row] & 1 << x) > 0;
-    
-    return is_pixel;
-}
-
-// NOTE: Not used atm, logic was inlined.
-static b32 Sample_Glyph(u8* glyph, u32 char_height, u32 x, u32 y)
-{
-    u32 row = char_height - y;
-    b32 is_pixel = (*(glyph + row) & 1 << x) > 0;
-    
-    return is_pixel;
 }
 
 

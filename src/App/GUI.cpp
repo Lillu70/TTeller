@@ -21,6 +21,20 @@ static bool GUI_Character_Check_View_Only(char* c)
 }
 
 
+static inline v2f GUI_Scale_Default(v2f scale_factor)
+{
+    v2f result = Hadamar_Product(GUI_DEFAULT_TEXT_SCALE, scale_factor);
+    return result;
+}
+
+
+static inline v2f GUI_Scale_Default(f32 scale_factor)
+{
+    v2f result = GUI_DEFAULT_TEXT_SCALE * scale_factor;
+    return result;
+}
+
+
 static inline u32 GUI_Make_Ignore_Selection_Mask()
 {
     u32 result = GUI_Context_Flags::soft_ignore_selection | GUI_Context_Flags::hard_ignore_selection;
@@ -538,7 +552,7 @@ static inline void GUI_Reset_Context(GUI_Context* context)
     // Make sure context is not reset between begin and end.
     Assert(!GUI_Is_Context_Ready(context));
     
-    u32 retained_flags = context->flags | GUI_Context_Flags::enable_dynamic_sliders;
+    u32 retained_flags = context->flags & GUI_Context_Flags::enable_dynamic_sliders;
     f32 dynamic_slider_girth = context->dynamic_slider_girth;
     u32 id = context->_context_id;
     *context = GUI_Context();
@@ -1171,8 +1185,10 @@ static inline bool GUI_Is_Element_Selected(GUI_Context* context, bool cursor_on_
     if(Bit_Not_Set(context->flags, GUI_Make_Ignore_Selection_Mask()) &&
         context->selected_index == context->widget_count)
     {
+        // TODO: CONSIDER, is ID even something we want to have?
         // Buuut, it seems to be a different widget?
-        if(id != context->selected_id)
+        bool not_ignore_id = Bit_Not_Set(context->flags, GUI_Context_Flags::one_time_ignore_id);
+        if(id != context->selected_id && not_ignore_id)
         {
             GUI_Reset_Selection_State(context);
             context->selected_id = id;
@@ -1203,7 +1219,8 @@ static inline bool GUI_Is_Element_Selected(GUI_Context* context, bool cursor_on_
         GUI_Context::active_context_id = context->_context_id;
         Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::soft_ignore_selection);
     }        
-
+    
+    Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::one_time_ignore_id);
     context->widget_count += 1; // Suprising side effect! But better to do it here than forget to do it ouside.
     return result;
 }
@@ -3733,7 +3750,8 @@ static bool GUI_Do_Sub_Context(
     f32 outline_thickness = f32(master->theme->outline_thickness);
     p.rect.min += outline_thickness;
     
-    if(Rects_Overlap(p.rect, master->canvas_rect))
+    bool result = false;
+    if(Is_Rect_Valid(p.rect) && Rects_Overlap(p.rect, master->canvas_rect))
     {
         v2f cp = Round(p.rect.min);
         cp.x = Max(cp.x, 0.f);
@@ -3748,47 +3766,52 @@ static bool GUI_Do_Sub_Context(
         
         if(buffer_offset.x < master->canvas->dim.x && buffer_offset.y < master->canvas->dim.y)
         {
-            v2u sub_dim = Round(p.dim + rendering_offset - outline_thickness * 2).As<u32>();
-            v2u sub_canvas_dim_max = master->canvas->dim - v2u{1, 1} - buffer_offset;
-            v2u sub_canvas_dim;
-            sub_canvas_dim.x = Min(sub_dim.x, sub_canvas_dim_max.x);
-            sub_canvas_dim.y = Min(sub_dim.y, sub_canvas_dim_max.y);
-            
-            *sub_canvas = Create_Sub_Canvas(
-                master->canvas,
-                sub_canvas_dim,
-                buffer_offset);
-            
+            v2f sub_dim_f32 = Round(p.dim + rendering_offset - outline_thickness * 2);
+            if(sub_dim_f32.x > 0 && sub_dim_f32.y > 0)
             {
-                if(master->flags & GUI_Context_Flags::hard_ignore_selection)
-                    sub_context->flags |= GUI_Context_Flags::hard_ignore_selection;
+                v2u sub_dim = sub_dim_f32.As<u32>();
                 
-                if(master->flags & GUI_Context_Flags::disable_mouse_scroll)
-                    sub_context->flags |= GUI_Context_Flags::disable_mouse_scroll;
+                v2u sub_canvas_dim_max = master->canvas->dim - v2u{1, 1} - buffer_offset;
+                v2u sub_canvas_dim = {};
+                sub_canvas_dim.x = Min(sub_dim.x, sub_canvas_dim_max.x);
+                sub_canvas_dim.y = Min(sub_dim.y, sub_canvas_dim_max.y);
                 
-                if(master->flags & GUI_Context_Flags::disable_kc_navigation)
-                    sub_context->flags |= GUI_Context_Flags::disable_kc_navigation;
+                *sub_canvas = Create_Sub_Canvas(
+                    master->canvas,
+                    sub_canvas_dim,
+                    buffer_offset);
                 
-                if(master->flags & GUI_Context_Flags::enable_dynamic_sliders)
-                    sub_context->flags |= GUI_Context_Flags::enable_dynamic_sliders;   
-            }
-            
-            GUI_Begin_Context(
-                sub_context, 
-                sub_canvas, 
-                master->external_action_context,
-                master->theme,
-                canvas_pos,
-                master->layout.anchor,
-                master->layout.build_direction,
-                ld);
+                {
+                    if(master->flags & GUI_Context_Flags::hard_ignore_selection)
+                        sub_context->flags |= GUI_Context_Flags::hard_ignore_selection;
+                    
+                    if(master->flags & GUI_Context_Flags::disable_mouse_scroll)
+                        sub_context->flags |= GUI_Context_Flags::disable_mouse_scroll;
+                    
+                    if(master->flags & GUI_Context_Flags::disable_kc_navigation)
+                        sub_context->flags |= GUI_Context_Flags::disable_kc_navigation;
+                    
+                    if(master->flags & GUI_Context_Flags::enable_dynamic_sliders)
+                        sub_context->flags |= GUI_Context_Flags::enable_dynamic_sliders;   
+                }
+                
+                GUI_Begin_Context(
+                    sub_context, 
+                    sub_canvas, 
+                    master->external_action_context,
+                    master->theme,
+                    canvas_pos,
+                    master->layout.anchor,
+                    master->layout.build_direction,
+                    ld);
 
-            sub_context->canvas_space_dim = sub_dim - Ceil(rendering_offset).As<u32>();
-            sub_context->rendering_offset = rendering_offset;
-            
-            return true;
+                sub_context->canvas_space_dim = sub_dim - Ceil(rendering_offset).As<u32>();
+                sub_context->rendering_offset = rendering_offset;
+                
+                result = true;                
+            }
         }
     }
     
-    return false;
+    return result;
 }

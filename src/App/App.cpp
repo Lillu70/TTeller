@@ -253,6 +253,9 @@ void Update_App()
             {
                 Editor_Event* event = Active_Event(&s_editor_state);
                 Update_Editor_Event_Consequence_Issues(event);
+            
+                if(event->issues.errors || event->issues.warnings)
+                    Update_Editor_Event_Participant_Issues(event);
             }break;
             
             case Menus::select_campaign_to_play_menu:
@@ -292,6 +295,14 @@ void Update_App()
                         (void*)s_edit_icon, 
                         Array_Lenght(s_edit_icon));
                 }
+            }break;
+            
+            // TODO: Instead of this bullshit hash the save and skip in case of a match.
+            case Menus::EE_participants:
+            case Menus::EE_consequences:
+            case Menus::EE_text:
+            {
+                s_editor_state.dirty = true;
             }break;
         }
     }
