@@ -7,25 +7,25 @@
 
 #pragma once
 
-static thread_local v2f GUI_AUTO_FIT            = v2f{0, 0};
-    
-static thread_local v2f GUI_AUTO_TOP_CENTER     = v2f{0, 0};
-static thread_local v2f GUI_AUTO_TOP_RIGHT      = v2f{0, 0};
-static thread_local v2f GUI_AUTO_TOP_LEFT       = v2f{0, 0};
-    
-static thread_local v2f GUI_AUTO_MIDDLE_RIGHT   = v2f{0, 0};
-static thread_local v2f GUI_AUTO_MIDDLE_LEFT    = v2f{0, 0};
-    
-static thread_local v2f GUI_AUTO_BOTTOM_CENTER  = v2f{0, 0};
-static thread_local v2f GUI_AUTO_BOTTOM_RIGHT   = v2f{0, 0};
-static thread_local v2f GUI_AUTO_BOTTOM_LEFT    = v2f{0, 0};
-    
-static thread_local v2f GUI_AUTO_MIDDLE         = v2f{0, 0};
-    
-static thread_local v2f GUI_DEFAULT_TEXT_SCALE  = v2f{1.f, 1.f};
-static thread_local v2f GUI_DEFAULT_TITLE_SCALER= v2f{1.5f, 1.5f};
-    
-static thread_local u32 GUI_NO_CHARACTER_LIMIT  = 0;
+static thread_local v2f GUI_AUTO_FIT                = v2f{0, 0};
+
+static thread_local v2f GUI_AUTO_TOP_CENTER         = v2f{0, 0};
+static thread_local v2f GUI_AUTO_TOP_RIGHT          = v2f{0, 0};
+static thread_local v2f GUI_AUTO_TOP_LEFT           = v2f{0, 0};
+
+static thread_local v2f GUI_AUTO_MIDDLE_RIGHT       = v2f{0, 0};
+static thread_local v2f GUI_AUTO_MIDDLE_LEFT        = v2f{0, 0};
+
+static thread_local v2f GUI_AUTO_BOTTOM_CENTER      = v2f{0, 0};
+static thread_local v2f GUI_AUTO_BOTTOM_RIGHT       = v2f{0, 0};
+static thread_local v2f GUI_AUTO_BOTTOM_LEFT        = v2f{0, 0};
+
+static thread_local v2f GUI_AUTO_MIDDLE             = v2f{0, 0};
+
+static thread_local v2f GUI_DEFAULT_TEXT_SCALE      = v2f{1.f, 1.f};
+static thread_local v2f GUI_DEFAULT_TITLE_SCALER    = v2f{1.5f, 1.5f};
+
+static thread_local u32 GUI_NO_CHARACTER_LIMIT      = 0;
 
 
 struct GUI_Theme
@@ -129,6 +129,13 @@ enum class GUI_Defered_Render_Type
 {
     none = 0,
     dropdown_button
+};
+
+
+enum class GUI_Mode : u8
+{
+    normal = 0,
+    layout_only,
 };
 
 
@@ -289,11 +296,14 @@ struct GUI_Context
     
     GUI_Layout layout = {};
     
+    
     GUI_Element_State selection_state = {};
     GUI_Defered_Render_Type defered_render = GUI_Defered_Render_Type::none;
-    
+
     u32 layout_stack_count = 0;
     GUI_Layout layout_stack[5];
+    
+    GUI_Mode mode = {};
 };
 
 

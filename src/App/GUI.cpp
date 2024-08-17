@@ -35,6 +35,44 @@ static inline v2f GUI_Scale_Default(f32 scale_factor)
 }
 
 
+static inline v2f GUI_Character_Size(GUI_Context* context, v2f scale_factor = GUI_DEFAULT_TEXT_SCALE)
+{
+    f32 y = f32(context->theme->font.char_height);
+    f32 x = f32(context->theme->font.char_width);
+    
+    v2f result = Hadamar_Product(v2f{x, y}, scale_factor);
+}
+
+
+static inline f32 GUI_Character_Height(
+    GUI_Context* context, 
+    f32 scale_factor = GUI_DEFAULT_TEXT_SCALE.y)
+{
+    f32 y = f32(context->theme->font.char_height);
+    f32 result = y * scale_factor;
+    
+    return result;
+}
+
+
+static inline f32 GUI_Character_Width(
+    GUI_Context* context, 
+    f32 scale_factor = GUI_DEFAULT_TEXT_SCALE.x)
+{
+    f32 x = f32(context->theme->font.char_width);
+    f32 result = x * scale_factor;
+    
+    return result;
+}
+
+
+static inline f32 GUI_Padding(GUI_Context* context)
+{
+    f32 result = f32(context->theme->padding);
+    return result;
+}
+
+
 static inline u32 GUI_Make_Ignore_Selection_Mask()
 {
     u32 result = GUI_Context_Flags::soft_ignore_selection | GUI_Context_Flags::hard_ignore_selection;
@@ -600,7 +638,36 @@ static inline bool GUI_Is_Context_Active(GUI_Context* context)
 }
 
 
-static inline void GUI_Begin_Context(
+static void GUI_Begin_Context_In_Layout_Only_Mode(
+    GUI_Context* context,
+    Canvas* canvas,
+    GUI_Theme* theme, 
+    GUI_Anchor anchor = GUI_Anchor::top_left,
+    GUI_Build_Direction build_direction = GUI_Build_Direction::down_left)
+{
+    Assert(theme);
+    Assert(context->_context_id);
+    Assert(!GUI_Is_Context_Ready(context));
+    
+    context->mode = GUI_Mode::layout_only;
+    
+    context->theme = theme;
+    context->canvas = canvas;
+    
+    context->layout = {};
+    context->layout.build_direction = build_direction;
+    context->layout.anchor = anchor;
+    
+    context->flags |= GUI_Context_Flags::context_ready;
+    
+    context->canvas_space_dim = context->canvas->dim;
+    context->canvas_rect = Create_Rect_Min_Dim(v2f{0}, v2u::Cast<f32>(context->canvas->dim));
+    
+    context->bounds_rel_anchor_base = { {F32_MAX, F32_MAX}, {-F32_MAX, -F32_MAX} };
+}
+
+
+static void GUI_Begin_Context(
     GUI_Context* context,
     Canvas* canvas,
     Action_Context* external_action_context,
@@ -610,18 +677,19 @@ static inline void GUI_Begin_Context(
     GUI_Build_Direction build_direction = GUI_Build_Direction::down_left,
     GUI_Link_Direction::Type ld = GUI_Link_Direction::up)
 {
-    Assert(canvas);
     Assert(theme);
-    Assert(!GUI_Is_Context_Ready(context));
-    Assert(context->_context_id);
+    Assert(canvas);
     Assert(context->platform);
+    Assert(context->_context_id);
+    Assert(!GUI_Is_Context_Ready(context));
     
-    context->layout = {};
+    context->mode = GUI_Mode::normal;
     
     context->canvas = canvas;
     context->theme = theme;
     context->external_action_context = external_action_context;
     
+    context->layout = {};
     context->layout.build_direction = build_direction;
     context->layout.anchor = anchor;
     context->widget_count = 0;
@@ -636,6 +704,8 @@ static inline void GUI_Begin_Context(
     
     context->canvas_space_dim = context->canvas->dim;
     context->canvas_rect = Create_Rect_Min_Dim(v2f{0}, v2u::Cast<f32>(context->canvas->dim));
+    
+    context->flags |= GUI_Context_Flags::context_ready;
     
     u32 app_flags = context->platform->Get_Flags();
     
@@ -661,7 +731,6 @@ static inline void GUI_Begin_Context(
     
     Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::cursor_mask_validation);
     
-    context->flags |= GUI_Context_Flags::context_ready;
     
     if(Is_Flag_Set(app_flags, (u32)App_Flags::is_focused))
     {
@@ -695,465 +764,475 @@ static inline void GUI_End_Context(GUI_Context* context)
     Assert(context);
     Assert(context->layout_stack_count == 0);
     
-    
-    // Sometimes you have to rendering some things at the end in order to insure that,
-    // draw order is correct.
-    // TODO: That said, this is a temprory placeholder, that carrise manny issues.
-    // For one the char*[] that is passed into the Do function, has still be valid,
-    // when ending the context here.
-    switch(context->defered_render)
+    if(context->mode == GUI_Mode::normal)
     {
-        case GUI_Defered_Render_Type::dropdown_button:
+        // DOC: Sometimes you have to rendering some things at the end in order to insure that,
+        // draw order is correct.
+        // TODO: That said, this is a temprory placeholder, that carrise manny issues.
+        // For one the char*[] that is passed into the Do function, has still be valid,
+        // when ending the context here.
+        switch(context->defered_render)
         {
-            GUI_Dropdown_Button_State* state = &context->selection_state.dropdown_button;
-            GUI_Theme* theme = state->theme;
-            
-            Font* font = &theme->font;
-
-            Draw_Filled_Rect_With_Outline(
-                context->canvas, 
-                state->open_rect, 
-                theme->background_color,
-                theme->outline_thickness, 
-                theme->selected_color);
-            
-            v2f pos = state->pos;
-            
-            for(u32 i = 0; i < state->element_count; ++i)
+            case GUI_Defered_Render_Type::dropdown_button:
             {
-                char* text = state->element_names[i];
-                Color text_color = theme->outline_color;
-                if(state->selected_element_idx == i)
+                GUI_Dropdown_Button_State* state = &context->selection_state.dropdown_button;
+                GUI_Theme* theme = state->theme;
+                
+                Font* font = &theme->font;
+
+                Draw_Filled_Rect_With_Outline(
+                    context->canvas, 
+                    state->open_rect, 
+                    theme->background_color,
+                    theme->outline_thickness, 
+                    theme->selected_color);
+                
+                v2f pos = state->pos;
+                
+                for(u32 i = 0; i < state->element_count; ++i)
                 {
-                    Color bg_color = theme->outline_color;
-                    text_color = theme->background_color;
-                    
-                    if(state->is_pressed_down)
+                    char* text = state->element_names[i];
+                    Color text_color = theme->outline_color;
+                    if(state->selected_element_idx == i)
                     {
-                        text_color = theme->down_color;
-                        bg_color = theme->background_color;
+                        Color bg_color = theme->outline_color;
+                        text_color = theme->background_color;
+                        
+                        if(state->is_pressed_down)
+                        {
+                            text_color = theme->down_color;
+                            bg_color = theme->background_color;
+                        }
+                        
+                        Rect bg_rect = Create_Rect_Center(pos, state->dim);
+                        
+                        Draw_Filled_Rect_With_Outline(
+                            context->canvas, 
+                            bg_rect, bg_color, 
+                            theme->outline_thickness, 
+                            theme->selected_color);
                     }
                     
-                    Rect bg_rect = Create_Rect_Center(pos, state->dim);
+                    v2f text_p = GUI_Calc_Centered_Text_Position(text, state->text_scale, pos, font);
+                    Draw_Text(context->canvas, (u8*)text, text_p, text_color, font, state->text_scale);
                     
-                    Draw_Filled_Rect_With_Outline(
-                        context->canvas, 
-                        bg_rect, bg_color, 
-                        theme->outline_thickness, 
-                        theme->selected_color);
+                    pos.y -= state->dim.y;
                 }
-                
-                v2f text_p = GUI_Calc_Centered_Text_Position(text, state->text_scale, pos, font);
-                Draw_Text(context->canvas, (u8*)text, text_p, text_color, font, state->text_scale);
-                
-                pos.y -= state->dim.y;
-            }
-        }break;
-    }
-    
-    context->defered_render = GUI_Defered_Render_Type::none;
-    
-    if(Bit_Not_Set(context->flags, GUI_Context_Flags::cursor_mask_validation))
-    {
-        Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::cursor_mask_enabled);
-        context->cursor_mask_area = {};
-    }
-    
-    u32 ignore_selection_mask = GUI_Make_Ignore_Selection_Mask();
-    
-    // Selection wrapping.
-    if(Bit_Not_Set(context->flags, ignore_selection_mask | GUI_Context_Flags::disable_wrapping))
-    {
-        if(context->widget_count > 0 &&
-            context->selected_index > context->widget_count - 1 &&
-            context->widget_count < context->last_widget_count)
-        {
-            context->selected_index = context->widget_count - 1;
+            }break;
         }
         
-        if(context->selected_index < 0)
+        context->defered_render = GUI_Defered_Render_Type::none;
+        
+        if(Bit_Not_Set(context->flags, GUI_Context_Flags::cursor_mask_validation))
         {
-            context->selected_index = context->widget_count - 1;
-            GUI_Reset_Selection_State(context);
+            Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::cursor_mask_enabled);
+            context->cursor_mask_area = {};
         }
         
-        if(context->selected_index >= context->widget_count)
+        u32 ignore_selection_mask = GUI_Make_Ignore_Selection_Mask();
+        
+        // Selection wrapping.
+        if(Bit_Not_Set(context->flags, ignore_selection_mask | GUI_Context_Flags::disable_wrapping))
         {
-            context->selected_index = 0;
-            GUI_Reset_Selection_State(context);
-        }
-    }
-    
-    context->last_widget_count = context->widget_count;
-    Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::disable_wrapping);
-    
-    // GUI scrolling
-    if(context->flags & GUI_Context_Flags::enable_dynamic_sliders)
-    {
-        f32 padding = context->theme->padding;
-        
-        v2f canvas_dim = v2u::Cast<f32>(context->canvas_space_dim);
-        
-        f32 canvas_height = canvas_dim.y;
-        f32 canvas_width = canvas_dim.x;
-        f32 canvas_bottom = 0;
-        
-        Rect bounds = GUI_Get_Bounds_In_Pixel_Space(context);
-        
-        // Recovery points if sliderds schange effective canvas size.
-        Rect bounds_recovery = bounds;
-        
-        f32 y_factor = 0;
-        {
-            if(bounds.min.y >= 0)
-                bounds.min.y = 0;
-            else
-                bounds.min.y -= padding;
-            
-            if(bounds.max.y < canvas_height)
-                bounds.max.y = canvas_height;
-            
-            else
+            if(context->widget_count > 0 &&
+                context->selected_index > context->widget_count - 1 &&
+                context->widget_count < context->last_widget_count)
             {
-                bounds.max.y += padding;
-                y_factor = bounds.max.y - canvas_height;
+                context->selected_index = context->widget_count - 1;
+            }
+            
+            if(context->selected_index < 0)
+            {
+                context->selected_index = context->widget_count - 1;
+                GUI_Reset_Selection_State(context);
+            }
+            
+            if(context->selected_index >= context->widget_count)
+            {
+                context->selected_index = 0;
+                GUI_Reset_Selection_State(context);
             }
         }
         
-        f32 x_factor = 0;
+        context->last_widget_count = context->widget_count;
+        Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::disable_wrapping);
+        
+        // GUI scrolling
+        if(context->flags & GUI_Context_Flags::enable_dynamic_sliders)
         {
-            if(bounds.max.x < canvas_width)
-                bounds.max.x = canvas_width;
+            f32 padding = context->theme->padding;
             
-            else
-                bounds.max.x += padding;
+            v2f canvas_dim = v2u::Cast<f32>(context->canvas_space_dim);
             
-            if(bounds.min.x >= 0)
-                bounds.min.x = 0;
+            f32 canvas_height = canvas_dim.y;
+            f32 canvas_width = canvas_dim.x;
+            f32 canvas_bottom = 0;
             
-            else
+            Rect bounds = GUI_Get_Bounds_In_Pixel_Space(context);
+            
+            // Recovery points if sliderds schange effective canvas size.
+            Rect bounds_recovery = bounds;
+            
+            f32 y_factor = 0;
             {
-                bounds.min.x -= padding;
-                x_factor = 0 - bounds.min.x;
-            }
-        }
-        
-        v2f selected_element_half_dim = context->selected_element_dim / 2;
-        
-        // NOTE: Done up here as the window sliders can cause selected_element records to be modified.
-        f32 selected_element_max_y = context->selected_element_pos.y + selected_element_half_dim.y;
-        f32 selected_element_min_y = context->selected_element_pos.y - selected_element_half_dim.y;    
-        f32 selected_element_max_x = context->selected_element_pos.x + selected_element_half_dim.x;
-        f32 selected_element_min_x = context->selected_element_pos.x - selected_element_half_dim.x;    
-        
-        bool selected_element_is_window_slider = false;
-        bool shift_down = context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT) || 
-            context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT);
-        
-        // Dynamic sliders!
-        {        
-            f32 slider_girth = context->dynamic_slider_girth;
-            f32 gui_height = bounds.max.y - bounds.min.y;
-            
-            bool enable_vertical_slider = gui_height > canvas_height && 
-                canvas_dim.x > slider_girth &&
-                canvas_dim.y > context->theme->outline_thickness * 2.f;
-            
-            if(enable_vertical_slider)
-            {
-                canvas_width -= slider_girth;
+                if(bounds.min.y >= 0)
+                    bounds.min.y = 0;
+                else
+                    bounds.min.y -= padding;
                 
-                // Recover max.x and recalc.
-                bounds.max.x = bounds_recovery.max.x;
+                if(bounds.max.y < canvas_height)
+                    bounds.max.y = canvas_height;
+                
+                else
+                {
+                    bounds.max.y += padding;
+                    y_factor = bounds.max.y - canvas_height;
+                }
+            }
+            
+            f32 x_factor = 0;
+            {
                 if(bounds.max.x < canvas_width)
                     bounds.max.x = canvas_width;
+                
                 else
                     bounds.max.x += padding;
+                
+                if(bounds.min.x >= 0)
+                    bounds.min.x = 0;
+                
+                else
+                {
+                    bounds.min.x -= padding;
+                    x_factor = 0 - bounds.min.x;
+                }
             }
             
-            f32 gui_width = bounds.max.x - bounds.min.x;
-            bool enable_horizontal_slider = gui_width > canvas_width && 
-                canvas_dim.y > slider_girth &&
-                canvas_dim.x > context->theme->outline_thickness * 2.f;
+            v2f selected_element_half_dim = context->selected_element_dim / 2;
             
-            if(enable_horizontal_slider)
-            {
-                f32 canvas_bottom_and_height = canvas_height;
-                canvas_bottom = slider_girth;
-                canvas_height -= slider_girth;
+            // NOTE: Done up here as the window sliders can cause selected_element records to be modified.
+            f32 selected_element_max_y = context->selected_element_pos.y + selected_element_half_dim.y;
+            f32 selected_element_min_y = context->selected_element_pos.y - selected_element_half_dim.y;    
+            f32 selected_element_max_x = context->selected_element_pos.x + selected_element_half_dim.x;
+            f32 selected_element_min_x = context->selected_element_pos.x - selected_element_half_dim.x;    
+            
+            bool selected_element_is_window_slider = false;
+            bool shift_down = context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT) || 
+                context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT);
+            
+            // Dynamic sliders!
+            {        
+                f32 slider_girth = context->dynamic_slider_girth;
+                f32 gui_height = bounds.max.y - bounds.min.y;
                 
-                // Recover min/max.y and recalc.
-                bounds.max.y = bounds_recovery.max.y;
-                bounds.min.y = bounds_recovery.min.y;
+                bool enable_vertical_slider = gui_height > canvas_height && 
+                    canvas_dim.x > slider_girth &&
+                    canvas_dim.y > context->theme->outline_thickness * 2.f;
+                
+                if(enable_vertical_slider)
                 {
-                    if(bounds.min.y >= canvas_bottom)
-                        bounds.min.y = canvas_bottom;
-                    else
-                    {
-                        //if(bounds.min.y > 0)
-                        //    bounds.min.y = 0;
-                        
-                        bounds.min.y -= padding;
-                    }
+                    canvas_width -= slider_girth;
                     
-                    if(bounds.max.y < canvas_bottom_and_height)
-                        bounds.max.y = canvas_bottom_and_height;
-                    
+                    // Recover max.x and recalc.
+                    bounds.max.x = bounds_recovery.max.x;
+                    if(bounds.max.x < canvas_width)
+                        bounds.max.x = canvas_width;
                     else
-                    {
-                        //bounds.max.y += padding;
-                        
-                        // TODO: This was changed from canvas_height without real understanding
-                        // of what the meaning is. Look into this!
-                        
-                        y_factor = bounds.max.y - canvas_bottom_and_height;
-                    }
+                        bounds.max.x += padding;
                 }
                 
-                gui_height = bounds.max.y - bounds.min.y;
-                // TODO: On a related note, seems like bounds is effectivel unused after this point,
-                // but still updated, so look into deleteting some code related to it.
+                f32 gui_width = bounds.max.x - bounds.min.x;
+                bool enable_horizontal_slider = gui_width > canvas_width && 
+                    canvas_dim.y > slider_girth &&
+                    canvas_dim.x > context->theme->outline_thickness * 2.f;
                 
-                if(!enable_vertical_slider)
+                if(enable_horizontal_slider)
                 {
-                    enable_vertical_slider = gui_height > canvas_height && 
-                        canvas_dim.x > slider_girth &&
-                        canvas_dim.y > context->theme->outline_thickness * 2.f;
+                    f32 canvas_bottom_and_height = canvas_height;
+                    canvas_bottom = slider_girth;
+                    canvas_height -= slider_girth;
                     
-                    if(enable_vertical_slider)
+                    // Recover min/max.y and recalc.
+                    bounds.max.y = bounds_recovery.max.y;
+                    bounds.min.y = bounds_recovery.min.y;
                     {
-                        canvas_width -= slider_girth;
-                        
-                        // Recover max.x and recalc.
-                        bounds.max.x = bounds_recovery.max.x;
-                        if(bounds.max.x < canvas_width)
-                            bounds.max.x = canvas_width;
+                        if(bounds.min.y >= canvas_bottom)
+                            bounds.min.y = canvas_bottom;
                         else
-                            bounds.max.x += padding;
-                    }
-                }
-            }
-            
-            if(enable_vertical_slider && enable_horizontal_slider)
-            {
-                v2f min = v2f{context->canvas->dim.x - 1 - slider_girth, 0};
-                v2f dim = v2f{} + slider_girth;
-                
-                Color color = context->theme->outline_color;
-                Draw_Filled_Rect(context->canvas, Create_Rect_Min_Dim(min, dim), color);
-            }
-            
-            f32 mouse_scroll;
-            u32 mouse_scroll_mask = GUI_Context_Flags::disable_mouse_scroll | ignore_selection_mask;
-            if(Bit_Not_Set(context->flags, mouse_scroll_mask) &&
-                Is_Point_Inside_Rect(context->cursor_fpos, context->canvas_rect) &&
-                Is_Flag_Set(context->platform->Get_Flags(), (u32)App_Flags::is_focused))
-            {
-                mouse_scroll = context->platform->Get_Scroll_Wheel_Delta();
-            }
-            else
-                mouse_scroll = 0;
-            
-            
-            v2f anchor_base = context->anchor_base;
-            context->anchor_base = {};
-            
-            if(enable_vertical_slider)
-            {
-                context->layout.anchor = GUI_Anchor::top_right;
-                
-                f32 slider_max = (gui_height / canvas_height) - 1;
-                v2f slider_dim = {slider_girth, canvas_height};
-                f32 slider_value = (anchor_base.y + y_factor) / canvas_height;
-                
-                context->flags |= GUI_Context_Flags::one_time_skip_padding;
-                
-                GUI_Do_Handle_Slider(
-                    context, 
-                    &GUI_AUTO_TOP_RIGHT, 
-                    &slider_dim, 
-                    &slider_value,
-                    slider_max, 
-                    0,
-                    GUI_Cardinal_Direction::up_down);
-                
-                f32 local_scroll_v = (!shift_down)? mouse_scroll : 0;
-                f32 scroll_delta = local_scroll_v / canvas_height * context->mouse_scroll_speed;
-                slider_value -= scroll_delta;
-                
-                if(context->flags & GUI_Context_Flags::maxout_vertical_slider)
-                    slider_value = slider_max;
-                
-                slider_value = Clamp_Zero_To_Max(slider_value, slider_max);
-    
-                anchor_base.y = (slider_value * canvas_height) - y_factor;
-                
-                // Selects the slider when using mouse scroll.
-                if(local_scroll_v != 0)
-                    context->selected_index = context->widget_count - 1;
-                
-                
-                if(Bit_Not_Set(context->flags, ignore_selection_mask) && 
-                    context->selected_index == context->widget_count - 1)
-                {
-                    selected_element_is_window_slider = true;
-                    context->flags |= GUI_Context_Flags::disable_kc_navigation;
-                    context->flags |= GUI_Context_Flags::disable_wrapping;
-                    
-                    v2f pos = context->layout.last_element.pos;
-                    v2f dim = context->layout.last_element.dim;
-                    Rect window_slider_rect;
-                    
-                    // NOTE: This is an unsafe union access!
-                    if(context->selection_state.slider.is_held_down)
-                    {
-                        window_slider_rect = Create_Rect_Min_Dim(v2f{0}, canvas_dim);
-                    }
-                    else
-                    {
-                        window_slider_rect = Create_Rect_Center(pos, dim);
-                    }
-                    
-                    if(Is_Point_Inside_Rect(context->cursor_fpos, window_slider_rect))
-                    {
-                        context->flags |= GUI_Context_Flags::cursor_mask_validation;
-                        context->flags |= GUI_Context_Flags::cursor_mask_enabled;
+                        {
+                            //if(bounds.min.y > 0)
+                            //    bounds.min.y = 0;
+                            
+                            bounds.min.y -= padding;
+                        }
                         
-                        context->cursor_mask_area = window_slider_rect;
-                    }
-                }
-            }
-            else
-            {
-                anchor_base.y = 0;
-            }
-            
-            if(enable_horizontal_slider)
-            {
-                context->layout.anchor = GUI_Anchor::bottom_left;
-                
-                f32 slider_max = (gui_width / canvas_width) - 1;
-                v2f slider_dim = {canvas_width, slider_girth};
-                f32 slider_value = (-(anchor_base.x - x_factor)) / canvas_width;
-                
-                context->flags |= GUI_Context_Flags::one_time_skip_padding;
-                GUI_Do_Handle_Slider(
-                    context, 
-                    &GUI_AUTO_BOTTOM_LEFT, 
-                    &slider_dim, 
-                    &slider_value,
-                    slider_max, 
-                    0,
-                    GUI_Cardinal_Direction::left_right);
-                
-                f32 local_scroll_v = (shift_down)? mouse_scroll : 0;
-                f32 scroll_delta = local_scroll_v / canvas_width * context->mouse_scroll_speed;
-                slider_value -= scroll_delta;
-                
-                if(context->flags & GUI_Context_Flags::maxout_horizontal_slider)
-                    slider_value = slider_max;
-                
-                slider_value = Clamp_Zero_To_Max(slider_value, slider_max);
-                
-                anchor_base.x = -(slider_value * canvas_width) + x_factor;
-                
-                // Selects the slider when using mouse scroll.
-                if(local_scroll_v != 0)
-                    context->selected_index = context->widget_count - 1;
-                
-                if(Bit_Not_Set(context->flags, ignore_selection_mask) && 
-                    context->selected_index == context->widget_count - 1)
-                {
-                    selected_element_is_window_slider = true;
-                    context->flags |= GUI_Context_Flags::disable_kc_navigation;
-                    context->flags |= GUI_Context_Flags::disable_wrapping;
-                    
-                    v2f pos = context->layout.last_element.pos;
-                    v2f dim = context->layout.last_element.dim;
-                    Rect window_slider_rect;
-                    
-                    // NOTE: This is an unsafe union access!
-                    if(context->selection_state.slider.is_held_down)
-                        window_slider_rect = Create_Rect_Min_Dim(v2f{0}, canvas_dim);
-                    
-                    else
-                    {
-                        window_slider_rect = Create_Rect_Center(pos, dim);
-                    }
-                    
-                    if(Is_Point_Inside_Rect(context->cursor_fpos, window_slider_rect))
-                    {
-                        context->flags |= GUI_Context_Flags::cursor_mask_validation;
-                        context->flags |= GUI_Context_Flags::cursor_mask_enabled;
+                        if(bounds.max.y < canvas_bottom_and_height)
+                            bounds.max.y = canvas_bottom_and_height;
                         
-                        context->cursor_mask_area = window_slider_rect;
+                        else
+                        {
+                            //bounds.max.y += padding;
+                            
+                            // TODO: This was changed from canvas_height without real understanding
+                            // of what the meaning is. Look into this!
+                            
+                            y_factor = bounds.max.y - canvas_bottom_and_height;
+                        }
+                    }
+                    
+                    gui_height = bounds.max.y - bounds.min.y;
+                    // TODO: On a related note, seems like bounds is effectivel unused after this point,
+                    // but still updated, so look into deleteting some code related to it.
+                    
+                    if(!enable_vertical_slider)
+                    {
+                        enable_vertical_slider = gui_height > canvas_height && 
+                            canvas_dim.x > slider_girth &&
+                            canvas_dim.y > context->theme->outline_thickness * 2.f;
+                        
+                        if(enable_vertical_slider)
+                        {
+                            canvas_width -= slider_girth;
+                            
+                            // Recover max.x and recalc.
+                            bounds.max.x = bounds_recovery.max.x;
+                            if(bounds.max.x < canvas_width)
+                                bounds.max.x = canvas_width;
+                            else
+                                bounds.max.x += padding;
+                        }
+                    }
+                }
+                
+                if(enable_vertical_slider && enable_horizontal_slider)
+                {
+                    v2f min = v2f{context->canvas->dim.x - 1 - slider_girth, 0};
+                    v2f dim = v2f{} + slider_girth;
+                    
+                    Color color = context->theme->outline_color;
+                    Draw_Filled_Rect(context->canvas, Create_Rect_Min_Dim(min, dim), color);
+                }
+                
+                f32 mouse_scroll;
+                u32 mouse_scroll_mask = GUI_Context_Flags::disable_mouse_scroll | ignore_selection_mask;
+                if(Bit_Not_Set(context->flags, mouse_scroll_mask) &&
+                    Is_Point_Inside_Rect(context->cursor_fpos, context->canvas_rect) &&
+                    Is_Flag_Set(context->platform->Get_Flags(), (u32)App_Flags::is_focused))
+                {
+                    mouse_scroll = context->platform->Get_Scroll_Wheel_Delta();
+                }
+                else
+                    mouse_scroll = 0;
+                
+                
+                v2f anchor_base = context->anchor_base;
+                context->anchor_base = {};
+                
+                if(enable_vertical_slider)
+                {
+                    context->layout.anchor = GUI_Anchor::top_right;
+                    
+                    f32 slider_max = (gui_height / canvas_height) - 1;
+                    v2f slider_dim = {slider_girth, canvas_height};
+                    f32 slider_value = (anchor_base.y + y_factor) / canvas_height;
+                    
+                    context->flags |= GUI_Context_Flags::one_time_skip_padding;
+                    
+                    GUI_Do_Handle_Slider(
+                        context, 
+                        &GUI_AUTO_TOP_RIGHT, 
+                        &slider_dim, 
+                        &slider_value,
+                        slider_max, 
+                        0,
+                        GUI_Cardinal_Direction::up_down);
+                    
+                    f32 local_scroll_v = (!shift_down)? mouse_scroll : 0;
+                    f32 scroll_delta = local_scroll_v / canvas_height * context->mouse_scroll_speed;
+                    slider_value -= scroll_delta;
+                    
+                    if(context->flags & GUI_Context_Flags::maxout_vertical_slider)
+                        slider_value = slider_max;
+                    
+                    slider_value = Clamp_Zero_To_Max(slider_value, slider_max);
+        
+                    anchor_base.y = (slider_value * canvas_height) - y_factor;
+                    
+                    // Selects the slider when using mouse scroll.
+                    if(local_scroll_v != 0)
+                        context->selected_index = context->widget_count - 1;
+                    
+                    
+                    if(Bit_Not_Set(context->flags, ignore_selection_mask) && 
+                        context->selected_index == context->widget_count - 1)
+                    {
+                        selected_element_is_window_slider = true;
+                        context->flags |= GUI_Context_Flags::disable_kc_navigation;
+                        context->flags |= GUI_Context_Flags::disable_wrapping;
+                        
+                        v2f pos = context->layout.last_element.pos;
+                        v2f dim = context->layout.last_element.dim;
+                        Rect window_slider_rect;
+                        
+                        // NOTE: This is an unsafe union access!
+                        if(context->selection_state.slider.is_held_down)
+                        {
+                            window_slider_rect = Create_Rect_Min_Dim(v2f{0}, canvas_dim);
+                        }
+                        else
+                        {
+                            window_slider_rect = Create_Rect_Center(pos, dim);
+                        }
+                        
+                        if(Is_Point_Inside_Rect(context->cursor_fpos, window_slider_rect))
+                        {
+                            context->flags |= GUI_Context_Flags::cursor_mask_validation;
+                            context->flags |= GUI_Context_Flags::cursor_mask_enabled;
+                            
+                            context->cursor_mask_area = window_slider_rect;
+                        }
+                    }
+                }
+                else
+                {
+                    anchor_base.y = 0;
+                }
+                
+                if(enable_horizontal_slider)
+                {
+                    context->layout.anchor = GUI_Anchor::bottom_left;
+                    
+                    f32 slider_max = (gui_width / canvas_width) - 1;
+                    v2f slider_dim = {canvas_width, slider_girth};
+                    f32 slider_value = (-(anchor_base.x - x_factor)) / canvas_width;
+                    
+                    context->flags |= GUI_Context_Flags::one_time_skip_padding;
+                    GUI_Do_Handle_Slider(
+                        context, 
+                        &GUI_AUTO_BOTTOM_LEFT, 
+                        &slider_dim, 
+                        &slider_value,
+                        slider_max, 
+                        0,
+                        GUI_Cardinal_Direction::left_right);
+                    
+                    f32 local_scroll_v = (shift_down)? mouse_scroll : 0;
+                    f32 scroll_delta = local_scroll_v / canvas_width * context->mouse_scroll_speed;
+                    slider_value -= scroll_delta;
+                    
+                    if(context->flags & GUI_Context_Flags::maxout_horizontal_slider)
+                        slider_value = slider_max;
+                    
+                    slider_value = Clamp_Zero_To_Max(slider_value, slider_max);
+                    
+                    anchor_base.x = -(slider_value * canvas_width) + x_factor;
+                    
+                    // Selects the slider when using mouse scroll.
+                    if(local_scroll_v != 0)
+                        context->selected_index = context->widget_count - 1;
+                    
+                    if(Bit_Not_Set(context->flags, ignore_selection_mask) && 
+                        context->selected_index == context->widget_count - 1)
+                    {
+                        selected_element_is_window_slider = true;
+                        context->flags |= GUI_Context_Flags::disable_kc_navigation;
+                        context->flags |= GUI_Context_Flags::disable_wrapping;
+                        
+                        v2f pos = context->layout.last_element.pos;
+                        v2f dim = context->layout.last_element.dim;
+                        Rect window_slider_rect;
+                        
+                        // NOTE: This is an unsafe union access!
+                        if(context->selection_state.slider.is_held_down)
+                            window_slider_rect = Create_Rect_Min_Dim(v2f{0}, canvas_dim);
+                        
+                        else
+                        {
+                            window_slider_rect = Create_Rect_Center(pos, dim);
+                        }
+                        
+                        if(Is_Point_Inside_Rect(context->cursor_fpos, window_slider_rect))
+                        {
+                            context->flags |= GUI_Context_Flags::cursor_mask_validation;
+                            context->flags |= GUI_Context_Flags::cursor_mask_enabled;
+                            
+                            context->cursor_mask_area = window_slider_rect;
+                        }
+                    }
+                }
+                else
+                {
+                    anchor_base.x = 0;
+                }
+                
+                context->anchor_base = anchor_base;
+            }
+            
+            if(Bit_Not_Set(context->flags, ignore_selection_mask) 
+                && !selected_element_is_window_slider && context->selected_id)
+            {
+                f32 true_canvas_height = canvas_dim.y;
+            
+                f32 padding_2 = padding * 2;
+                
+                f32 padded_e_height = selected_element_max_y - selected_element_min_y + padding_2;
+                if(padded_e_height < canvas_height)
+                {
+                    // Selection below the canvas.
+                    if(selected_element_min_y < canvas_bottom)
+                    {
+                        f32 dif = canvas_bottom - selected_element_min_y + padding;
+                        context->anchor_base.y += dif;
+                    }
+                    
+                    // Selection above the canvas.
+                    else if(selected_element_max_y > true_canvas_height)
+                    {
+                        f32 dif = true_canvas_height - selected_element_max_y - padding;
+                        context->anchor_base.y += dif;
+                    }
+                    
+                }
+                
+                f32 padded_e_width = selected_element_max_x - selected_element_min_x + padding_2;
+                if(padded_e_width < canvas_width)
+                {
+                    // Selection left the canvas.
+                    if(selected_element_min_x < 0)
+                    {
+                        f32 dif = 0 - selected_element_min_x + padding;
+                        context->anchor_base.x += dif;
+                    }
+                    
+                    // Selection right the canvas.
+                    else if(selected_element_max_x > canvas_width)
+                    {
+                        f32 dif = canvas_width - selected_element_max_x - padding;
+                        context->anchor_base.x += dif;
                     }
                 }
             }
-            else
-            {
-                anchor_base.x = 0;
-            }
-            
-            context->anchor_base = anchor_base;
         }
         
-        if(Bit_Not_Set(context->flags, ignore_selection_mask) 
-            && !selected_element_is_window_slider && context->selected_id)
+        // Reset state.
         {
-            f32 true_canvas_height = canvas_dim.y;
-        
-            f32 padding_2 = padding * 2;
+            context->last_cursor_position = context->cursor_position;
             
-            f32 padded_e_height = selected_element_max_y - selected_element_min_y + padding_2;
-            if(padded_e_height < canvas_height)
-            {
-                // Selection below the canvas.
-                if(selected_element_min_y < canvas_bottom)
-                {
-                    f32 dif = canvas_bottom - selected_element_min_y + padding;
-                    context->anchor_base.y += dif;
-                }
-                
-                // Selection above the canvas.
-                else if(selected_element_max_y > true_canvas_height)
-                {
-                    f32 dif = true_canvas_height - selected_element_max_y - padding;
-                    context->anchor_base.y += dif;
-                }
-                
-            }
+            u32 reset_mask = 
+                GUI_Context_Flags::context_ready | 
+                GUI_Context_Flags::maxout_horizontal_slider | 
+                GUI_Context_Flags::maxout_vertical_slider;
             
-            f32 padded_e_width = selected_element_max_x - selected_element_min_x + padding_2;
-            if(padded_e_width < canvas_width)
-            {
-                // Selection left the canvas.
-                if(selected_element_min_x < 0)
-                {
-                    f32 dif = 0 - selected_element_min_x + padding;
-                    context->anchor_base.x += dif;
-                }
-                
-                // Selection right the canvas.
-                else if(selected_element_max_x > canvas_width)
-                {
-                    f32 dif = canvas_width - selected_element_max_x - padding;
-                    context->anchor_base.x += dif;
-                }
-            }
-        }
+            Inverse_Bit_Mask(&context->flags, reset_mask);
+        }   
     }
-    
-    // Reset state.
+    else if(context->mode == GUI_Mode::layout_only)
     {
-        context->last_cursor_position = context->cursor_position;
-        
-        u32 reset_mask = 
-            GUI_Context_Flags::context_ready | 
-            GUI_Context_Flags::maxout_horizontal_slider | 
-            GUI_Context_Flags::maxout_vertical_slider;
-        
-        Inverse_Bit_Mask(&context->flags, reset_mask);
+        Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::context_ready);
+    }
+    else
+    {
+        Terminate;
     }
 }
 
@@ -1550,7 +1629,7 @@ static void GUI_Do_Text(
     v2f dim = GUI_Tight_Fit_Text(text, &theme->font, text_scale);
     
     GUI_Placement p = GUI_Get_Placement(context, &dim, pos);
-    if(!Is_Rect_Valid(p.rect))
+    if(!Is_Rect_Valid(p.rect) || context->mode == GUI_Mode::layout_only)
         return;
     
     v2f text_p = GUI_Calc_Centered_Text_Position(text, text_scale, p.pos, &theme->font);
@@ -1587,7 +1666,7 @@ static void GUI_Do_Panel(GUI_Context* context, v2f* pos, v2f* dim)
 {
     // --------------------------------------------------------------------------
     GUI_Placement p = GUI_Get_Placement(context, dim, pos);
-    if(!Is_Rect_Valid(p.rect))
+    if(!Is_Rect_Valid(p.rect) || context->mode == GUI_Mode::layout_only)
         return;
     // --------------------------------------------------------------------------
     
@@ -1608,7 +1687,7 @@ static void GUI_Do_Panel(GUI_Context* context, v2f* pos, v2f* dim, Color bg_colo
 {
     // --------------------------------------------------------------------------
     GUI_Placement p = GUI_Get_Placement(context, dim, pos);
-    if(!Is_Rect_Valid(p.rect))
+    if(!Is_Rect_Valid(p.rect) || context->mode == GUI_Mode::layout_only)
         return;
     // --------------------------------------------------------------------------
     
@@ -1647,7 +1726,7 @@ static void GUI_Do_Image_Panel(GUI_Context* context, v2f* pos, v2f* dim, Image* 
 {
     // --------------------------------------------------------------------------
     GUI_Placement p = GUI_Get_Placement(context, dim, pos);
-    if(!Is_Rect_Valid(p.rect))
+    if(!Is_Rect_Valid(p.rect) || context->mode == GUI_Mode::layout_only)
         return;
     // --------------------------------------------------------------------------
     
@@ -1689,7 +1768,7 @@ static bool GUI_Do_Button(
     }
     
     GUI_Placement p = GUI_Get_Placement(context, dim, pos);
-    if(!Is_Rect_Valid(p.rect))
+    if(!Is_Rect_Valid(p.rect) || context->mode == GUI_Mode::layout_only)
         return false;
     
     u32 id = GUI_Generate_ID(p.rect, __LINE__);
@@ -1765,7 +1844,7 @@ static bool GUI_Do_Image_Button(
     }
     
     GUI_Placement p = GUI_Get_Placement(context, dim, pos);
-    if(!Is_Rect_Valid(p.rect))
+    if(!Is_Rect_Valid(p.rect) || context->mode == GUI_Mode::layout_only)
         return false;
     
     u32 id = GUI_Generate_ID(p.rect, __LINE__);
@@ -1848,7 +1927,7 @@ static bool GUI_Do_Fill_Slider(
     // --------------------------------------------------------------------------
     
     GUI_Placement p = GUI_Get_Placement(context, dim, pos);
-    if(!Is_Rect_Valid(p.rect))
+    if(!Is_Rect_Valid(p.rect) || context->mode == GUI_Mode::layout_only)
         return false;
     
     u32 id = GUI_Generate_ID(p.rect, __LINE__);
@@ -1971,7 +2050,7 @@ static bool GUI_Do_Handle_Slider(
     // --------------------------------------------------------------------------
     
     GUI_Placement p = GUI_Get_Placement(context, dim, pos);
-    if(!Is_Rect_Valid(p.rect))
+    if(!Is_Rect_Valid(p.rect) || context->mode == GUI_Mode::layout_only)
         return false;
     
     u32 id = GUI_Generate_ID(p.rect, __LINE__);
@@ -2146,7 +2225,7 @@ static bool GUI_Do_Checkbox(GUI_Context* context, v2f* pos, v2f* dim, bool* valu
     // --------------------------------------------------------------------------
     
     GUI_Placement p = GUI_Get_Placement(context, dim, pos);
-    if(!Is_Rect_Valid(p.rect))
+    if(!Is_Rect_Valid(p.rect) || context->mode == GUI_Mode::layout_only)
         return false;
     
     u32 id = GUI_Generate_ID(p.rect, __LINE__);
@@ -2239,7 +2318,7 @@ static u32 GUI_Do_Dropdown_Button(
     
     
     GUI_Placement p = GUI_Get_Placement(context, dim, pos);
-    if(!Is_Rect_Valid(p.rect))
+    if(!Is_Rect_Valid(p.rect) || context->mode == GUI_Mode::layout_only)
         return false;
     
     
@@ -2442,7 +2521,7 @@ static bool GUI_Do_SL_Input_Field(
     // --------------------------------------------------------------------------
     
     GUI_Placement p = GUI_Get_Placement(context, &dim, pos);
-    if(!Is_Rect_Valid(p.rect))
+    if(!Is_Rect_Valid(p.rect) || context->mode == GUI_Mode::layout_only)
         return false;
     
     u32 id = GUI_Generate_ID(p.rect, __LINE__);
@@ -2868,7 +2947,7 @@ static void GUI_Do_ML_Input_Field(
     GUI_Theme* theme = context->theme;
     
     GUI_Placement p = GUI_Get_Placement(context, dim, pos);
-    if(!Is_Rect_Valid(p.rect))
+    if(!Is_Rect_Valid(p.rect) || context->mode == GUI_Mode::layout_only)
         return;
     
     u32 id = GUI_Generate_ID(p.rect, __LINE__);

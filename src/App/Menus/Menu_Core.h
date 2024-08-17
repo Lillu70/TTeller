@@ -175,7 +175,7 @@ static inline v2f Get_Title_Bar_Row_Placement(
     else
         back_button_x = f32(context->canvas->dim.x) - ctrl_buttons_width;
     
-    f32 back_button_y = f32(context->canvas->dim.y) - padding;
+    f32 back_button_y = f32(context->canvas->dim.y - 1) - padding;
     
     v2f result = v2f{back_button_x, back_button_y};
     return result;
@@ -199,15 +199,11 @@ Do_GUI_Frame_With_Banner(banner_func, menu_func);
 
 */
 
-static u32 DEFAULT_BANNER_HEIGHT = 200;
-
 static void Do_GUI_Frame_With_Banner(
     void(*banner_func)(GUI_Context*), 
     void(*menu_func)(GUI_Context*), 
-    u32 banner_height = DEFAULT_BANNER_HEIGHT,
     bool enable_default_active_menu_hotkey_behavior = true)
 {
-    Assert(banner_height);
     Assert(banner_func);
     Assert(menu_func);
     
@@ -232,8 +228,20 @@ static void Do_GUI_Frame_With_Banner(
         }
     }
     
-    v2u banner_dim = s_canvas.dim;
-    banner_dim.y = Min(s_canvas.dim.y, banner_height);
+    GUI_Begin_Context_In_Layout_Only_Mode(&s_gui_banner, &s_canvas, &s_theme);
+    {
+        banner_func(&s_gui_banner);
+    }
+    GUI_End_Context(&s_gui_banner);
+    
+    Rect banner_rect = GUI_Get_Bounds_In_Pixel_Space(&s_gui_banner);
+    
+    f32 banner_height = Get_Rect_Dimensions(banner_rect).y;
+    banner_height = Ceil(banner_height);
+    banner_height += f32(s_theme.padding * 2) + s_gui.dynamic_slider_girth;
+    banner_height = Clamp_Zero_To_Max(banner_height, f32(s_canvas.dim.y));
+    
+    v2u banner_dim = v2u{s_canvas.dim.x, u32(banner_height)};
     
     u32 banner_offset = banner_dim.x * banner_dim.y;
     u32 canvas_pixel_count = s_canvas.row_stride * s_canvas.dim.y;
@@ -246,15 +254,13 @@ static void Do_GUI_Frame_With_Banner(
     
     v2i banner_canvas_pos = v2i{0, i32(s_canvas.dim.y - banner_dim.y)};
 
-    GUI_Context* context = &s_gui_banner;
-    
     Action_Context* ac = &s_global_data.action_context;
     
-    GUI_Begin_Context(context, &banner_canvas, ac, &s_theme, banner_canvas_pos);
+    GUI_Begin_Context(&s_gui_banner, &banner_canvas, ac, &s_theme, banner_canvas_pos);
     {
-        banner_func(context);
+        banner_func(&s_gui_banner);
     }
-    GUI_End_Context(context);
+    GUI_End_Context(&s_gui_banner);
     
     v2u menu_dim = v2u{s_canvas.dim.x, s_canvas.dim.y - banner_dim.y};
     
@@ -268,13 +274,11 @@ static void Do_GUI_Frame_With_Banner(
     // Clear works on vertical sub canvases
     Clear_Canvas(&menu_canvas, s_background_color);
     
-    context = &s_gui;
-    
-    GUI_Begin_Context(context, &menu_canvas, ac, &s_theme);
+    GUI_Begin_Context(&s_gui, &menu_canvas, ac, &s_theme);
     {
-        menu_func(context);
+        menu_func(&s_gui);
     }
-    GUI_End_Context(context);
+    GUI_End_Context(&s_gui);
 }
 
 
@@ -354,7 +358,7 @@ static inline void Init_GUI()
     
     GUI_Set_Default_Menu_Actions();
 
-    GUI_DEFAULT_TEXT_SCALE = v2f{5.f, 5.f};
+    GUI_DEFAULT_TEXT_SCALE = v2f{2.f, 2.f};
     
     v3<u8> c;
     f32 g;

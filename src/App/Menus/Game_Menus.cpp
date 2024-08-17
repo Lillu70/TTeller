@@ -7,10 +7,10 @@
 
 #pragma once
 
-static f32 s_player_creation_collumn_min_width = 300;
-static f32 s_player_creation_text_box_width = s_player_creation_collumn_min_width - 50;
-static v2f s_player_picture_dim 
-    = v2f{s_player_creation_text_box_width, s_player_creation_text_box_width};
+constexpr f32 s_player_creation_collumn_min_width_base = 150;
+constexpr f32 s_player_creation_text_box_width_base = s_player_creation_collumn_min_width_base - 25;
+constexpr v2f s_player_picture_dim_base
+    = v2f{s_player_creation_text_box_width_base, s_player_creation_text_box_width_base};
 
 
 static void Do_Load_Failed_Popup(GUI_Context* context);
@@ -37,7 +37,7 @@ static void Do_Create_Player_FI_Instruction_Popup(GUI_Context* context)
         "\n\nSee you in the next one");
     }
     
-    v2f title_scale = GUI_DEFAULT_TEXT_SCALE * 1.5f;
+    v2f title_scale = Hadamar_Product(GUI_DEFAULT_TEXT_SCALE, GUI_DEFAULT_TITLE_SCALER);
     
     static constexpr char* title_text = "Pelihahmon luonti ohjeet";
     v2f d = GUI_Tight_Fit_Text(title_text, &context->theme->font, title_scale);
@@ -45,7 +45,7 @@ static void Do_Create_Player_FI_Instruction_Popup(GUI_Context* context)
     
     context->layout.anchor = GUI_Anchor::center;
     
-    v2f dim = v2f{d.x + context->theme->padding + b.x, 400.f};
+    v2f dim = v2f{d.x + context->theme->padding + b.x, 200.f * GUI_DEFAULT_TEXT_SCALE.x};
     GUI_Do_ML_Input_Field(
         context, 
         &GUI_AUTO_MIDDLE, 
@@ -56,27 +56,23 @@ static void Do_Create_Player_FI_Instruction_Popup(GUI_Context* context)
         GUI_Character_Check_View_Only);
     
     context->layout.build_direction = GUI_Build_Direction::up_left;
-    GUI_Do_Title_Text(context, AUTO, title_text, title_scale);
+    GUI_Do_Title_Text(context, AUTO, title_text);
     
     context->layout.build_direction = GUI_Build_Direction::right_center;
     if(GUI_Do_Button(context, AUTO, &b, "X"))
         Close_Popup();
     
-    // TODO: Check if this line is neccecary!
+    // TODO: Check if this line is neccecary! --- LATER: Why would it be? We're done with the pop?
     context->layout.build_direction = GUI_Build_Direction::down_center;
-    
 }
 
 
 static void Do_Out_Of_Template_Names_Popup(GUI_Context* context)
 {
-    v2f title_scale = GUI_DEFAULT_TEXT_SCALE * 1.5f;
-    
     GUI_Do_Title_Text(
         context, 
         &GUI_AUTO_MIDDLE, 
-        "Hupsis, valmiit nimet loppuivat kesken.", 
-        title_scale);
+        "Hupsis, valmiit nimet loppuivat kesken.");
     
     context->layout.build_direction = GUI_Build_Direction::down_center;
     
@@ -89,10 +85,9 @@ static void Do_New_Game_Players()
 {
     void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
     {
-        v2f title_scale = v2f{4.f, 4.f};
-        Font* font = &context->theme->font;
-        v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
-        if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
+        constexpr f32 s = 2.f;
+        
+        if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &GUI_AUTO_FIT, "<", GUI_Scale_Default(s)))
         {
             if(s_game_state.memory)
                 Delete_Game(&s_game_state, &s_allocator);
@@ -100,14 +95,14 @@ static void Do_New_Game_Players()
             s_global_data.active_menu = Menus::select_campaign_to_play_menu;
             return;
         }
+        f32 title_height = context->layout.last_element.dim.y;
         
         GUI_Push_Layout(context);
         
         context->layout.build_direction = GUI_Build_Direction::right_center;
         
-        GUI_Do_Title_Text(context, AUTO, "Kampanjan pelaajat", title_scale);
+        GUI_Do_Title_Text(context, AUTO, "Kampanjan pelaajat", GUI_Scale_Default(s));
         
-        f32 title_height = context->layout.last_element.dim.y;
         f32 title_max_x = context->layout.last_element.rect.max.x - context->anchor_base.x;
         
         GUI_Pop_Layout(context);
@@ -146,7 +141,7 @@ static void Do_New_Game_Players()
         GUI_Do_Text(context, AUTO, "Siemennys:", GUI_Highlight_Next(context));
         context->flags |= GUI_Context_Flags::one_time_skip_padding;
         
-        f32 width = 100;
+        f32 width = 50 * GUI_DEFAULT_TEXT_SCALE.x;
         GUI_Do_SL_Input_Field(
             context, 
             AUTO, 
@@ -161,7 +156,7 @@ static void Do_New_Game_Players()
         
         static constexpr char* start_game_text = "Valmista";
         
-        f32 w1 = GUI_Tight_Fit_Text(start_game_text, font).x + padding;
+        f32 w1 = GUI_Tight_Fit_Text(start_game_text, &context->theme->font).x + padding;
         
         f32 buttons_width = w1 + context->dynamic_slider_girth + padding * 3;
         v2f title_row_pos = Get_Title_Bar_Row_Placement(context, title_max_x, padding, buttons_width);
@@ -184,8 +179,12 @@ static void Do_New_Game_Players()
         
         v2f* pos = &GUI_AUTO_TOP_LEFT;
         
-        
         context->layout.build_direction = GUI_Build_Direction::right_top;
+        
+        f32 player_creation_text_box_width 
+            = s_player_creation_text_box_width_base * GUI_DEFAULT_TEXT_SCALE.x;
+        
+        v2f player_picture_dim = Hadamar_Product(s_player_picture_dim_base, GUI_DEFAULT_TEXT_SCALE);
         
         u32 i = 0;
         for(auto n = Begin(names); n < End(names); ++n, ++i)
@@ -234,7 +233,7 @@ static void Do_New_Game_Players()
             context->layout.build_direction = GUI_Build_Direction::down_left;
             
             GUI_Do_Text(context, AUTO, "Nimi:", GUI_Highlight_Next(context));
-            if(GUI_Do_SL_Input_Field(context, AUTO, &s_player_creation_text_box_width, &n->full_name))
+            if(GUI_Do_SL_Input_Field(context, AUTO, &player_creation_text_box_width, &n->full_name))
             {
                 context->selected_index += 1;
                 if(!n->variant_name_1.lenght)
@@ -257,7 +256,7 @@ static void Do_New_Game_Players()
             if(GUI_Do_SL_Input_Field(
                 context, 
                 AUTO, 
-                &s_player_creation_text_box_width, 
+                &player_creation_text_box_width, 
                 &n->variant_name_1))
             {
                 context->selected_index += 1;
@@ -268,7 +267,7 @@ static void Do_New_Game_Players()
             GUI_Do_SL_Input_Field(
                 context, 
                 AUTO, 
-                &s_player_creation_text_box_width, 
+                &player_creation_text_box_width, 
                 &n->variant_name_2);
             
             
@@ -284,7 +283,7 @@ static void Do_New_Game_Players()
             GUI_Pop_Layout(context);
             
             v2f test_button_dim = 
-                v2f{s_player_creation_text_box_width, context->layout.last_element.dim.y};
+                v2f{player_creation_text_box_width, context->layout.last_element.dim.y};
             if(GUI_Do_Button(context, AUTO, &test_button_dim, "Testaa muodot"))
             {
                 
@@ -308,7 +307,7 @@ static void Do_New_Game_Players()
                         }
                         
                         #if 1
-                            img->dim = s_player_picture_dim.As<i32>();
+                            img->dim = player_picture_dim.As<i32>();
                             u32 sm_size = img->dim.x * img->dim.y * sizeof(Color);
                             
                             img->buffer = (u8*)s_allocator.push(sm_size);
@@ -342,20 +341,119 @@ static void Do_New_Game_Players()
             
             GUI_Pop_Layout(context);
             
-            GUI_Do_Image_Panel(context, AUTO, &s_player_picture_dim, img);
+            GUI_Do_Image_Panel(context, AUTO, &player_picture_dim, img);
             
             GUI_Pop_Layout(context);
             
             GUI_End_Collumn(
                 context, 
-                s_player_creation_collumn_min_width, 
+                s_player_creation_collumn_min_width_base * GUI_DEFAULT_TEXT_SCALE.x, 
                 collumn_start, 
                 X_AXIS);
         }
         
     }; // ----------------------------------------------------------------------------------------
 
-    Do_GUI_Frame_With_Banner(banner_func, menu_func, 160);
+    Do_GUI_Frame_With_Banner(banner_func, menu_func);
+}
+
+
+static void Do_Select_Campagin_To_Play_Frame()
+{
+    void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
+    {
+        constexpr f32 s = 2.f;
+        
+        context->layout.build_direction = GUI_Build_Direction::right_center;
+        
+        if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &GUI_AUTO_FIT, "<", GUI_Scale_Default(s)))
+        {
+            s_global_data.active_menu = Menus::main_menu;
+            Clear_Editor_Format_Campaigns();
+        }
+        
+        GUI_Do_Title_Text(context, AUTO, "Uusi peli", GUI_Scale_Default(s));
+        f32 title_height = context->layout.last_element.dim.y;
+        f32 title_max_x = context->layout.last_element.rect.max.x - context->anchor_base.x;
+    
+    }; // ----------------------------------------------------------------------------------------
+
+    void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
+    {
+        GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "(l\xF6ydetty kohteesta \"", {}, GUI_Scale_Default(.5f));
+        GUI_Push_Layout(context);
+        context->layout.build_direction = GUI_Build_Direction::right_center;
+        
+        context->flags |= GUI_Context_Flags::one_time_skip_padding;
+        GUI_Do_Text(context, AUTO, campaign_folder_wildcard_path, {}, GUI_Scale_Default(.5f));
+        
+        context->flags |= GUI_Context_Flags::one_time_skip_padding;
+        GUI_Do_Text(context, AUTO, "\" jossa * on kampanjan nimi.)", {}, GUI_Scale_Default(.5f));
+        
+        GUI_Pop_Layout(context);
+        GUI_Do_Text(context, AUTO, "Valitse kampanja:");
+        
+        if(s_global_data.on_disk_campaign_names)
+        {
+            for(each(String*, save_name, s_global_data.on_disk_campaign_names))
+            {
+                if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, save_name->buffer))
+                {
+                    Events_Container editor_format_campagin = {};
+                    if(Load_Campaign(&editor_format_campagin, save_name, &s_allocator, &s_platform))
+                    {
+                        Dynamic_Array<Invalid_Event_Filter_Result>* filter_results = 
+                            Unordered_Filter_Prolematic_Events(&editor_format_campagin, &s_allocator);
+                        
+                        if(filter_results)
+                        {
+                            Set_Popup_Function(
+                                Do_Display_Invalid_Event_Filter_Results_Popup, 
+                                Free_Invalid_Event_Filter_Result_Memory);
+                            
+                            Assert(!s_global_data.IEFR);
+                            s_global_data.IEFR = filter_results;
+                            s_editor_state.event_container = editor_format_campagin;
+                        }
+                        else
+                        {
+                            Game_State game_state;
+                            
+                            u32 errors = Convert_Editor_Campaign_Into_Game_Format(
+                                &game_state,
+                                &editor_format_campagin,
+                                &s_platform,
+                                &s_allocator);
+                            
+                            if(!errors)
+                            {
+                                if(s_game_state.memory)
+                                    Delete_Game(&s_game_state, &s_allocator);
+                                
+                                s_game_state = game_state;
+                                
+                                s_global_data.active_menu = Menus::GM_players;
+                            }
+                            else
+                            {
+                                s_global_data.GM_conversion_errors = errors;
+                                Set_Popup_Function(Do_GM_Campaign_Was_Unusable_Popup);
+                            }
+
+                            Delete_Event_Container(&editor_format_campagin, &s_allocator);
+                        }
+                    }
+                    else
+                    {
+                        Set_Popup_Function(Do_Load_Failed_Popup);
+                    }
+                }
+            }
+        }
+        
+    }; // ----------------------------------------------------------------------------------------
+
+    Do_GUI_Frame_With_Banner(banner_func, menu_func);
 }
 
 
@@ -363,12 +461,12 @@ static void Do_Let_The_Games_Begin_Frame()
 {
     void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
     {
-        v2f title_scale = v2f{4.f, 4.f};
+        constexpr f32 s = 2.f;
         
         context->layout.anchor = GUI_Anchor::top;
         context->layout.build_direction = GUI_Build_Direction::down_center;
         
-        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, s_game_state.campaign_name, title_scale);
+        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, s_game_state.campaign_name, GUI_Scale_Default(s));
     
         GUI_Do_Text(context, AUTO, "Osallistujat kamppailevat kuolemaan asti.");
         GUI_Do_Text(context, AUTO, "On vain yksi voittaja.");
@@ -380,7 +478,7 @@ static void Do_Let_The_Games_Begin_Frame()
         }
         
         context->layout.anchor = GUI_Anchor::top_left;
-        v2f back_button_dim = GUI_Tight_Fit_Text("<", &context->theme->font, title_scale);
+        v2f back_button_dim = GUI_Tight_Fit_Text("<", &context->theme->font, GUI_Scale_Default(s));
         if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
         {
             s_global_data.active_menu = Menus::GM_players;
@@ -398,6 +496,8 @@ static void Do_Let_The_Games_Begin_Frame()
         Player_Image* player_images = Begin(s_game_state.player_images);
         Game_Player_Name_FI* player_names = Begin(s_game_state.player_names);
         
+        v2f player_picture_dim = Hadamar_Product(s_player_picture_dim_base, GUI_DEFAULT_TEXT_SCALE);
+        
         for(u32 i = 0; i < s_game_state.player_images->count; ++i)
         {
             char* name = (player_names + i)->full_name.buffer;
@@ -405,12 +505,12 @@ static void Do_Let_The_Games_Begin_Frame()
             
             GUI_Do_Text(context, p, name);
             p = AUTO;
-            
-            GUI_Do_Image_Panel(context, AUTO, &s_player_picture_dim, img);
+        
+            GUI_Do_Image_Panel(context, AUTO, &player_picture_dim, img);
         }
     }; // ----------------------------------------------------------------------------------------
 
-    Do_GUI_Frame_With_Banner(banner_func, menu_func, 210);
+    Do_GUI_Frame_With_Banner(banner_func, menu_func);
 }
 
 
@@ -431,10 +531,9 @@ static void Do_Event_Display_Frame()
         &active_event_header);    
     
     void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
-    {        
-        v2f title_scale = v2f{4.f, 4.f};
+    { 
         char* event_name = active_event_header->event_name.buffer;
-        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_LEFT, event_name, title_scale);
+        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_LEFT, event_name, GUI_Scale_Default(2.f));
         
         if(s_game_state.display_event_idx < s_game_state.active_events->count - 1)
         {
@@ -492,6 +591,8 @@ static void Do_Event_Display_Frame()
         Assert(active_event->participant_count);
         Player_Image* player_images = Begin(s_game_state.player_images);
         
+        v2f player_picture_dim = Hadamar_Product(s_player_picture_dim_base, GUI_DEFAULT_TEXT_SCALE);
+        
         f32 collumn_start;
         v2f* p = &GUI_AUTO_TOP_LEFT;
         for(u32 i = 0; i < active_event->participant_count; ++i)
@@ -509,13 +610,13 @@ static void Do_Event_Display_Frame()
             }
             
             Player_Image* player_image = player_images + player_idx;
-            GUI_Do_Image_Panel(context, AUTO, &s_player_picture_dim, &player_image->image);
+            GUI_Do_Image_Panel(context, AUTO, &player_picture_dim, &player_image->image);
         }
         
         GUI_Pop_Layout(context);
         GUI_End_Collumn(
             context, 
-            s_player_creation_collumn_min_width, 
+            s_player_creation_collumn_min_width_base * GUI_DEFAULT_TEXT_SCALE.x, 
             collumn_start, 
             X_AXIS);
         
@@ -542,7 +643,7 @@ static void Do_Event_Display_Frame()
             GUI_Character_Check_View_Only);
     }; // ----------------------------------------------------------------------------------------
 
-    Do_GUI_Frame_With_Banner(banner_func, menu_func, 200);
+    Do_GUI_Frame_With_Banner(banner_func, menu_func);
 }
 
 
@@ -553,16 +654,17 @@ static void Do_Day_Counter_Display_Frame()
     
     void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
     {
+        constexpr f32 s = 2.f;
+        
         context->layout.anchor = GUI_Anchor::top;
         context->layout.build_direction = GUI_Build_Direction::down_center;
         
-        v2f title_scale = v2f{4.f, 4.f};
-        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, "P\xE4iv\xE4", title_scale);
+        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, "P\xE4iv\xE4", GUI_Scale_Default(s));
         v2f title_dim = context->layout.last_element.dim;
         
         char index_text_buffer[12] = {0};
         char* num = U32_To_Char_Buffer((u8*)&index_text_buffer, s_game_state.day_counter);
-        GUI_Do_Text(context, AUTO, num, {}, title_scale);
+        GUI_Do_Text(context, AUTO, num, {},  GUI_Scale_Default(s));
         
         if(GUI_Do_Button(context, AUTO, &title_dim, "Jatka"))
         {
@@ -614,17 +716,19 @@ static void Do_Day_Counter_Display_Frame()
             GUI_Pop_Layout(context);
         }
         
-        v2f title_scale = v2f{3.f, 3.f};
+        
         GUI_Do_Title_Text(
             context, 
             AUTO, 
             "J\xE4ljell\xE4 olevat osallistujat.", 
-            title_scale);
+            GUI_Scale_Default(1.5f));
         
         f32 padding = f32(context->theme->padding);
         
+        v2f player_picture_dim = Hadamar_Product(s_player_picture_dim_base, GUI_DEFAULT_TEXT_SCALE);
+        
         f32 dx = 
-            (s_player_picture_dim.x * s_game_state.live_player_count) + 
+            (player_picture_dim.x * s_game_state.live_player_count) + 
             (padding * (s_game_state.live_player_count - 1));
         
         v2f p = context->layout.last_element.pos - context->anchor_base;
@@ -642,9 +746,9 @@ static void Do_Day_Counter_Display_Frame()
             Game_Player* player = s_game_state.players + i;
             
             GUI_Do_Text(context, &p, (names + i)->full_name.buffer);
-            p.x += s_player_picture_dim.x + padding;
+            p.x += player_picture_dim.x + padding;
             
-            GUI_Do_Image_Panel(context, AUTO, &s_player_picture_dim, &((images + i)->image));
+            GUI_Do_Image_Panel(context, AUTO, &player_picture_dim, &((images + i)->image));
             
             for(u32 s = 0; s < u32(Character_Stats::COUNT); ++s)
             {
@@ -718,7 +822,7 @@ static void Do_Day_Counter_Display_Frame()
         
     }; // ----------------------------------------------------------------------------------------
 
-    Do_GUI_Frame_With_Banner(banner_func, menu_func, 220);
+    Do_GUI_Frame_With_Banner(banner_func, menu_func);
 }
 
 
@@ -739,7 +843,7 @@ static void Do_Night_Falls_Frame()
         GUI_Build_Direction::down_center);
     
     Font* font = &context->theme->font;
-    v2f text_scale = v2f{6.f, 6.f};
+    v2f text_scale = GUI_DEFAULT_TEXT_SCALE * 3.f;
     
     f32 half_char_height = (font->char_height * text_scale.y) * 0.5f;
     f32 x = Get_Middle(context->canvas).x;
@@ -784,19 +888,16 @@ static void Do_All_Players_Are_Dead_Frame()
 {
     Assert(s_game_state.live_player_count == 0);
     
-    
     static bool skip_frame;
     skip_frame = false;
     
     void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
-    {
-        v2f title_scale = v2f{4.f, 4.f};
-        
+    { 
         context->layout.anchor = GUI_Anchor::top;
         context->layout.build_direction = GUI_Build_Direction::down_center;
         
         char* title_text = "Kaikki osallistujat makavat kuolleina...";
-        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, title_text, title_scale);
+        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, title_text, GUI_Scale_Default(2.f));
         GUI_Do_Text(context, AUTO, "Kukaan ei selviytynyt!");
         
         if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Pelaa uudelleen"))
@@ -826,69 +927,18 @@ static void Do_All_Players_Are_Dead_Frame()
         context->layout.build_direction = GUI_Build_Direction::down_center;
         
         GUI_Do_Text(context, &GUI_AUTO_TOP_CENTER, "Kuolleet:");
+        
+        v2f player_picture_dim = Hadamar_Product(s_player_picture_dim_base, GUI_DEFAULT_TEXT_SCALE);
         
         for(u32 i = 0; i < s_game_state.total_player_count; ++i)
         {
             GUI_Do_Text(context, AUTO, (names + i)->full_name.buffer);
-            GUI_Do_Image_Panel(context, AUTO, &s_player_picture_dim, &((images + i)->image));
+            GUI_Do_Image_Panel(context, AUTO, &player_picture_dim, &((images + i)->image));
         }
         
     }; // ----------------------------------------------------------------------------------------
 
-    Do_GUI_Frame_With_Banner(banner_func, menu_func, 230);
-    
-    #if 0
-    static bool skip_frame;
-    
-    skip_frame = false;
-    
-    void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
-    {
-        v2f title_scale = v2f{4.f, 4.f};
-        
-        context->layout.anchor = GUI_Anchor::top;
-        context->layout.build_direction = GUI_Build_Direction::down_center;
-        
-        char* title_text = "Kaikki osallistujat makavat kuolleina...";
-        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, title_text, title_scale);
-    
-        GUI_Do_Text(context, AUTO, "Kukaan ei selviytynyt!");
-        
-        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Pelaa uudelleen"))
-        {
-            skip_frame = true;
-            Reset_Game(&s_game_state, &s_allocator);
-            s_global_data.active_menu = Menus::GM_let_the_games_begin;
-        }
-        
-        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lopeta peli"))
-        {
-            skip_frame = true;
-            Delete_Game(&s_game_state, &s_allocator);
-            s_global_data.active_menu = Menus::main_menu;
-        }
-        
-    }; // ----------------------------------------------------------------------------------------
-
-    void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
-    {
-        if(skip_frame)
-            return;
-        
-        Player_Image* images = Begin(s_game_state.player_images);
-        Game_Player_Name_FI* names = Begin(s_game_state.player_names);
-        
-        GUI_Do_Text(context, &GUI_AUTO_TOP_CENTER, "Kuolleet:");
-        
-        for(u32 i = 1; i < s_game_state.total_player_count; ++i)
-        {
-            GUI_Do_Text(context, AUTO, (names + i)->full_name.buffer);
-            GUI_Do_Image_Panel(context, AUTO, &s_player_picture_dim, &((images + i)->image));
-        }
-    }; // ----------------------------------------------------------------------------------------
-
-    Do_GUI_Frame_With_Banner(banner_func, menu_func);
-    #endif
+    Do_GUI_Frame_With_Banner(banner_func, menu_func);    
 }
 
 
@@ -900,13 +950,11 @@ static void Do_We_Have_A_Winner_Frame()
     skip_frame = false;
     
     void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
-    {
-        v2f title_scale = v2f{4.f, 4.f};
-        
+    {     
         context->layout.anchor = GUI_Anchor::top;
         context->layout.build_direction = GUI_Build_Direction::down_center;
         
-        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, "Voittaja on selvinnyt!", title_scale);
+        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, "Voittaja on selvinnyt!", GUI_Scale_Default(2.f));
         GUI_Do_Text(context, AUTO, "H\xE4nen nimens\xE4 j\xE4\xE4k\xF6\xF6n histoarian kirjoihin.");
         
         if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Pelaa uudelleen"))
@@ -937,11 +985,13 @@ static void Do_We_Have_A_Winner_Frame()
         Player_Image* images = Begin(s_game_state.player_images);
         Game_Player_Name_FI* names = Begin(s_game_state.player_names);
         
+        v2f player_picture_dim = Hadamar_Product(s_player_picture_dim_base, GUI_DEFAULT_TEXT_SCALE);
+        
         GUI_Do_Text(context, AUTO, names->full_name.buffer);
-        GUI_Do_Image_Panel(context, AUTO, &s_player_picture_dim, &images->image);
+        GUI_Do_Image_Panel(context, AUTO, &player_picture_dim, &images->image);
         
         v2f seperator_dim = v2f{f32(context->canvas->dim.x) - 50, 10};
-        seperator_dim.x = Max(seperator_dim.x, s_player_picture_dim.x);
+        seperator_dim.x = Max(seperator_dim.x, player_picture_dim.x);
         
         GUI_Do_Panel(context, AUTO, &seperator_dim);
         
@@ -950,12 +1000,12 @@ static void Do_We_Have_A_Winner_Frame()
         for(u32 i = 1; i < s_game_state.total_player_count; ++i)
         {
             GUI_Do_Text(context, AUTO, (names + i)->full_name.buffer);
-            GUI_Do_Image_Panel(context, AUTO, &s_player_picture_dim, &((images + i)->image));
+            GUI_Do_Image_Panel(context, AUTO, &player_picture_dim, &((images + i)->image));
         }
         
     }; // ----------------------------------------------------------------------------------------
 
-    Do_GUI_Frame_With_Banner(banner_func, menu_func, 230);
+    Do_GUI_Frame_With_Banner(banner_func, menu_func);
 }
 
 
@@ -965,14 +1015,12 @@ static void Do_Event_Assignement_Failed_Frame()
     skip_frame = false;
     
     void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
-    {
-        v2f title_scale = v2f{4.f, 4.f};
-        
+    {        
         context->layout.anchor = GUI_Anchor::top;
         context->layout.build_direction = GUI_Build_Direction::down_center;
         
         char* title_text = "Tapahtuma virhe :(";
-        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, title_text, title_scale);
+        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, title_text, GUI_Scale_Default(2.f));
         GUI_Do_Text(context, AUTO, "Kaikia osallistujia ei saatu mahtumaan tapahtumaan.");
         
         if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lopeta peli"))
@@ -1006,16 +1054,18 @@ static void Do_Event_Assignement_Failed_Frame()
         
         v2f screen_middle = Get_Middle(context->canvas);
         
-        f32 pos_x = (c * (padding + s_player_picture_dim.x) - padding) * -0.5f;
+        v2f player_picture_dim = Hadamar_Product(s_player_picture_dim_base, GUI_DEFAULT_TEXT_SCALE);
+        
+        f32 pos_x = (c * (padding + player_picture_dim.x) - padding) * -0.5f;
        
         context->layout.anchor = GUI_Anchor::left;
         
         for(each(Player_Image*, img, s_game_state.player_images))
         {
             f32 y_offset;
-            if(context->canvas->dim.y > s_player_picture_dim.y + padding * 2)
+            if(context->canvas->dim.y > player_picture_dim.y + padding * 2)
             {
-                f32 y_span = 0.5f * (f32(context->canvas->dim.y) - s_player_picture_dim.y) - padding;
+                f32 y_span = 0.5f * (f32(context->canvas->dim.y) - player_picture_dim.y) - padding;
                 y_offset = f32(Sin(time)) * y_span;                
             }
             else
@@ -1025,8 +1075,8 @@ static void Do_Event_Assignement_Failed_Frame()
             
             v2f pos = {screen_middle.x + pos_x, screen_middle.y + y_offset};
             
-            GUI_Do_Image_Panel(context, &pos, &s_player_picture_dim, &img->image);
-            pos_x += padding + s_player_picture_dim.x;
+            GUI_Do_Image_Panel(context, &pos, &player_picture_dim, &img->image);
+            pos_x += padding + player_picture_dim.x;
             time += 0.5;
         }
         
@@ -1035,110 +1085,9 @@ static void Do_Event_Assignement_Failed_Frame()
     u32 flags = s_gui.flags;
     Inverse_Bit_Mask(&s_gui.flags, GUI_Context_Flags::enable_dynamic_sliders);
     
-    Do_GUI_Frame_With_Banner(banner_func, menu_func, 230);
+    Do_GUI_Frame_With_Banner(banner_func, menu_func);
     
     s_gui.flags = flags;
-}
-
-
-static void Do_Select_Campagin_To_Play_Frame()
-{
-    void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
-    {
-        context->layout.build_direction = GUI_Build_Direction::right_center;
-        
-        v2f title_scale = v2f{4.f, 4.f};
-        Font* font = &context->theme->font;
-        v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
-        if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
-        {
-            s_global_data.active_menu = Menus::main_menu;
-            Clear_Editor_Format_Campaigns();
-        }
-        
-        GUI_Do_Text(context, AUTO, "Uusi peli", {}, title_scale, true);
-        f32 title_height = context->layout.last_element.dim.y;
-        f32 title_max_x = context->layout.last_element.rect.max.x - context->anchor_base.x;
-    
-    }; // ----------------------------------------------------------------------------------------
-
-    void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
-    {
-        GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "(l\xF6ydetty kohteesta \"", {}, v2f{1.f, 1.f});
-        GUI_Push_Layout(context);
-        context->layout.build_direction = GUI_Build_Direction::right_center;
-        
-        context->flags |= GUI_Context_Flags::one_time_skip_padding;
-        GUI_Do_Text(context, AUTO, campaign_folder_wildcard_path, {}, v2f{1.f, 1.f});
-        
-        context->flags |= GUI_Context_Flags::one_time_skip_padding;
-        GUI_Do_Text(context, AUTO, "\" jossa * on kampanjan nimi.)", {}, v2f{1.f, 1.f});
-        
-        GUI_Pop_Layout(context);
-        GUI_Do_Text(context, AUTO, "Valitse kampanja:");
-        
-        Dynamic_Array<String>* on_disk_names = s_global_data.on_disk_campaign_names;
-        if(on_disk_names)
-        {
-            for(String* save_name = Begin(on_disk_names); save_name < End(on_disk_names); ++save_name)
-            {
-                if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, save_name->buffer))
-                {
-                    Events_Container editor_format_campagin = {};
-                    if(Load_Campaign(&editor_format_campagin, save_name, &s_allocator, &s_platform))
-                    {
-                        Dynamic_Array<Invalid_Event_Filter_Result>* filter_results = 
-                            Unordered_Filter_Prolematic_Events(&editor_format_campagin, &s_allocator);
-                        
-                        if(filter_results)
-                        {
-                            Set_Popup_Function(
-                                Do_Display_Invalid_Event_Filter_Results_Popup, 
-                                Free_Invalid_Event_Filter_Result_Memory);
-                            
-                            Assert(!s_global_data.IEFR);
-                            s_global_data.IEFR = filter_results;
-                            s_editor_state.event_container = editor_format_campagin;
-                        }
-                        else
-                        {
-                            Game_State game_state;
-                            
-                            u32 errors = Convert_Editor_Campaign_Into_Game_Format(
-                                &game_state,
-                                &editor_format_campagin,
-                                &s_platform,
-                                &s_allocator);
-                            
-                            if(!errors)
-                            {
-                                if(s_game_state.memory)
-                                    Delete_Game(&s_game_state, &s_allocator);
-                                
-                                s_game_state = game_state;
-                                
-                                s_global_data.active_menu = Menus::GM_players;
-                            }
-                            else
-                            {
-                                s_global_data.GM_conversion_errors = errors;
-                                Set_Popup_Function(Do_GM_Campaign_Was_Unusable_Popup);
-                            }
-
-                            Delete_Event_Container(&editor_format_campagin, &s_allocator);
-                        }
-                    }
-                    else
-                    {
-                        Set_Popup_Function(Do_Load_Failed_Popup);
-                    }
-                }
-            }
-        }
-        
-    }; // ----------------------------------------------------------------------------------------
-
-    Do_GUI_Frame_With_Banner(banner_func, menu_func, 100);
 }
 
 

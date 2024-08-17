@@ -8,9 +8,9 @@
 #pragma once
 
 static void Do_Main_Menu_Name_New_Campaign_Popup(GUI_Context*);
-static void Do_Event_Editor_On_Exit_Popup(GUI_Context*);
+static void Do_Event_Editor_On_Exit_Editor(GUI_Context*);
 static void Do_Event_Editor_Delete_Event_Popup(GUI_Context*);
-static void Do_Event_Editor_Display_Active_Event_Errors(GUI_Context*);
+static void Do_Event_Editor_Display_Active_Event_Errors_Popup(GUI_Context*);
 static void Do_Name_New_Campaign_Popup(GUI_Context* context);
 static void Do_Are_You_Sure_You_Want_To_Delete_Campaing_Popup(GUI_Context* context);
 static void Do_Rename_Campaing_Popup(GUI_Context* context);
@@ -26,15 +26,12 @@ static void Do_Event_Editor_All_Events_Frame()
 {
     void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
     {
-        v2f title_scale = v2f{4.f, 4.f};
-        Font* font = &context->theme->font;
-        v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
-        
-        if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
+        constexpr f32 s = 2.f;
+        if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &GUI_AUTO_FIT, "<", GUI_Scale_Default(s)))
         {
             if(s_editor_state.dirty)
             {
-                Set_Popup_Function(Do_Event_Editor_On_Exit_Popup);
+                Set_Popup_Function(Do_Event_Editor_On_Exit_Editor);
             }
             else
             {
@@ -49,24 +46,26 @@ static void Do_Event_Editor_All_Events_Frame()
         context->layout.build_direction = GUI_Build_Direction::right_center;
         
         char* title_text = s_editor_state.event_container.campaign_name.buffer;
-        GUI_Do_Title_Text(context, AUTO, title_text, title_scale);
+        GUI_Do_Title_Text(context, AUTO, title_text, GUI_Scale_Default(s));
         
         v2f img_dim = v2f{1.f, 1.f} * context->layout.last_element.dim.y;
         if(GUI_Do_Image_Button(context, AUTO, &img_dim, &s_global_data.edit_image))
         {
             Set_Popup_Function(Do_Rename_Campaing_Popup, Free_New_Campaing_Name);
         }
+        f32 rename_button_pos_y = context->layout.last_element.pos.y;
         
         f32 title_height = context->layout.last_element.dim.y;
         f32 title_max_x = context->layout.last_element.rect.max.x - context->anchor_base.x;
         
-        GUI_Pop_Layout(context);
-        
+        GUI_Pop_Layout(context);            
+    
         static bool jump_into_new_event = true;
         
         GUI_Do_Spacing(context, v2f{0, s_post_title_y_spacing});
         
-        v2f checkbox_dim = v2f{30, 30};
+        f32 char_height = GUI_Character_Height(context) + f32(context->theme->padding);
+        v2f checkbox_dim = v2f{char_height, char_height};
         GUI_Do_Checkbox(context, AUTO, &checkbox_dim, &jump_into_new_event);
         
         GUI_Push_Layout(context);
@@ -139,11 +138,15 @@ static void Do_Event_Editor_All_Events_Frame()
         
         static constexpr char* save_text = "Tallenna";
         
-        f32 w1 = GUI_Tight_Fit_Text(save_text, font).x + padding;
+        f32 w1 = GUI_Tight_Fit_Text(save_text, &context->theme->font).x + padding;
         
         f32 ctrl_buttons_width = w1 + context->dynamic_slider_girth + padding * 2;
         v2f title_row_pos 
             = Get_Title_Bar_Row_Placement(context, title_max_x, padding, ctrl_buttons_width);
+        
+        context->layout.anchor = GUI_Anchor::left;
+        
+        title_row_pos.y = rename_button_pos_y;
         
         v2f dim = v2f{w1, title_height};
     
@@ -282,7 +285,7 @@ static void Do_Event_Editor_All_Events_Frame()
             {
                 
                 s_editor_state.active_event_index = i;
-                Set_Popup_Function(Do_Event_Editor_Display_Active_Event_Errors);
+                Set_Popup_Function(Do_Event_Editor_Display_Active_Event_Errors_Popup);
             }
             
             if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, event->name.buffer))
@@ -369,7 +372,7 @@ static void Do_Event_Editor_All_Events_Frame()
         
     }; // ----------------------------------------------------------------------------------------
     
-    Do_GUI_Frame_With_Banner(banner_func, menu_func, DEFAULT_BANNER_HEIGHT, false);
+    Do_GUI_Frame_With_Banner(banner_func, menu_func, false);
 }
 
 
@@ -377,20 +380,19 @@ static void Do_Event_Editor_Participants_Frame()
 {
     void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
     {
-        v2f title_scale = v2f{4.f, 4.f};
-        Font* font = &context->theme->font;
-        v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
-        if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
+        constexpr f32 s = 2.f;
+        
+        if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &GUI_AUTO_FIT, "<", GUI_Scale_Default(s)))
         {
             s_global_data.active_menu = Menus::EE_all_events;
         }
+        f32 title_height = context->layout.last_element.dim.y;
         
         GUI_Push_Layout(context);
         
         context->layout.build_direction = GUI_Build_Direction::right_center;
         
-        GUI_Do_Text(context, AUTO, "Osallistujat", {}, title_scale, true);
-        f32 title_height = context->layout.last_element.dim.y;
+        GUI_Do_Title_Text(context, AUTO, "Osallistujat", GUI_Scale_Default(s));
         f32 title_max_x = context->layout.last_element.rect.max.x - context->anchor_base.x;
         
         GUI_Pop_Layout(context);
@@ -418,7 +420,6 @@ static void Do_Event_Editor_Participants_Frame()
         if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lis\xE4\xE4 yleis vaatimus"))
         {
             Global_Mark_Requirement* gmr = Push(&event->global_mark_reqs, &s_allocator);
-            *gmr = {};
             gmr->mark = Create_String(&s_allocator, 12);
         }
         
@@ -429,6 +430,7 @@ static void Do_Event_Editor_Participants_Frame()
         static constexpr char* go_to_event_text_text = "Tapahtuma Teksti";
         static constexpr char* go_to_consequences_text = "Seuraamukset";
         
+        Font* font = &context->theme->font;
         f32 w1 = GUI_Tight_Fit_Text(go_to_event_text_text, font).x + padding;
         f32 w2 = GUI_Tight_Fit_Text(go_to_consequences_text, font).x + padding;
         
@@ -455,15 +457,15 @@ static void Do_Event_Editor_Participants_Frame()
     {
         Editor_Event* event = Active_Event(&s_editor_state);
     
-        static constexpr f32 collumn_min_width = 300;
+        f32 collumn_min_width = 150.f * GUI_DEFAULT_TEXT_SCALE.x;
         f32 padding = context->theme->padding;
         
-        v2f* start_pos_ptr = &GUI_AUTO_TOP_LEFT;
+        v2f* pos = &GUI_AUTO_TOP_LEFT;
         if(event->global_mark_reqs->count)
         {
             
-            GUI_Do_Text(context, start_pos_ptr, "Yleis vaatimukset:");
-            start_pos_ptr = 0;
+            GUI_Do_Text(context, pos, "Yleis vaatimukset:");
+            pos = 0;
             
             GUI_Push_Layout(context);
             
@@ -474,8 +476,7 @@ static void Do_Event_Editor_Participants_Frame()
             {
                 GUI_Placement rcp = context->layout.last_element;
                 
-                v2f dim = v2f{36, 36};
-                if(GUI_Do_Button(context, start_pos_ptr, &dim, "X"))
+                if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "X"))
                 {
                     context->layout.last_element = rcp;
                     
@@ -557,7 +558,7 @@ static void Do_Event_Editor_Participants_Frame()
         
         // -- participants --
         
-        GUI_Do_Text(context, start_pos_ptr, "Osallistujat:");
+        GUI_Do_Text(context, pos, "Osallistujat:");
         
         context->layout.build_direction = GUI_Build_Direction::down_left;
         
@@ -565,11 +566,9 @@ static void Do_Event_Editor_Participants_Frame()
         {
             Participent* parti = Begin(event->participents) + p;
             
-            v2f dim = v2f{36, 36};
-            
             GUI_Placement rcp = context->layout.last_element;
             
-            if(GUI_Do_Button(context, AUTO, &dim, "X"))
+            if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "X"))
             {
                 Delete_Participent(p--, event->participents, &s_allocator);
                 
@@ -626,7 +625,7 @@ static void Do_Event_Editor_Participants_Frame()
                 
                 rcp = context->layout.last_element;
                 
-                if(GUI_Do_Button(context, AUTO, &dim, "X"))
+                if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "X"))
                 {
                     Make_Requirement_Hollow(req);
                     
@@ -767,7 +766,7 @@ static void Do_Event_Editor_Participants_Frame()
         }
     }; // ----------------------------------------------------------------------------------------
     
-    Do_GUI_Frame_With_Banner(banner_func, menu_func, 160);
+    Do_GUI_Frame_With_Banner(banner_func, menu_func);
     
     if(s_hotkeys[Editor_Hotkeys::jump_right].Is_Released())
     {
@@ -780,22 +779,21 @@ static void Do_Event_Editor_Text_Frame()
 {
     void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
     {
+        constexpr f32 s = 2.f;
+        
         Editor_Event* event = Active_Event(&s_editor_state);
         
-        v2f title_scale = v2f{4.f, 4.f};
-        Font* font = &context->theme->font;
-        v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
-        if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
+        if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &GUI_AUTO_FIT, "<", GUI_Scale_Default(s)))
         {
             s_global_data.active_menu = Menus::EE_all_events;
         }
+        f32 title_height = context->layout.last_element.dim.y;
         
         GUI_Push_Layout(context);
         
         context->layout.build_direction = GUI_Build_Direction::right_center;
         
-        GUI_Do_Text(context, AUTO, "Tapahtuma Teksti", {}, title_scale, true);
-        f32 title_height = context->layout.last_element.dim.y;
+        GUI_Do_Title_Text(context, AUTO, "Tapahtuma Teksti", GUI_Scale_Default(s));
         f32 title_max_x = context->layout.last_element.rect.max.x - context->anchor_base.x;
         GUI_Pop_Layout(context);
         
@@ -807,7 +805,7 @@ static void Do_Event_Editor_Text_Frame()
                 "Tapahtuman (p\xE4iv\xE4) nimi:" : "Tapahtuman (y\xF6) nimi:";
             GUI_Do_Text(context, AUTO, event_name_text);
             
-            f32 event_name_sl_field_width = 500;
+            f32 event_name_sl_field_width = 250 * GUI_DEFAULT_TEXT_SCALE.x;
             GUI_Do_SL_Input_Field(context, AUTO, &event_name_sl_field_width, &event->name);
         }
         
@@ -815,9 +813,10 @@ static void Do_Event_Editor_Text_Frame()
         
         // -- title bar buttons --    
         f32 padding = context->theme->padding;
-        static constexpr char* go_to_requirements_text = "Osallistujat";
-        static constexpr char* go_to_consequences_text = "Seuraamukset";
+        constexpr char* go_to_requirements_text = "Osallistujat";
+        constexpr char* go_to_consequences_text = "Seuraamukset";
         
+        Font* font = &context->theme->font;
         f32 w1 = GUI_Tight_Fit_Text(go_to_requirements_text, font).x + padding;
         f32 w2 = GUI_Tight_Fit_Text(go_to_consequences_text, font).x + padding;
         
@@ -871,20 +870,19 @@ static void Do_Event_Editor_Consequences_Frame()
 {
     void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
     {
-        v2f title_scale = v2f{4.f, 4.f};
-        Font* font = &context->theme->font;
-        v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
-        if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
+        constexpr f32 s = 2.f;
+        
+        if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &GUI_AUTO_FIT, "<", GUI_Scale_Default(s)))
         {
             s_global_data.active_menu = Menus::EE_all_events;
         }
+        f32 title_height = context->layout.last_element.dim.y;
         
         GUI_Push_Layout(context);
         
         context->layout.build_direction = GUI_Build_Direction::right_center;
         
-        GUI_Do_Text(context, AUTO, "Seuraamukset", {}, title_scale, true);
-        f32 title_height = context->layout.last_element.dim.y;
+        GUI_Do_Title_Text(context, AUTO, "Seuraamukset", GUI_Scale_Default(s));
         f32 title_max_x = context->layout.last_element.rect.max.x - context->anchor_base.x;
         
         GUI_Pop_Layout(context);
@@ -907,9 +905,11 @@ static void Do_Event_Editor_Consequences_Frame()
         
         // -- title bar buttons --    
         f32 padding = context->theme->padding;
-        static constexpr char* go_to_requirements_text = "Osallistujat";
-        static constexpr char* go_to_event_text_text = "Tapahtuma Teksti";
+        
+        constexpr char* go_to_requirements_text = "Osallistujat";
+        constexpr char* go_to_event_text_text = "Tapahtuma Teksti";
 
+        Font* font = &context->theme->font;
         f32 w1 = GUI_Tight_Fit_Text(go_to_requirements_text, font).x + padding;
         f32 w2 = GUI_Tight_Fit_Text(go_to_event_text_text, font).x + padding;
         
@@ -933,22 +933,23 @@ static void Do_Event_Editor_Consequences_Frame()
 
     void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
     {
+        // CONSIDER: local scope statics are a bit iffy?
         static f64 multiple_death_cons_error_time = 0;
         static u32 multiple_death_cons_error_idx = 0;
         
         static f64 death_con_with_additional_cons_time = 0;
         static u32 death_con_with_additional_cons_idx = 0;
         
-        static constexpr f32 collumn_min_width = 300;
+        f32 collumn_min_width = 150 * GUI_DEFAULT_TEXT_SCALE.x;
         
-        v2f* start_pos_ptr = &GUI_AUTO_TOP_LEFT;
+        v2f* pos = &GUI_AUTO_TOP_LEFT;
         
         Editor_Event* event = Begin(s_editor_state.event_container.events) + s_editor_state.active_event_index;
         
         if(event->global_mark_cons->count)
         {
-            GUI_Do_Text(context, start_pos_ptr, "Yleis seuraamukset:");
-            start_pos_ptr = 0;
+            GUI_Do_Text(context, pos, "Yleis seuraamukset:");
+            pos = 0;
             
             GUI_Push_Layout(context);
             
@@ -958,9 +959,8 @@ static void Do_Event_Editor_Consequences_Frame()
             for(u32 i = 0; i < event->global_mark_cons->count; ++i)
             {
                 GUI_Placement rcp = context->layout.last_element;
-                
-                v2f dim = v2f{36, 36};
-                if(GUI_Do_Button(context, start_pos_ptr, &dim, "X"))
+
+                if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "X"))
                 {
                     context->layout.last_element = rcp;
                     
@@ -987,7 +987,7 @@ static void Do_Event_Editor_Consequences_Frame()
                 Global_Mark_Consequence* gmc = global_mark_cons + i;
                 GUI_Do_SL_Input_Field(context, AUTO, &width, &gmc->mark);
                 
-                dim = context->layout.last_element.dim;
+                v2f dim = context->layout.last_element.dim;
                 
                 GUI_Do_Text(context, AUTO, "Kesto:", GUI_Highlight_Next(context));
                 
@@ -1016,7 +1016,7 @@ static void Do_Event_Editor_Consequences_Frame()
             GUI_Do_Panel(context, AUTO, &pannel_dim);
         }
         
-        GUI_Do_Text(context, start_pos_ptr, "Osallistujat:");
+        GUI_Do_Text(context, pos, "Osallistujat:");
 
         context->layout.build_direction = GUI_Build_Direction::down_left;
         
@@ -1090,20 +1090,21 @@ static void Do_Event_Editor_Consequences_Frame()
                 time <= multiple_death_cons_error_time &&
                 multiple_death_cons_error_idx == i)
             {
-                GUI_Do_Text(context, AUTO, "Vain yksi kuolema seuraamus on sallittu!", {0}, v2f{1.f,1.f}, true);
+                constexpr char* text = "Vain yksi kuolema seuraamus on sallittu!";
+                GUI_Do_Title_Text(context, AUTO, text, GUI_Scale_Default(0.5f));
             }
             
             if(contains_death_con && parti->cons->count >= 2)
             {
-                GUI_Do_Text(context, AUTO, "Vain kuolema seuraamus toteutuu.", {0}, v2f{1.f,1.f}, true);
+                constexpr char* text = "Vain kuolema seuraamus toteutuu.";
+                GUI_Do_Title_Text(context, AUTO, text, GUI_Scale_Default(0.5f));
             }
             
             Event_Consequens* cons = Begin(parti->cons);
             for(u32 y = 0; y < parti->cons->count; ++y)
             {
                 Event_Consequens* con = cons + y;
-                v2f del_dim = v2f{36, 36};
-                if(GUI_Do_Button(context, AUTO, &del_dim, "X"))
+                if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "X"))
                 {
                     Make_Consequense_Hollow(con);
                     u32 size = sizeof(*con);
@@ -1140,7 +1141,7 @@ static void Do_Event_Editor_Consequences_Frame()
                             GUI_Do_Text(context, AUTO, "Kuka perii \\k:", GUI_Highlight_Next(context));
                             
                             GUI_Push_Layout(context);
-                            f32 width = 80;
+                            f32 width = 40 * GUI_DEFAULT_TEXT_SCALE.x;
                             context->layout.build_direction = GUI_Build_Direction::right_center;
                             
                             context->flags |= GUI_Context_Flags::one_time_skip_padding;
@@ -1195,7 +1196,7 @@ static void Do_Event_Editor_Consequences_Frame()
                                 con->stat_change_amount *= -1;
                         }
                         
-                        static constexpr char* num_options[] = {"1", "2", "3"};
+                        constexpr char* num_options[] = {"1", "2", "3"};
                         u32 abs_stat_amount = Abs(con->stat_change_amount) - 1;
                         
                         Assert(abs_stat_amount < Array_Lenght(num_options));
@@ -1281,7 +1282,7 @@ static void Do_Event_Editor_Consequences_Frame()
         
     }; // ----------------------------------------------------------------------------------------
 
-    Do_GUI_Frame_With_Banner(banner_func, menu_func, 160);
+    Do_GUI_Frame_With_Banner(banner_func, menu_func);
     
     if(s_hotkeys[Editor_Hotkeys::jump_left].Is_Released())
     {
@@ -1296,16 +1297,15 @@ static void Do_Event_Editor_Campaigns_Menu_Frame()
     {
         context->layout.build_direction = GUI_Build_Direction::right_center;
         
-        v2f title_scale = v2f{4.f, 4.f};
-        Font* font = &context->theme->font;
-        v2f back_button_dim = GUI_Tight_Fit_Text("<", font, title_scale);
-        if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &back_button_dim, "<"))
+        constexpr f32 s = 2.f;
+        
+        if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &GUI_AUTO_FIT, "<", GUI_Scale_Default(s)))
         {
             s_global_data.active_menu = Menus::main_menu;
             Clear_Editor_Format_Campaigns();
         }
         
-        GUI_Do_Text(context, AUTO, "Kampanja Editori", {}, title_scale, true);
+        GUI_Do_Title_Text(context, AUTO, "Kampanja Editori", GUI_Scale_Default(s));
         f32 title_height = context->layout.last_element.dim.y;
         f32 title_max_x = context->layout.last_element.rect.max.x - context->anchor_base.x;
         
@@ -1313,7 +1313,7 @@ static void Do_Event_Editor_Campaigns_Menu_Frame()
         constexpr char* create_new_text = "Luo uusi kampanja";
         
         f32 padding = context->theme->padding;
-        f32 w1 = GUI_Tight_Fit_Text(create_new_text, font).x + padding;    
+        f32 w1 = GUI_Tight_Fit_Text(create_new_text, &context->theme->font).x + padding;    
         
         f32 ctrl_buttons_width = w1 + context->dynamic_slider_girth + padding * 2;
         
@@ -1331,15 +1331,18 @@ static void Do_Event_Editor_Campaigns_Menu_Frame()
 
     void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
     {
-        GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "(l\xF6ydetty kohteesta \"", {}, v2f{1.f, 1.f});
+        constexpr f32 s = 0.5f;
+        
+        char* found_from = "(l\xF6ydetty kohteesta \"";
+        GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, found_from, {}, GUI_Scale_Default(s));
         GUI_Push_Layout(context);
         context->layout.build_direction = GUI_Build_Direction::right_center;
         
         context->flags |= GUI_Context_Flags::one_time_skip_padding;
-        GUI_Do_Text(context, AUTO, campaign_folder_wildcard_path, {}, v2f{1.f, 1.f});
+        GUI_Do_Text(context, AUTO, campaign_folder_wildcard_path, {}, GUI_Scale_Default(s));
         
         context->flags |= GUI_Context_Flags::one_time_skip_padding;
-        GUI_Do_Text(context, AUTO, "\" jossa * on kampanjan nimi.)", {}, v2f{1.f, 1.f});
+        GUI_Do_Text(context, AUTO, "\" jossa * on kampanjan nimi.)", {}, GUI_Scale_Default(s));
         
         GUI_Pop_Layout(context);
         GUI_Do_Text(context, AUTO, "Lataa tallenus:");
@@ -1378,14 +1381,22 @@ static void Do_Event_Editor_Campaigns_Menu_Frame()
         
     }; // ----------------------------------------------------------------------------------------
 
-    Do_GUI_Frame_With_Banner(banner_func, menu_func, 100);
+    Do_GUI_Frame_With_Banner(banner_func, menu_func);
 }
 
 
-static void Do_Event_Editor_On_Exit_Popup(GUI_Context* context)
+static void Do_Event_Editor_On_Exit_Editor(GUI_Context* context)
 {
+    f32 text_height = GUI_Character_Height(context);
+    f32 title_height = text_height * GUI_DEFAULT_TITLE_SCALER.y;
+    f32 padding = GUI_Padding(context);
+    f32 frame_height = title_height + (text_height + padding * 2) * 3;
+    
+    v2f title_pos = Get_Middle(context->canvas);
+    title_pos.y += frame_height * 0.5f;
+    
     static constexpr char* text = "Tallenetaanko kampanja?";
-    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, text);
+    GUI_Do_Title_Text(context, &title_pos, text);
     
     context->layout.build_direction = GUI_Build_Direction::down_center;
     
@@ -1423,9 +1434,17 @@ static void Do_Event_Editor_On_Exit_Popup(GUI_Context* context)
 
 
 static void Do_Event_Editor_Quit_Popup(GUI_Context* context)
-{    
+{
+    f32 text_height = GUI_Character_Height(context);
+    f32 title_height = text_height * GUI_DEFAULT_TITLE_SCALER.y;
+    f32 padding = GUI_Padding(context);
+    f32 frame_height = title_height + (text_height + padding * 2) * 3;
+    
+    v2f title_pos = Get_Middle(context->canvas);
+    title_pos.y += frame_height * 0.5f;
+    
     static constexpr char* text = "Suljetaanko varmasti?";
-    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, text);
+    GUI_Do_Title_Text(context, &title_pos, text);
     
     context->layout.build_direction = GUI_Build_Direction::down_center;
     
@@ -1456,8 +1475,16 @@ static void Do_Event_Editor_Quit_Popup(GUI_Context* context)
 
 static void Do_Event_Editor_Delete_Event_Popup(GUI_Context* context)
 {
+    f32 text_height = GUI_Character_Height(context);
+    f32 title_height = text_height * GUI_DEFAULT_TITLE_SCALER.y;
+    f32 padding = GUI_Padding(context);
+    f32 frame_height = title_height + (text_height + padding * 2) * 2;
+    
+    v2f title_pos = Get_Middle(context->canvas);
+    title_pos.y += frame_height * 0.5f;
+    
     static constexpr char* text = "Poistetaanko varmasti?";
-    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, text);
+    GUI_Do_Title_Text(context, &title_pos, text);
     
     context->layout.build_direction = GUI_Build_Direction::down_center;
     
@@ -1487,19 +1514,14 @@ static void Do_Event_Editor_Delete_Event_Popup(GUI_Context* context)
 }
 
 
-static void Do_Event_Editor_Display_Active_Event_Errors(GUI_Context* context)
+static void Do_Event_Editor_Display_Active_Event_Errors_Popup(GUI_Context* context)
 {
     Editor_Event* event = Active_Event(&s_editor_state);
     
     context->layout.build_direction = GUI_Build_Direction::down_left;
     context->layout.anchor = GUI_Anchor::center;
     
-    v2f panel_dim = v2f
-        {
-            900,
-            500
-        };
-        
+    v2f panel_dim = Hadamar_Product(v2f{450, 250}, GUI_DEFAULT_TEXT_SCALE);
     v2f panel_center = Get_Middle(context->canvas);
     
     GUI_Get_Placement(context, &panel_dim, &GUI_AUTO_MIDDLE);
@@ -1516,8 +1538,8 @@ static void Do_Event_Editor_Display_Active_Event_Errors(GUI_Context* context)
     v2f sub_space_dim = v2f
         {
             panel_dim.x, 
-            (context->layout.last_element.pos.y - context->layout.last_element.dim.y / 2) - 
-                (panel_center.y - panel_dim.y / 2)
+            (context->layout.last_element.pos.y - context->anchor_base.y - 
+            context->layout.last_element.dim.y / 2) - (panel_center.y - panel_dim.y / 2)
         };
     
     if(GUI_Do_Sub_Context(context, sub_context, &sub_canvas, AUTO, &sub_space_dim, &s_list_bg_color))
