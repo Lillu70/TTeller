@@ -39,7 +39,7 @@ static void Do_Create_Player_FI_Instruction_Popup(GUI_Context* context)
     
     v2f title_scale = Hadamar_Product(GUI_DEFAULT_TEXT_SCALE, GUI_DEFAULT_TITLE_SCALER);
     
-    static constexpr char* title_text = "Pelihahmon luonti ohjeet";
+    char* title_text = L1(player_creation_instructions);
     v2f d = GUI_Tight_Fit_Text(title_text, &context->theme->font, title_scale);
     v2f b = v2f{d.y, d.y};
     
@@ -72,11 +72,11 @@ static void Do_Out_Of_Template_Names_Popup(GUI_Context* context)
     GUI_Do_Title_Text(
         context, 
         &GUI_AUTO_MIDDLE, 
-        "Hupsis, valmiit nimet loppuivat kesken.");
+        L1(ran_out_of_premade_names));
     
     context->layout.build_direction = GUI_Build_Direction::down_center;
     
-    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Okei :("))
+    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(sad_confirm)))
         Close_Popup();
 }
 
@@ -101,7 +101,7 @@ static void Do_New_Game_Players()
         
         context->layout.build_direction = GUI_Build_Direction::right_center;
         
-        GUI_Do_Title_Text(context, AUTO, "Kampanjan pelaajat", GUI_Scale_Default(s));
+        GUI_Do_Title_Text(context, AUTO, L1(players), GUI_Scale_Default(s));
         
         f32 title_max_x = context->layout.last_element.rect.max.x - context->anchor_base.x;
         
@@ -109,7 +109,7 @@ static void Do_New_Game_Players()
         
         GUI_Do_Spacing(context, v2f{0, s_post_title_y_spacing});
         
-        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lis\xE4\xE4 pelaaja"))
+        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(add_player)))
         {
             Create_Player_Name_FI(&s_game_state, &s_allocator);
             *Push(&s_game_state.player_images, &s_allocator) = {};
@@ -120,14 +120,14 @@ static void Do_New_Game_Players()
         context->layout.build_direction = GUI_Build_Direction::right_center;
         
         
-        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Ohje"))
+        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(instuction)))
         {
             Set_Popup_Function(Do_Create_Player_FI_Instruction_Popup);
         }
         
         if(s_game_state.player_images->count)
         {
-            if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "T\xE4yt\xE4 tyhj\xE4t paikat"))
+            if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(fill_empty_spots)))
             {
                 s_game_state.rm.seed = (i32)s_platform.Get_Time_Stamp();
                 
@@ -154,7 +154,7 @@ static void Do_New_Game_Players()
         // -- title bar buttons --    
         f32 padding = context->theme->padding;
         
-        static constexpr char* start_game_text = "Valmista";
+        char* start_game_text = L1(ready);
         
         f32 w1 = GUI_Tight_Fit_Text(start_game_text, &context->theme->font).x + padding;
         
@@ -225,14 +225,14 @@ static void Do_New_Game_Players()
             GUI_Push_Layout(context);
             context->layout.build_direction = GUI_Build_Direction::right_center;
             
-            GUI_Do_Text(context, AUTO, "Pelaaja");
+            GUI_Do_Text(context, AUTO, L1(player));
             
             GUI_Pop_Layout(context);
             
             GUI_Push_Layout(context);
             context->layout.build_direction = GUI_Build_Direction::down_left;
             
-            GUI_Do_Text(context, AUTO, "Nimi:", GUI_Highlight_Next(context));
+            GUI_Do_Text(context, AUTO, L1(name), GUI_Highlight_Next(context));
             if(GUI_Do_SL_Input_Field(context, AUTO, &player_creation_text_box_width, &n->full_name))
             {
                 context->selected_index += 1;
@@ -251,7 +251,7 @@ static void Do_New_Game_Players()
                 }
             }
             
-            GUI_Do_Text(context, AUTO, "Muoto 1:", GUI_Highlight_Next(context));
+            GUI_Do_Text(context, AUTO, L1(name_form_1), GUI_Highlight_Next(context));
             
             if(GUI_Do_SL_Input_Field(
                 context, 
@@ -262,7 +262,7 @@ static void Do_New_Game_Players()
                 context->selected_index += 1;
             }
             
-            GUI_Do_Text(context, AUTO, "Muoto 2:", GUI_Highlight_Next(context));
+            GUI_Do_Text(context, AUTO, L1(name_form_2), GUI_Highlight_Next(context));
             
             GUI_Do_SL_Input_Field(
                 context, 
@@ -278,18 +278,18 @@ static void Do_New_Game_Players()
             
             context->layout.build_direction = GUI_Build_Direction::right_center;
             
-            GUI_Do_Text(context, AUTO, "\xC4\xE4kk\xF6s ohitus", GUI_Highlight_Prev(context));
+            GUI_Do_Text(context, AUTO, L1(umlauts_override), GUI_Highlight_Prev(context));
             
             GUI_Pop_Layout(context);
             
             v2f test_button_dim = 
                 v2f{player_creation_text_box_width, context->layout.last_element.dim.y};
-            if(GUI_Do_Button(context, AUTO, &test_button_dim, "Testaa muodot"))
+            if(GUI_Do_Button(context, AUTO, &test_button_dim, L1(test_forms)))
             {
                 
             }
             
-            if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Valitse kuva"))
+            if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(choose_image)))
             {
                 char path[260];
                 
@@ -306,20 +306,14 @@ static void Do_New_Game_Players()
                             s_allocator.free(img->buffer);
                         }
                         
-                        #if 1
-                            img->dim = player_picture_dim.As<i32>();
-                            u32 sm_size = img->dim.x * img->dim.y * sizeof(Color);
-                            
-                            img->buffer = (u8*)s_allocator.push(sm_size);
+                        img->dim = player_picture_dim.As<i32>();
+                        u32 sm_size = img->dim.x * img->dim.y * sizeof(Color);
                         
-                            Resize_Image(img, &loaded_img);
-                            s_allocator.free(loaded_img.buffer);
-                        #else
-                        
-                            *img = loaded_img;
-                        
-                        #endif
-                        
+                        img->buffer = (u8*)s_allocator.push(sm_size);
+                    
+                        Resize_Image(img, &loaded_img);
+                        s_allocator.free(loaded_img.buffer);
+                    
                         Convert_From_RGB_To_Color_And_Flip_Y(img);
                         
                         Init_String(&player_image->file_path, &s_allocator, path);
@@ -372,7 +366,7 @@ static void Do_Select_Campagin_To_Play_Frame()
             Clear_Editor_Format_Campaigns();
         }
         
-        GUI_Do_Title_Text(context, AUTO, "Uusi peli", GUI_Scale_Default(s));
+        GUI_Do_Title_Text(context, AUTO, L1(new_game), GUI_Scale_Default(s));
         f32 title_height = context->layout.last_element.dim.y;
         f32 title_max_x = context->layout.last_element.rect.max.x - context->anchor_base.x;
     
@@ -380,7 +374,7 @@ static void Do_Select_Campagin_To_Play_Frame()
 
     void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
     {
-        GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "(l\xF6ydetty kohteesta \"", {}, GUI_Scale_Default(.5f));
+        GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, L1(found_from_loc), {}, GUI_Scale_Default(.5f));
         GUI_Push_Layout(context);
         context->layout.build_direction = GUI_Build_Direction::right_center;
         
@@ -388,10 +382,10 @@ static void Do_Select_Campagin_To_Play_Frame()
         GUI_Do_Text(context, AUTO, campaign_folder_wildcard_path, {}, GUI_Scale_Default(.5f));
         
         context->flags |= GUI_Context_Flags::one_time_skip_padding;
-        GUI_Do_Text(context, AUTO, "\" jossa * on kampanjan nimi.)", {}, GUI_Scale_Default(.5f));
+        GUI_Do_Text(context, AUTO, L1(where_wildcard_is_campaing_name), {}, GUI_Scale_Default(.5f));
         
         GUI_Pop_Layout(context);
-        GUI_Do_Text(context, AUTO, "Valitse kampanja:");
+        GUI_Do_Text(context, AUTO, L1(choose_campaign));
         
         if(s_global_data.on_disk_campaign_names)
         {
@@ -468,10 +462,10 @@ static void Do_Let_The_Games_Begin_Frame()
         
         GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, s_game_state.campaign_name, GUI_Scale_Default(s));
     
-        GUI_Do_Text(context, AUTO, "Osallistujat kamppailevat kuolemaan asti.");
-        GUI_Do_Text(context, AUTO, "On vain yksi voittaja.");
+        GUI_Do_Text(context, AUTO, L1(partis_compete_to_death));
+        GUI_Do_Text(context, AUTO, L1(there_is_only_one_winner));
         
-        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Aloita peli!"))
+        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(start_game)))
         {
             s_global_data.active_menu = Menus::GM_day_counter;
             Begin_Game(&s_game_state, &s_platform, &s_allocator);
@@ -537,7 +531,7 @@ static void Do_Event_Display_Frame()
         
         if(s_game_state.display_event_idx < s_game_state.active_events->count - 1)
         {
-            if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Seuraava tapahtuma"))
+            if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(next_event)))
             {
                 skip_frame = true;
                 s_game_state.display_event_idx += 1;
@@ -546,7 +540,7 @@ static void Do_Event_Display_Frame()
         }
         else
         {
-            if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Jatka"))
+            if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(_continue)))
             {
                 Resolve_Current_Event_Set(&s_game_state, &s_allocator);
                 skip_frame = true;
@@ -659,14 +653,14 @@ static void Do_Day_Counter_Display_Frame()
         context->layout.anchor = GUI_Anchor::top;
         context->layout.build_direction = GUI_Build_Direction::down_center;
         
-        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, "P\xE4iv\xE4", GUI_Scale_Default(s));
+        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, L1(day), GUI_Scale_Default(s));
         v2f title_dim = context->layout.last_element.dim;
         
         char index_text_buffer[12] = {0};
         char* num = U32_To_Char_Buffer((u8*)&index_text_buffer, s_game_state.day_counter);
         GUI_Do_Text(context, AUTO, num, {},  GUI_Scale_Default(s));
         
-        if(GUI_Do_Button(context, AUTO, &title_dim, "Jatka"))
+        if(GUI_Do_Button(context, AUTO, &title_dim, L1(_continue)))
         {
             if(!Assign_Events_To_Participants(&s_game_state, Event_List::day, &s_allocator))
             {
@@ -679,7 +673,7 @@ static void Do_Day_Counter_Display_Frame()
         }
         
         context->layout.anchor = GUI_Anchor::top_left;
-        if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &GUI_AUTO_FIT, "Lopeta peli"))
+        if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &GUI_AUTO_FIT, L1(quit_game)))
         {
             Delete_Game(&s_game_state, &s_allocator);
             s_global_data.active_menu = Menus::main_menu;
@@ -697,7 +691,7 @@ static void Do_Day_Counter_Display_Frame()
         context->layout.anchor = GUI_Anchor::top;
         context->layout.build_direction = GUI_Build_Direction::down_center;
         
-        GUI_Do_Text(context, &GUI_AUTO_TOP_CENTER, "Aktiiviset yleis merkit.");
+        GUI_Do_Text(context, &GUI_AUTO_TOP_CENTER, L1(active_global_marks));
         
         char num_text_buffer[12] = {0};
         
@@ -720,7 +714,7 @@ static void Do_Day_Counter_Display_Frame()
         GUI_Do_Title_Text(
             context, 
             AUTO, 
-            "J\xE4ljell\xE4 olevat osallistujat.", 
+            L1(remaining_partis), 
             GUI_Scale_Default(1.5f));
         
         f32 padding = f32(context->theme->padding);
@@ -768,7 +762,7 @@ static void Do_Day_Counter_Display_Frame()
             }
             
             
-            GUI_Do_Text(context, AUTO, "Esineet:");
+            GUI_Do_Text(context, AUTO, L1(items));
             for(each(Mark_GM*, mark, player->marks))
             {
                 if(mark->type == Mark_Type::item)
@@ -794,7 +788,7 @@ static void Do_Day_Counter_Display_Frame()
             }
             
             
-            GUI_Do_Text(context, AUTO, "Hahmo merkit:");
+            GUI_Do_Text(context, AUTO, L1(character_marks));
             for(each(Mark_GM*, mark, player->marks))
             {
                 if(mark->type == Mark_Type::personal)
@@ -859,7 +853,7 @@ static void Do_Night_Falls_Frame()
     
     v2f text_pos = v2f{x, y};
     
-    GUI_Do_Title_Text(context, &text_pos, "Y\xF6 laskeutuu...", text_scale);
+    GUI_Do_Title_Text(context, &text_pos, L1(night_falls), text_scale);
     
     v2i cursor_pos = s_platform.Get_Cursor_Position();
     bool cursor_on_canvas = Is_Point_On_Canvas(context->canvas, cursor_pos);
@@ -896,18 +890,18 @@ static void Do_All_Players_Are_Dead_Frame()
         context->layout.anchor = GUI_Anchor::top;
         context->layout.build_direction = GUI_Build_Direction::down_center;
         
-        char* title_text = "Kaikki osallistujat makavat kuolleina...";
+        char* title_text = L1(all_partis_are_dead);
         GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, title_text, GUI_Scale_Default(2.f));
-        GUI_Do_Text(context, AUTO, "Kukaan ei selviytynyt!");
+        GUI_Do_Text(context, AUTO, L1(nobody_survived));
         
-        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Pelaa uudelleen"))
+        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(play_again)))
         {
             skip_frame = true;
             Reset_Game(&s_game_state, &s_allocator);
             s_global_data.active_menu = Menus::GM_let_the_games_begin;
         }
         
-        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lopeta peli"))
+        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(quit_game)))
         {
             skip_frame = true;
             Delete_Game(&s_game_state, &s_allocator);
@@ -926,7 +920,7 @@ static void Do_All_Players_Are_Dead_Frame()
         context->layout.anchor = GUI_Anchor::top;
         context->layout.build_direction = GUI_Build_Direction::down_center;
         
-        GUI_Do_Text(context, &GUI_AUTO_TOP_CENTER, "Kuolleet:");
+        GUI_Do_Text(context, &GUI_AUTO_TOP_CENTER, L1(the_dead));
         
         v2f player_picture_dim = Hadamar_Product(s_player_picture_dim_base, GUI_DEFAULT_TEXT_SCALE);
         
@@ -954,17 +948,17 @@ static void Do_We_Have_A_Winner_Frame()
         context->layout.anchor = GUI_Anchor::top;
         context->layout.build_direction = GUI_Build_Direction::down_center;
         
-        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, "Voittaja on selvinnyt!", GUI_Scale_Default(2.f));
-        GUI_Do_Text(context, AUTO, "H\xE4nen nimens\xE4 j\xE4\xE4k\xF6\xF6n histoarian kirjoihin.");
+        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, L1(we_have_winner), GUI_Scale_Default(2.f));
+        GUI_Do_Text(context, AUTO, L1(may_his_name_be_written_in_legends));
         
-        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Pelaa uudelleen"))
+        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(play_again)))
         {
             skip_frame = true;
             Reset_Game(&s_game_state, &s_allocator);
             s_global_data.active_menu = Menus::GM_let_the_games_begin;
         }
         
-        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lopeta peli"))
+        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(quit_game)))
         {
             skip_frame = true;
             Delete_Game(&s_game_state, &s_allocator);
@@ -980,7 +974,7 @@ static void Do_We_Have_A_Winner_Frame()
         context->layout.anchor = GUI_Anchor::top;
         context->layout.build_direction = GUI_Build_Direction::down_center;
         
-        GUI_Do_Text(context, &GUI_AUTO_TOP_CENTER, "Voittaja!");
+        GUI_Do_Text(context, &GUI_AUTO_TOP_CENTER, L1(winner));
         
         Player_Image* images = Begin(s_game_state.player_images);
         Game_Player_Name_FI* names = Begin(s_game_state.player_names);
@@ -995,7 +989,7 @@ static void Do_We_Have_A_Winner_Frame()
         
         GUI_Do_Panel(context, AUTO, &seperator_dim);
         
-        GUI_Do_Text(context, AUTO, "Kuolleet:");
+        GUI_Do_Text(context, AUTO, L1(the_dead));
         
         for(u32 i = 1; i < s_game_state.total_player_count; ++i)
         {
@@ -1019,18 +1013,18 @@ static void Do_Event_Assignement_Failed_Frame()
         context->layout.anchor = GUI_Anchor::top;
         context->layout.build_direction = GUI_Build_Direction::down_center;
         
-        char* title_text = "Tapahtuma virhe :(";
+        char* title_text = L1(event_error);
         GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, title_text, GUI_Scale_Default(2.f));
-        GUI_Do_Text(context, AUTO, "Kaikia osallistujia ei saatu mahtumaan tapahtumaan.");
+        GUI_Do_Text(context, AUTO, L1(could_not_fit_every_parti));
         
-        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Lopeta peli"))
+        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(quit_game)))
         {
             skip_frame = true;
             Delete_Game(&s_game_state, &s_allocator);
             s_global_data.active_menu = Menus::main_menu;
         }
         
-        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Pelaa uudelleen"))
+        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(play_again)))
         {
             skip_frame = true;
             Reset_Game(&s_game_state, &s_allocator);
@@ -1096,12 +1090,12 @@ static void Do_Load_Failed_Popup(GUI_Context* context)
     context->layout.anchor = GUI_Anchor::bottom;
     context->layout.build_direction = GUI_Build_Direction::down_center;
     
-    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, "Jokin meni m\xF6nk\xE4\xE4n!");
-    GUI_Do_Text(context, AUTO, "Kampanjaa ei voitu ladata.");
+    GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, L1(something_failed));
+    GUI_Do_Text(context, AUTO, L1(campaign_could_not_be_loaded));
     
     GUI_Do_Spacing(context, v2f{0, 20});
     
-    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "OK"))
+    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(confirm)))
     {
         Close_Popup();
     }
@@ -1135,14 +1129,14 @@ static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
     
     v2f title_pos = {Get_Middle(context->canvas).x, sh - offset};
     
-    char* text = "Kamppania sis\xE4lsi viallisia tapahtumia!";
+    char* text = L1(campaign_contains_invalid_events);
     GUI_Do_Title_Text(context, &title_pos, text);
     
     f32 title_width = context->layout.last_element.dim.x;
     
-    GUI_Do_Text(context, AUTO, "Pelin toimivuuden takia ne oli poistettava.");
+    GUI_Do_Text(context, AUTO, L1(for_game_functionality_they_have_been_removed));
 
-    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Jatka siit\xE4 huolimatta"))
+    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(continue_anyway)))
     {
         Game_State game_state;
         
@@ -1174,12 +1168,12 @@ static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
     
     context->layout.build_direction = GUI_Build_Direction::right_center;
     
-    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Peruuta"))
+    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(cancel)))
     {
         Close_Popup();
     }
     
-    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "Avaa editorissa"))
+    if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(open_in_editor)))
     {
         Events_Container ec;
         
@@ -1202,7 +1196,7 @@ static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
     
     GUI_Do_Spacing(context, v2f{0, 30});
     
-    GUI_Do_Text(context, AUTO, "Seuraavat tapahtumat sis\xE4lsiv\xE4t virheit\xE4:");
+    GUI_Do_Text(context, AUTO, L1(the_following_events_contain_errors));
     
     if(s_global_data.IEFR)
     {
@@ -1298,8 +1292,8 @@ static void Do_GM_Campaign_Was_Unusable_Popup(GUI_Context* context)
     context->layout.anchor = GUI_Anchor::top_left;
     
     v2f title_pos = panel_center + v2f{panel_dim.x * -1, panel_dim.y} / 2;
-    GUI_Do_Title_Text(context, &title_pos, "Virhe raportti:");
-    GUI_Do_Text(context, AUTO, "Peli ei ole pelattavissa:");
+    GUI_Do_Title_Text(context, &title_pos, L1(error_report));
+    GUI_Do_Text(context, AUTO, L1(game_can_not_be_played));
     
     Canvas sub_canvas;
     GUI_Context* sub_context = Get_GUI_Context_From_Pool();
@@ -1313,7 +1307,7 @@ static void Do_GM_Campaign_Was_Unusable_Popup(GUI_Context* context)
     
     if(GUI_Do_Sub_Context(context, sub_context, &sub_canvas, AUTO, &sub_space_dim, &s_list_bg_color))
     {
-        GUI_Do_Title_Text(sub_context, &GUI_AUTO_TOP_LEFT, "Virheet:", GUI_DEFAULT_TEXT_SCALE);
+        GUI_Do_Title_Text(sub_context, &GUI_AUTO_TOP_LEFT, L1(errors), GUI_DEFAULT_TEXT_SCALE);
 
         for(u32 i = 0; i < Array_Lenght(Game_Errors::names); ++i)
         {

@@ -483,7 +483,7 @@ static GUI_Context* Get_GUI_Context_From_Pool_(u64 line_id, u64 func_id)
     return result;
 }
 
-// NOTE: Crazy shit happens here. please don't look at it xD
+// NOTE: Crazy shit happens here. Please don't look at it xD
 
 
 #define SINGLE

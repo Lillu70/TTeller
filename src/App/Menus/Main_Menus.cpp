@@ -21,7 +21,7 @@ static void Do_Settings_Menu_Frame()
         
         context->layout.build_direction = GUI_Build_Direction::right_center;
         
-        GUI_Do_Title_Text(context, AUTO, "Asetukset", GUI_Scale_Default(s));
+        GUI_Do_Title_Text(context, AUTO, L1(settings_title), GUI_Scale_Default(s));
         
     }; // ----------------------------------------------------------------------------------------
 
@@ -31,7 +31,7 @@ static void Do_Settings_Menu_Frame()
         if(s_settings.allow_non_uniform_text_scale)
             highlight = {};
         
-        GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, "Tekstin koko:", highlight);
+        GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, L1(text_size), highlight);
         
         v2f check_box_dim = v2f{1.f, 1.f} * context->layout.last_element.dim.y;
         
@@ -42,7 +42,7 @@ static void Do_Settings_Menu_Frame()
         
         context->layout.build_direction = GUI_Build_Direction::right_center;
         
-        GUI_Do_Text(context, AUTO, "Salli ep\xE4 symmentrinen skaala", GUI_Highlight_Prev(context));
+        GUI_Do_Text(context, AUTO, L1(allow_non_uniform_text_scale), GUI_Highlight_Prev(context));
         
         GUI_Pop_Layout(context);
         
@@ -98,6 +98,19 @@ static void Do_Settings_Menu_Frame()
             }            
         }
         
+        String_List languages = LN(languages);
+        
+        if(u32 s = GUI_Do_Dropdown_Button(
+            context, 
+            AUTO, 
+            &GUI_AUTO_FIT, 
+            languages.list[u32(s_settings.language)],
+            languages.count,
+            languages.list))
+        {
+            s_settings.language = Language(s - 1);
+        }
+        
     }; // ----------------------------------------------------------------------------------------
 
     Do_GUI_Frame_With_Banner(banner_func, menu_func);
@@ -114,12 +127,12 @@ static void Do_Default_Quit_Popup(GUI_Context* context)
     v2f title_pos = Get_Middle(context->canvas);
     title_pos.y += frame_height * 0.5f;
     
-    GUI_Do_Title_Text(context, &title_pos, "Suljetaanko varmasti?");
+    GUI_Do_Title_Text(context, &title_pos, L1(are_you_sure_close));
     
     context->layout.build_direction = GUI_Build_Direction::down_center;
     
-    constexpr char* t1 = "Peruuta ja jatka";
-    constexpr char* t2 = "Sulje";
+    char* t1 = L1(cancel_and_continue);
+    char* t2 = L1(close_app);
     
     char* t = Get_Longest_CSTR(t1, t2);
     v2f button_dim = GUI_Tight_Fit_Text(t, &context->theme->font) + context->theme->padding;
