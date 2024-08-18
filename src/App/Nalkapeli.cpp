@@ -426,14 +426,12 @@ static void Update_Editor_Event_Text_Issues(Editor_Event* event)
             search,
             seek_number,
             seek_space,
-            seek_form,
-            seek_bender
         };
         Mode mode = Mode::search;
         String_View number_view = {};
         
-        for(char* cptr = event->event_text.buffer; *cptr; ++cptr)
-        {
+        for(char* cptr = event->event_text.buffer;; ++cptr)
+        { 
             char c = *cptr;
             switch(mode)
             {
@@ -472,20 +470,44 @@ static void Update_Editor_Event_Text_Issues(Editor_Event* event)
                 
                 case Mode::seek_space:
                 {
-                    if(c == ' ' || c == '\n')
+                    switch(c)
                     {
-                        mode = Mode::search;
+                        case ' ':
+                        case '\n':
+                        {
+                            cptr -= 1;
+                            mode = Mode::search;
+                        }break;
+                        
+                        case '/':
+                        {
+                            switch(*(cptr + 1))
+                            {
+                                case 'k':
+                                case 'K':
+                                {
+                                    mode = Mode::search;
+                                    cptr -= 1;
+                                }break;
+                            }
+                            
+                        }break;
                     }
                 }break;
                 
                 case Mode::seek_number:
                 {
-                    char c2 = *(cptr + 1);
-                    
-                    if(c < '0' || c > '9' || c2 == 0)
+                    if(c < '0' || c > '9')
                     {
-                        if(c2)
-                            cptr -= 1; // NOTE GO back!                        
+                        if(c == ':' || c == ';')
+                        {
+                            mode = Mode::seek_space;
+                        }
+                        else
+                        {
+                            mode = Mode::search;
+                            cptr -= 1; // NOTE GO back!                            
+                        }
                         
                         u32 participant_idx = Convert_String_View_Into_U32(number_view) - 1;
                         
@@ -493,8 +515,6 @@ static void Update_Editor_Event_Text_Issues(Editor_Event* event)
                             *(player_referenced_array + participant_idx) = true;
                         else
                             issues.errors |= Event_Errors::text_references_uninvolved_participant;
-                        
-                        mode = Mode::seek_space;
                     }
                     else
                     {
@@ -502,6 +522,9 @@ static void Update_Editor_Event_Text_Issues(Editor_Event* event)
                     }
                 }break;
             }
+            
+            if(!*cptr)
+                break;
         }
         
         for(u32 i = 0; i < event->participents->count; ++i)
@@ -696,10 +719,10 @@ static void Update_Editor_Event_Issues(Editor_Event* event)
 }
 
 
-static void Serialize_Campaign(
-    Events_Container event_container,
-    Platform_Calltable* platform)
-{    
+static void Serialize_Campaign_Write_To_Memory(
+        Events_Container* event_container,
+        Platform_Calltable* platform)
+{
     /*
      ---- Version History ---- 
     1->2: Added seperation of day and night events.
@@ -708,10 +731,11 @@ static void Serialize_Campaign(
     
     //TODO: Write like a file description thing or something maybe?
     
+    
     #define WRITE(X, type)\
     {\
         void* adrs = s_scrach_buffer.safe_push(sizeof(type));\
-        if(adrs != 0)\
+        if(adrs)\
         {\
             *(type*)adrs = X;\
         }\
@@ -724,7 +748,7 @@ static void Serialize_Campaign(
     #define WRITE_BLOCK(copy_buffer, copy_amount)\
     {\
         void* adrs = s_scrach_buffer.safe_push(copy_amount);\
-        if(adrs != 0)\
+        if(adrs)\
         {\
             Mem_Copy((u8*)adrs, copy_buffer, copy_amount);\
         }\
@@ -734,15 +758,15 @@ static void Serialize_Campaign(
         }\
     }
     
-    Assert(event_container.campaign_name.buffer);
+    Assert(event_container->campaign_name.buffer);
     
     s_scrach_buffer.clear();
     
     u32 version = 3;
     WRITE(version, u32);
-    WRITE(event_container.events->count, u32);
-    WRITE(event_container.day_event_count, u32);
-    for(Editor_Event* e = Begin(event_container.events); e < End(event_container.events); ++e)
+    WRITE(event_container->events->count, u32);
+    WRITE(event_container->day_event_count, u32);
+    for(Editor_Event* e = Begin(event_container->events); e < End(event_container->events); ++e)
     {
         // event name
         WRITE(e->name.lenght, u32);
@@ -873,32 +897,102 @@ static void Serialize_Campaign(
         }
     }
     
-    u32 buffer_size = s_scrach_buffer.get_used_capacity();
-    if(buffer_size)
-    {
-        // TODO: Use a part of the s_scrach_buffer allocation for the full path buffer,
-        // to avoid this allocation bussines.
-        
-        String full_path = Create_Campaign_Full_Path(
-            &event_container.campaign_name, 
-            platform,
-            event_container.campaign_name.alloc);
-        
-        bool success = platform->Write_File(
-            full_path.buffer, 
-            (u8*)s_scrach_buffer.memory, 
-            buffer_size);
-        
-        Assert(success);
-        full_path.free();
-    }
     return;
     
     OUT_OF_MEMORY:
     Assert(s_scrach_buffer.capacity);
     
     s_scrach_buffer.init(platform, s_scrach_buffer.capacity * 2);
-    Serialize_Campaign(event_container, platform);
+    Serialize_Campaign_Write_To_Memory(event_container, platform);
+    
+    #undef WRITE
+    #undef WRITE_BLOCK
+}
+
+
+static bool Serialize_Campaign_Write_To_Disk(
+    String* event_name,
+    Platform_Calltable* platform)
+{
+    bool result = false;
+    
+    u32 buffer_size = s_scrach_buffer.get_used_capacity();
+    if(buffer_size)
+    {
+        String full_path = Create_Campaign_Full_Path(
+            event_name, 
+            platform,
+            event_name->alloc);
+        
+        bool result = platform->Write_File(
+            full_path.buffer, 
+            (u8*)s_scrach_buffer.memory, 
+            buffer_size);
+        
+        full_path.free();
+    } 
+    
+    return result;
+}
+
+
+static bool Is_Event_Container_Different_From_On_Disk_File(
+    Events_Container* event_container,
+    Platform_Calltable* platform,
+    Allocator_Shell* allocator)
+{
+    bool result = true;
+    
+    Serialize_Campaign_Write_To_Memory(event_container, platform);
+    
+    String full_path = Create_Campaign_Full_Path(
+        &event_container->campaign_name, 
+        platform, 
+        allocator);
+    
+    u32 buffer_size = 0;
+    
+    if(platform->Get_File_Size(full_path.buffer, &buffer_size))
+    {
+        if(buffer_size == s_scrach_buffer.get_used_capacity())
+        {            
+            u8* file_buffer = (u8*)allocator->push(buffer_size);
+            
+            if(platform->Read_File(full_path.buffer, file_buffer, buffer_size))
+            {    
+                bool file_is_different = false;
+                
+                for(u32 i = 0; i < buffer_size; ++i)
+                {
+                    u8 a = *file_buffer + i;
+                    u8 b = *s_scrach_buffer.memory + i;
+                    
+                    if(a != b)
+                    {
+                        file_is_different = true;
+                        break;
+                    }
+                }
+                
+                result = file_is_different;
+            }
+            
+            allocator->free(file_buffer);
+        }
+    }
+    
+    full_path.free();
+    
+    return result;
+}
+
+
+static void Serialize_Campaign(
+    Events_Container* event_container,
+    Platform_Calltable* platform)
+{    
+    Serialize_Campaign_Write_To_Memory(event_container, platform);
+    Serialize_Campaign_Write_To_Disk(&event_container->campaign_name, platform);
 }
 
 #define READ(type) *(type*)(buffer + read_head); read_head += sizeof(type); Assert(read_head <= buffer_size);

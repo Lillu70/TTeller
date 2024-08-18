@@ -29,7 +29,12 @@ static void Do_Event_Editor_All_Events_Frame()
         constexpr f32 s = 2.f;
         if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &GUI_AUTO_FIT, "<", GUI_Scale_Default(s)))
         {
-            if(s_editor_state.dirty)
+            bool diff = Is_Event_Container_Different_From_On_Disk_File(
+                &s_editor_state.event_container, 
+                &s_platform,
+                &s_allocator);
+            
+            if(diff)
             {
                 Set_Popup_Function(Do_Event_Editor_On_Exit_Editor);
             }
@@ -153,7 +158,7 @@ static void Do_Event_Editor_All_Events_Frame()
         // Save button.
         if(GUI_Do_Button(context, &title_row_pos, &dim, save_text))
         {
-            Serialize_Campaign(s_editor_state.event_container, &s_platform);
+            Serialize_Campaign(&s_editor_state.event_container, &s_platform);
         }
         
         if(GUI_Is_Context_Active(&s_gui_banner) &&
@@ -1414,7 +1419,7 @@ static void Do_Event_Editor_On_Exit_Editor(GUI_Context* context)
     
     if(GUI_Do_Button(context, AUTO, &button_dim, t2))
     {
-        Serialize_Campaign(s_editor_state.event_container, &s_platform);
+        Serialize_Campaign(&s_editor_state.event_container, &s_platform);
         
         Delete_Event_Container(&s_editor_state.event_container, &s_allocator);
         
@@ -1462,7 +1467,7 @@ static void Do_Event_Editor_Quit_Popup(GUI_Context* context)
     
     if(GUI_Do_Button(context, AUTO, &button_dim, t2))
     {
-        Serialize_Campaign(s_editor_state.event_container, &s_platform);
+        Serialize_Campaign(&s_editor_state.event_container, &s_platform);
         s_platform.Set_Flag(App_Flags::is_running, false);
     }
     
@@ -1650,7 +1655,7 @@ static void Do_Name_New_Campaign_Popup(GUI_Context* context)
                 &s_allocator, 
                 &s_global_data.new_campaign_name);
             
-            Serialize_Campaign(s_editor_state.event_container, &s_platform);
+            Serialize_Campaign(&s_editor_state.event_container, &s_platform);
             
             Close_Popup();            
         }

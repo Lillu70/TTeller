@@ -668,141 +668,159 @@ static void Generate_Display_Text(Game_State* game)
     String* full_name = 0;
     
     game->display_text.lenght = 0;
+    *game->display_text.buffer = 0;
     
-    for(char* cptr = event_header->event_text.buffer; *cptr; ++cptr)
+    if(event_header->event_text.buffer)
     {
-        char c = *cptr;
-        switch(mode)
+        for(char* cptr = event_header->event_text.buffer;; ++cptr)
         {
-            case Mode::search:
+            char c = *cptr;
+            switch(mode)
             {
-                if(c == '/')
+                case Mode::search:
                 {
-                    cptr += 1; // NOTE: skip the next character for now.
-                    Assert(*cptr == 'k');
-                    
-                    mode = Mode::seek_number;
-                    number_view.buffer = cptr + 1;
-                    Assert(*number_view.buffer >= '0' && *number_view.buffer <= '9');
-                    number_view.lenght = 0;
-                }
-                else
-                {
-                    game->display_text += c;
-                }
-                
-            }break;
-            
-            case Mode::seek_number:
-            {
-                if(c < '0' || c > '9')
-                {
-                    cptr -= 1; // NOTE GO back!
-                    
-                    u32 participant_idx = Convert_String_View_Into_U32(number_view) - 1;
-                    Assert(participant_idx < event_ref->participant_count);
-                    
-                    player_idx = *(event_ref->player_indices + participant_idx);
-                    Assert(player_idx < game->live_player_count);
-                    
-                    mode = Mode::seek_form;
-                }
-                else
-                {
-                    number_view.lenght += 1;
-                }
-            }break;
-            
-            case Mode::seek_form:
-            {
-                Game_Player_Name_FI* name = Begin(game->player_names) + player_idx;
-                a_switch = false;
-                a_switch_owerride = name->special_char_override;
-                full_name = &name->full_name;
-                switch(c)
-                {
-                    case ':':
+                    if(c == '/')
                     {
-                        mode = Mode::seek_bender;
-                        if(name->variant_name_1.lenght)
-                        {
-                            u32 required_memory = game->display_text.lenght + name->variant_name_1.lenght + 1;
-                            Reserve_String_Memory(&game->display_text, required_memory);
-                            char* dest = game->display_text.buffer + game->display_text.lenght;
-                            
-                            Mem_Copy(dest, name->variant_name_1.buffer, name->variant_name_1.lenght);
-                            game->display_text.lenght += name->variant_name_1.lenght;
-                        }
-                    }break;
-                    
-                    case ';':
-                    {
-                        mode = Mode::seek_bender;
-                        if(name->variant_name_2.lenght)
-                        {
-                            u32 required_memory = game->display_text.lenght + name->variant_name_2.lenght + 1;
-                            Reserve_String_Memory(&game->display_text, required_memory);
-                            char* dest = game->display_text.buffer + game->display_text.lenght;
-                            
-                            Mem_Copy(dest, name->variant_name_2.buffer, name->variant_name_2.lenght);
-                            game->display_text.lenght += name->variant_name_2.lenght;
-                        }
-                    }break;
-                    
-                    default:
-                    {
+                        cptr += 1; // NOTE: skip the next character for now.
                         
-                        mode = Mode::search;
-                        cptr -= 1; // NOTE GO back!
-                        
-                        if(name->full_name.lenght)
-                        {
-                            u32 required_memory = game->display_text.lenght + name->full_name.lenght + 1;
-                            Reserve_String_Memory(&game->display_text, required_memory);
-                            char* dest = game->display_text.buffer + game->display_text.lenght;
-                            
-                            Mem_Copy(dest, name->full_name.buffer, name->full_name.lenght);
-                            game->display_text.lenght += name->full_name.lenght;
-                        }
+                        mode = Mode::seek_number;
+                        number_view.buffer = cptr + 1;
+                        Assert(*number_view.buffer >= '0' && *number_view.buffer <= '9');
+                        number_view.lenght = 0;
                     }
-                }
-                
-            }break;
-            
-            case Mode::seek_bender:
-            {
-                if(c == '/')
-                {
-                    a_switch = true;
-                }
-                else if(c == 0 || c == ' ' || c == '\n')
-                {
-                    mode = Mode::search;
-                    cptr -= 1; // NOTE GO back!
-                }
-                else
-                {
-                    if(a_switch)
-                    {
-                        if(full_name->lenght)
-                        {
-                            char lc = *(full_name->buffer + (full_name->lenght - 1));
-                            
-                            if(c == 'a' && ((lc == '\xE4' || lc == '\xF6') || a_switch_owerride))
-                                c = '\xE4';
-                            
-                            game->display_text += c;
-                        }
-                    }
-                    else
+                    else if(c)
                     {
                         game->display_text += c;
                     }
-                }
+                    
+                }break;
                 
-            }break;
+                case Mode::seek_number:
+                {
+                    if(c < '0' || c > '9')
+                    {
+                        cptr -= 1; // NOTE GO back!
+                        
+                        u32 participant_idx = Convert_String_View_Into_U32(number_view) - 1;
+                        Assert(participant_idx < event_ref->participant_count);
+                        
+                        player_idx = *(event_ref->player_indices + participant_idx);
+                        Assert(player_idx < game->live_player_count);
+                        
+                        mode = Mode::seek_form;
+                    }
+                    else
+                    {
+                        number_view.lenght += 1;
+                    }
+                }break;
+                
+                case Mode::seek_form:
+                {
+                    Game_Player_Name_FI* name = Begin(game->player_names) + player_idx;
+                    a_switch = false;
+                    a_switch_owerride = name->special_char_override;
+                    full_name = &name->full_name;
+                    switch(c)
+                    {
+                        case ':':
+                        {
+                            mode = Mode::seek_bender;
+                            if(name->variant_name_1.lenght)
+                            {
+                                u32 required_memory = game->display_text.lenght + name->variant_name_1.lenght + 1;
+                                Reserve_String_Memory(&game->display_text, required_memory);
+                                char* dest = game->display_text.buffer + game->display_text.lenght;
+                                
+                                Mem_Copy(dest, name->variant_name_1.buffer, name->variant_name_1.lenght);
+                                game->display_text.lenght += name->variant_name_1.lenght;
+                            }
+                        }break;
+                        
+                        case ';':
+                        {
+                            mode = Mode::seek_bender;
+                            if(name->variant_name_2.lenght)
+                            {
+                                u32 required_memory = game->display_text.lenght + name->variant_name_2.lenght + 1;
+                                Reserve_String_Memory(&game->display_text, required_memory);
+                                char* dest = game->display_text.buffer + game->display_text.lenght;
+                                
+                                Mem_Copy(dest, name->variant_name_2.buffer, name->variant_name_2.lenght);
+                                game->display_text.lenght += name->variant_name_2.lenght;
+                            }
+                        }break;
+                        
+                        default:
+                        {
+                            
+                            mode = Mode::search;
+                            cptr -= 1; // NOTE GO back!
+                            
+                            if(name->full_name.lenght)
+                            {
+                                u32 required_memory = game->display_text.lenght + name->full_name.lenght + 1;
+                                Reserve_String_Memory(&game->display_text, required_memory);
+                                char* dest = game->display_text.buffer + game->display_text.lenght;
+                                
+                                Mem_Copy(dest, name->full_name.buffer, name->full_name.lenght);
+                                game->display_text.lenght += name->full_name.lenght;
+                            }
+                        }
+                    }
+                    
+                }break;
+                
+                case Mode::seek_bender:
+                {
+                    if(c == '/')
+                    {
+                        switch(*(cptr + 1))
+                        {
+                            case 'k':
+                            case 'K':
+                            {
+                                mode = Mode::search;
+                                cptr -= 1;
+                            }break;
+                        }
+                        a_switch = true;
+                    }
+                    else if(c == 0 || c == ' ' || c == '\n')
+                    {
+                        mode = Mode::search;
+                        cptr -= 1; // NOTE GO back!
+                    }
+                    else
+                    {
+                        if(a_switch)
+                        {
+                            if(full_name->lenght)
+                            {
+                                char lc = *(full_name->buffer + (full_name->lenght - 1));
+                                
+                                if(c == 'a' && ((lc == '\xE4' || lc == '\xF6') || a_switch_owerride))
+                                    c = '\xE4';
+                                
+                                if(c)
+                                    game->display_text += c;
+                            }
+                        }
+                        else if(c)
+                        {
+                            game->display_text += c;
+                        }
+                    }
+                    
+                }break;
+            }
+            
+            if(!*cptr)
+                break;
         }
-    }
+        
+        game->display_text.buffer[game->display_text.lenght + 1] = 0;
+    }    
 }
 
 

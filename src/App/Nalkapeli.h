@@ -273,8 +273,6 @@ struct Editor_State
     
     u32 active_event_index = 0;
     u32 event_idx_to_delete = 0;
-    
-    bool dirty = 0;
 };
 
 

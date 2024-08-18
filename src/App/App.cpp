@@ -196,7 +196,7 @@ void Update_App()
         {
             if(s_hotkeys[Editor_Hotkeys::save].Is_Released())
             {
-                Serialize_Campaign(s_editor_state.event_container, &s_platform);
+                Serialize_Campaign(&s_editor_state.event_container, &s_platform);
             }
             
             if(s_global_data.active_menu != Menus::EE_all_events)
@@ -295,14 +295,6 @@ void Update_App()
                         (void*)s_edit_icon, 
                         Array_Lenght(s_edit_icon));
                 }
-            }break;
-            
-            // TODO: Instead of this bullshit hash the save and skip in case of a match.
-            case Menus::EE_participants:
-            case Menus::EE_consequences:
-            case Menus::EE_text:
-            {
-                s_editor_state.dirty = true;
             }break;
         }
     }
