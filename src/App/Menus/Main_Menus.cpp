@@ -7,13 +7,6 @@
 
 #pragma once
 
-struct Settings
-{
-    bool allow_non_uniform_text_scale;
-    v2f text_scale;
-};
-static Settings s_settings = {};
-
 
 static void Do_Settings_Menu_Frame()
 {
@@ -155,67 +148,59 @@ static void Do_Main_Menu_Frame()
         v2i{0, 0},
         GUI_Anchor::top);
     
-    GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, "T-TELLER", GUI_Scale_Default(4.f));
+    GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, L1(menu_title), GUI_Scale_Default(4.f));
     
     f32 last_half_height = context->layout.last_element.dim.y / 2;
     GUI_Do_Spacing(context, v2f{0, last_half_height});
     
     context->layout.build_direction = GUI_Build_Direction::down_center;
     
-    static constexpr char* button_texts[] = 
-    {
-        "Jatka",
-        "Uusi Peli",
-        "Lataa Peli",
-        "Avaa editori",
-        "Asetukset",
-        "Sulje"
-    };
+    String_List button_texts = LN(main_menu_buttons);
     
     constexpr f32 s = 2.f;
 
     v2f dim = GUI_Tight_Fit_Multi_Line_Text(
         &context->theme->font, 
-        (char**)button_texts, 
-        Array_Lenght(button_texts), GUI_Scale_Default(s));
+        button_texts.list, 
+        button_texts.count, GUI_Scale_Default(s));
     
     dim += context->theme->padding;
     
     u32 i = 0;
     // Continue
-    if(GUI_Do_Button(context, AUTO, &dim, button_texts[i++], GUI_Scale_Default(s)))
+    if(GUI_Do_Button(context, AUTO, &dim, button_texts.list[i++], GUI_Scale_Default(s)))
     {
         
     }
     
     // New game
-    if(GUI_Do_Button(context, AUTO, AUTO, button_texts[i++], GUI_Scale_Default(s)))
+    if(GUI_Do_Button(context, AUTO, AUTO, button_texts.list[i++], GUI_Scale_Default(s)))
     {
         Gather_Editor_Format_Campaigns();
         s_global_data.active_menu = Menus::select_campaign_to_play_menu;
     }
     
     // Load game
-    if(GUI_Do_Button(context, AUTO, AUTO, button_texts[i++], GUI_Scale_Default(s)))
+    if(GUI_Do_Button(context, AUTO, AUTO, button_texts.list[i++], GUI_Scale_Default(s)))
     {
         
     }
     
     // Open editor
-    if(GUI_Do_Button(context, AUTO, AUTO, button_texts[i++], GUI_Scale_Default(s)))
+    if(GUI_Do_Button(context, AUTO, AUTO, button_texts.list[i++], GUI_Scale_Default(s)))
     {
         Gather_Editor_Format_Campaigns();
         s_global_data.active_menu = Menus::campaigns_menu;
     }
     
     // Settings
-    if(GUI_Do_Button(context, AUTO, AUTO, button_texts[i++], GUI_Scale_Default(s)))
+    if(GUI_Do_Button(context, AUTO, AUTO, button_texts.list[i++], GUI_Scale_Default(s)))
     {
         s_global_data.active_menu = Menus::settings_menu;
     }
     
     // Close 
-    if(GUI_Do_Button(context, AUTO, AUTO, button_texts[i++], GUI_Scale_Default(s)))
+    if(GUI_Do_Button(context, AUTO, AUTO, button_texts.list[i++], GUI_Scale_Default(s)))
     {
         s_global_data.force_quit_popup = true;
     }

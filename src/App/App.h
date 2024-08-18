@@ -43,6 +43,8 @@ static Linear_Allocator s_scrach_buffer = {};
 
 #include "Random_Machine.h"
 
+#include "Menus\Menu.h"
+
 #include "Nalkapeli.h"
 #include "Nalkapeli.cpp"
 

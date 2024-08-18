@@ -10,6 +10,9 @@
 
 static inline Editor_Event* Active_Event(Editor_State* editor)
 {
+    Assert(editor->event_container.events);
+    Assert(editor->active_event_index < editor->event_container.events->count);
+    
     Editor_Event* result = Begin(editor->event_container.events) + editor->active_event_index;
     return result;
 }

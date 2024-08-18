@@ -64,32 +64,14 @@ static constexpr u32 s_hotkey_count = Editor_Hotkeys::COUNT;
 static Action s_hotkeys[s_hotkey_count] = {};
 // ----------------------------------------- 
 
-
-enum class Menus : u32
+struct Settings
 {
-    main_menu = 0,
-    settings_menu,
-    campaigns_menu,
-    select_campaign_to_play_menu,
+    bool allow_non_uniform_text_scale;
+    v2f text_scale;
     
-    EVENT_EDITOR_BEGIN,
-        EE_all_events,
-        EE_participants,
-        EE_text,
-        EE_consequences,
-    EVENT_EDITOR_END,
-    
-    GAME_MODE_BEGIN,
-        GM_players,
-        GM_let_the_games_begin,
-        GM_event_display,
-        GM_event_assignement_failed,
-        GM_day_counter,
-        GM_night_falls,
-        GM_everyone_is_dead,
-        GM_we_have_a_winner,
-    GAME_MODE_END
+    Language language;
 };
+static Settings s_settings = {};
 
 
 struct Global_Data
@@ -500,3 +482,67 @@ static GUI_Context* Get_GUI_Context_From_Pool_(u64 line_id, u64 func_id)
     
     return result;
 }
+
+// NOTE: Crazy shit happens here. please don't look at it xD
+
+
+#define SINGLE
+#define FILL_LOC_IDENTIFIER
+enum class Loc_Identifier : u32
+{
+    #include "Localisation.h"
+};
+#undef FILL_LOC_IDENTIFIER
+
+char* Get_Localised_Text(Loc_Identifier LI)
+{ 
+    char* result = "Localisation error!";
+    
+    switch(LI)
+    {
+        #include "Localisation.h"
+    }
+   
+    return result;
+}
+
+#undef SINGLE
+#define L1(X) Get_Localised_Text(Loc_Identifier::##X)
+
+#define MULTI
+
+#define CREATE_LISTS
+#include "Localisation.h"
+#undef CREATE_LISTS
+
+#define FILL_LOC_IDENTIFIER
+enum class Loc_List_Identifier : u32
+{
+    #include "Localisation.h"
+};
+#undef FILL_LOC_IDENTIFIER
+
+struct String_List
+{
+    char** list;
+    u32 count;
+};
+
+String_List Get_Localised_Texts(Loc_List_Identifier LI)
+{
+    char* error_stud[] = {"Localisation list error!"};
+    
+    String_List result = {};
+    result.list = error_stud;
+    result.count = Array_Lenght(error_stud);
+
+    switch(LI)
+    {
+        #include "Localisation.h"
+    }
+    
+    return result;
+}
+
+#undef MULTI
+#define LN(X) Get_Localised_Texts(Loc_List_Identifier::##X)

@@ -1826,6 +1826,7 @@ static bool GUI_Do_Image_Button(
     v2f* pos, 
     v2f* dim, 
     Image* img,
+    v2f img_scale = v2f{1.f, 1.f},
     GUI_Theme_Coloring apply_theme_color_to_image = GUI_Theme_Coloring::apply)
 {
     Assert(GUI_Is_Context_Ready(context));
@@ -1886,12 +1887,17 @@ static bool GUI_Do_Image_Button(
         
         if(img)
         {
+            Rect img_rect = Shink_Rect(p.rect, f32(context->theme->outline_thickness));
+            v2f img_rect_dim = Get_Rect_Dimensions(img_rect);
+            img_rect_dim = Hadamar_Product(img_rect_dim, img_scale);
+            img_rect = Create_Rect_Center(p.pos, img_rect_dim);
+            
             if(apply_theme_color_to_image == GUI_Theme_Coloring::apply)
-            {
+            {    
                 Draw_Image(
                     context->canvas, 
                     img, 
-                    Shink_Rect(p.rect, f32(context->theme->outline_thickness)),
+                    img_rect,
                     Unpack_Color(outline_color) / 255.f);                
             }
             else
@@ -1899,7 +1905,7 @@ static bool GUI_Do_Image_Button(
                 Draw_Image(
                     context->canvas, 
                     img, 
-                    Shink_Rect(p.rect, f32(context->theme->outline_thickness)));
+                    img_rect);
             }
         }
     }

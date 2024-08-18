@@ -17,7 +17,7 @@
 
 enum class Event_List : u8
 {
-    day,
+    day = 0,
     night,
     COUNT
 };
@@ -25,8 +25,8 @@ enum class Event_List : u8
 
 enum class Language : u8
 {
-    finnish,
     english,
+    finnish,
     COUNT
 };
 

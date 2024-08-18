@@ -24,6 +24,8 @@ static void Free_New_Campaing_Name()
 
 static void Do_Event_Editor_All_Events_Frame()
 {
+    Assert(s_editor_state.source == Menus::campaigns_menu || s_editor_state.source == Menus::select_campaign_to_play_menu);
+    
     void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
     {
         constexpr f32 s = 2.f;
@@ -41,7 +43,7 @@ static void Do_Event_Editor_All_Events_Frame()
             else
             {
                 Delete_Event_Container(&s_editor_state.event_container, &s_allocator);
-                s_global_data.active_menu = Menus::campaigns_menu;
+                s_global_data.active_menu = s_editor_state.source;
                 return;
             }
         }
@@ -53,8 +55,9 @@ static void Do_Event_Editor_All_Events_Frame()
         char* title_text = s_editor_state.event_container.campaign_name.buffer;
         GUI_Do_Title_Text(context, AUTO, title_text, GUI_Scale_Default(s));
         
-        v2f img_dim = v2f{1.f, 1.f} * context->layout.last_element.dim.y;
-        if(GUI_Do_Image_Button(context, AUTO, &img_dim, &s_global_data.edit_image))
+        v2f scaler = GUI_Scale_Default(s);
+        v2f img_dim = v2f{GUI_Character_Height(context, scaler.x), GUI_Character_Height(context, scaler.y)};
+        if(GUI_Do_Image_Button(context, AUTO, &img_dim, &s_global_data.edit_image, v2f{0.9f, 0.9f}))
         {
             Set_Popup_Function(Do_Rename_Campaing_Popup, Free_New_Campaing_Name);
         }
@@ -1423,7 +1426,7 @@ static void Do_Event_Editor_On_Exit_Editor(GUI_Context* context)
         
         Delete_Event_Container(&s_editor_state.event_container, &s_allocator);
         
-        s_global_data.active_menu = Menus::campaigns_menu;
+        s_global_data.active_menu = s_editor_state.source;
         
         Close_Popup();
     }
@@ -1431,7 +1434,7 @@ static void Do_Event_Editor_On_Exit_Editor(GUI_Context* context)
     if(GUI_Do_Button(context, AUTO, &button_dim, t3))
     {
         Delete_Event_Container(&s_editor_state.event_container, &s_allocator);
-        s_global_data.active_menu = Menus::campaigns_menu;
+        s_global_data.active_menu = s_editor_state.source;
         
         Close_Popup();
     }
@@ -1650,6 +1653,7 @@ static void Do_Name_New_Campaign_Popup(GUI_Context* context)
         if(name_not_in_use)
         {
             s_global_data.active_menu = Menus::EE_all_events;
+            
             Init_Event_Container_Takes_Name_Ownership(
                 &s_editor_state.event_container, 
                 &s_allocator, 

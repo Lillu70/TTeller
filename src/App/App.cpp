@@ -271,6 +271,7 @@ void Update_App()
             case Menus::select_campaign_to_play_menu:
             case Menus::campaigns_menu:
             {
+                s_editor_state.source = s_global_data.active_menu;
                 Gather_Editor_Format_Campaigns();
             }break;
             
@@ -287,7 +288,7 @@ void Update_App()
             }break;
             
             case Menus::EE_all_events:
-            {
+            {                
                 if(!s_global_data.edit_image.buffer)
                 {
                     Load_Image_From_Memory(
