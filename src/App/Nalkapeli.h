@@ -31,21 +31,6 @@ namespace Event_Errors
         cotaints_empty_mark_field_in_global_consequences = 1 << 9,
         death_consequence_with_uninvolved_inheritor      = 1 << 10,
     };
-    
-    char* names[] = 
-    {
-        "Tapahtumateksti viittaa osallistujaan joka ei ole tapahtumassa mukana!",
-        "Merkki (/) ilman hyv\xE4ksytt\xE4v\xE4\xE4 jatko merkki\xE4!",
-        "Osallistujan tunnistaja ei ole numero!",
-        "Tapahtumassa ei ole osallitujia!",
-        "Sis\xE4lt\xE4\xE4 mahdottoman vaatimuksen!",
-        "Sis\xE4lt\xE4\xE4 mahdottoman yleis vaatimuksen!",
-        "Sis\xE4lt\xE4\xE4 tyhj\xE4n merkki kent\xE4n vaatimuksissa!",
-        "Sis\xE4lt\xE4\xE4 tyhj\xE4n merkki kent\xE4n yleis vaatimuksissa!",
-        "Sis\xE4lt\xE4\xE4 tyhj\xE4n merkki kent\xE4n seuraamuksissa!",
-        "Sis\xE4lt\xE4\xE4 tyhj\xE4n merkki kent\xE4n yleis seuraamuksissa!",
-        "Kuolema seuraamus jossa tapahtumaan osallistumaton perij\xE4!"
-    };
 }
 
 
@@ -59,15 +44,6 @@ namespace Event_Warnings
         death_consequence_with_self_inheriting          = 1 << 3,
         death_consequence_with_zero_as_inheritor        = 1 << 4,
     };
-    
-    char* names[] = 
-    {
-        "Tapahtumateksti on tyhj\xE4.",
-        "Tapahtumateksti ei viittaa jokaiseen osallistujaan.",
-        "Sis\xE4lt\xE4\xE4 merkitsem\xE4tt\xF6m\xE4n vaatimuksen.",
-        "Kuolema seuraamus jossa perij\xE4n\xE4 on itse kuolija.",
-        "Kuolema seuraamus jossa perij\xE4n\xE4 on nolla."
-    };
 }
 
 
@@ -75,13 +51,6 @@ enum class Exists_Statement : u8
 {
     does_not_have = 0,
     does_have
-};
-
-
-static const char* s_exists_statement_names[] =
-{
-    "Ei saa olla.",
-    "T\xE4ytyy olla."
 };
 
 
@@ -112,21 +81,6 @@ static const char* s_arithmatic_names[] =
 };
 
 
-static const char* s_mark_type_names[] = 
-{
-    "Esine Merkki", 
-    "Hahmo Merkki"
-};
-
-
-static const char* s_duration_names[] = 
-{
-    "Rajaton",
-    "1 p\xE4iv\xE4",
-    "2 p\xE4iv\xE4\xE4",
-    "3 p\xE4iv\xE4\xE4",
-};
-
 enum class Mark_Type :u8
 {
     global = U8_MAX,
@@ -142,8 +96,6 @@ enum class Character_Stats : u8
     mind,
     COUNT
 };
-
-static const char* s_stat_names[] = {"Keho", "Mieli"};
 
 
 struct Global_Mark_Requirement
@@ -173,9 +125,7 @@ enum class Participation_Requirement_Type : u8
 
 
 struct Participation_Requirement
-{
-    static inline const char* type_names[] = {"Ominaisuus", "Esine Merkki", "Hahmo Merkki"};
-    
+{    
     Participation_Requirement_Type type;
     Exists_Statement mark_exists;
     Numerical_Relation numerical_relation = Numerical_Relation::greater_than_equals;
@@ -202,14 +152,6 @@ enum class Event_Consequens_Type : u8
 
 struct Event_Consequens
 {
-    static inline const char* type_names[] = 
-    {
-        "Kuolema",
-        "Ominaisuus muutos",
-        "Saa merkin",
-        "Menett\xE4\xE4 merkin"
-    };
-    
     Event_Consequens_Type type = Event_Consequens_Type::death;
     
     Mark_Type mark_type = Mark_Type::item;

@@ -90,3 +90,35 @@ static inline char* Get_Longest_CSTR(char* a, char* b, char* c, char* d, char* f
     
     return result;
 }
+
+
+static char* Get_Longest_CSTR(CSTR_List strings)
+{
+    Assert(strings.count);
+    
+    char* result = strings.list[0];
+    u32 max_lenght = Null_Terminated_Buffer_Lenght(result);
+    
+    for(u32 i = 1; i < strings.count; ++i)
+    {
+        char* element = strings.list[i];
+        u32 len = Null_Terminated_Buffer_Lenght(element);
+        if(len > max_lenght)
+        {
+            max_lenght = len;
+            result = element;
+        }
+    }
+    
+    return result;
+}
+
+
+static char* Get_Longest_CSTR(CSTR_List strings_a, CSTR_List strings_b)
+{
+    char* a = Get_Longest_CSTR(strings_a);
+    char* b = Get_Longest_CSTR(strings_b);
+    
+    char* result = Get_Longest_CSTR(a, b);
+    return result;
+}

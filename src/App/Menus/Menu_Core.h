@@ -40,6 +40,7 @@ namespace Global_Hotkeys
     {
         toggle_fullscreen = 0,
         open_quit_popup,
+        toggle_language,
         display_memory,
         COUNT
     };
@@ -308,19 +309,20 @@ static inline void Init_GUI()
 {
     // globals:
     Action* htkeys = s_hotkeys;
-    htkeys[Global_Hotkeys::toggle_fullscreen]/*---*/= Make_Action(Key_Code::F11, Button::START);
-    htkeys[Global_Hotkeys::open_quit_popup]/*-----*/= Make_Action(Key_Code::ESC, Button::BUT_Y);
-    htkeys[Global_Hotkeys::display_memory]/*------*/= Make_Action(Key_Code::F8, Button::NONE);
+    htkeys[Global_Hotkeys::toggle_fullscreen]           = Make_Action(Key_Code::F11, Button::START);
+    htkeys[Global_Hotkeys::open_quit_popup]             = Make_Action(Key_Code::ESC, Button::BUT_Y);
+    htkeys[Global_Hotkeys::display_memory]              = Make_Action(Key_Code::F8, Button::NONE);
+    htkeys[Global_Hotkeys::toggle_language]             = Make_Action(Key_Code::F9, Button::NONE);
     
     // editor:
-    htkeys[Editor_Hotkeys::active_pannel_toggle]/**/= Make_Action(Key_Code::TAB, Button::BUT_X);
-    htkeys[Editor_Hotkeys::jump_to_all_events]/*--*/= Make_Action(Key_Code::F1,  Button::NONE);
-    htkeys[Editor_Hotkeys::jump_to_participants]/**/= Make_Action(Key_Code::F2,  Button::NONE);
-    htkeys[Editor_Hotkeys::jump_to_event_text]/*--*/= Make_Action(Key_Code::F3,  Button::NONE);
-    htkeys[Editor_Hotkeys::jump_to_consequences]/**/= Make_Action(Key_Code::F4,  Button::NONE);
-    htkeys[Editor_Hotkeys::save]/*----------------*/= Make_Action(Key_Code::F5,  Button::L_THUMB);
-    htkeys[Editor_Hotkeys::jump_left]/*************/= Make_Action(Key_Code::F6,  Button::L_SHLD);
-    htkeys[Editor_Hotkeys::jump_right]/*----------*/= Make_Action(Key_Code::F7,  Button::R_SHLD);
+    htkeys[Editor_Hotkeys::active_pannel_toggle]        = Make_Action(Key_Code::TAB, Button::BUT_X);
+    htkeys[Editor_Hotkeys::jump_to_all_events]          = Make_Action(Key_Code::F1,  Button::NONE);
+    htkeys[Editor_Hotkeys::jump_to_participants]        = Make_Action(Key_Code::F2,  Button::NONE);
+    htkeys[Editor_Hotkeys::jump_to_event_text]          = Make_Action(Key_Code::F3,  Button::NONE);
+    htkeys[Editor_Hotkeys::jump_to_consequences]        = Make_Action(Key_Code::F4,  Button::NONE);
+    htkeys[Editor_Hotkeys::save]                        = Make_Action(Key_Code::F5,  Button::L_THUMB);
+    htkeys[Editor_Hotkeys::jump_left]                   = Make_Action(Key_Code::F6,  Button::L_SHLD);
+    htkeys[Editor_Hotkeys::jump_right]                  = Make_Action(Key_Code::F7,  Button::R_SHLD);
     // ------------
     
     GUI_Context::platform = &s_platform;
@@ -330,7 +332,6 @@ static inline void Init_GUI()
     
     for(u32 i = 0; i < Array_Lenght(s_context_pool); ++i)
         s_context_pool[i].context = GUI_Create_Context();
-    
     
     GUI_Activate_Context(&s_gui_banner);
     
@@ -483,16 +484,17 @@ static GUI_Context* Get_GUI_Context_From_Pool_(u64 line_id, u64 func_id)
     return result;
 }
 
+
 // NOTE: Crazy shit happens here. Please don't look at it xD
 
 
-#define SINGLE
-#define FILL_LOC_IDENTIFIER
 enum class Loc_Identifier : u32
 {
+    #define L(ID, ENG, FIN) ID##,
     #include "Localisation.h"
+    
+    #undef L
 };
-#undef FILL_LOC_IDENTIFIER
 
 char* Get_Localised_Text(Loc_Identifier LI)
 { 
@@ -500,49 +502,85 @@ char* Get_Localised_Text(Loc_Identifier LI)
     
     switch(LI)
     {
+        #define L(ID,ENG, FI) case Loc_Identifier::##ID:                \
+        {                                                               \
+            switch(s_settings.language)                                 \
+            {                                                           \
+                case Language::english:                                 \
+                {                                                       \
+                    result = ENG;                                       \
+                }break;                                                 \
+                                                                        \
+                case Language::finnish:                                 \
+                {                                                       \
+                    result = FI;                                        \
+                }break;                                                 \
+            }                                                           \
+        }break;
+        
         #include "Localisation.h"
+        
+        #undef L
     }
    
     return result;
 }
-
-#undef SINGLE
 #define L1(X) Get_Localised_Text(Loc_Identifier::##X)
 
-#define MULTI
 
-#define CREATE_LISTS
-#include "Localisation.h"
-#undef CREATE_LISTS
+#define L(ID, ENG, FIN)                                                 \
+static constexpr char* s_##ID##_FIN[] = FIN;                            \
+static constexpr char* s_##ID##_ENG[] = ENG;                    
 
-#define FILL_LOC_IDENTIFIER
+#include "Localisation_Multi.h"
+
+#undef L
+
+
 enum class Loc_List_Identifier : u32
 {
-    #include "Localisation.h"
-};
-#undef FILL_LOC_IDENTIFIER
-
-struct String_List
-{
-    char** list;
-    u32 count;
+    #define L(ID, ENG, FIN) ID##,
+    #include "Localisation_Multi.h"
+    #undef L
 };
 
-String_List Get_Localised_Texts(Loc_List_Identifier LI)
+
+CSTR_List Get_Localised_Texts(Loc_List_Identifier LI)
 {
     char* error_stud[] = {"Localisation list error!"};
     
-    String_List result = {};
+    CSTR_List result = {};
     result.list = error_stud;
     result.count = Array_Lenght(error_stud);
 
     switch(LI)
     {
-        #include "Localisation.h"
+        #define L(ID, ENG, FI) case Loc_List_Identifier::##ID:      \
+        {                                                           \
+            switch(s_settings.language)                             \
+            {                                                       \
+                case Language::english:                             \
+                {                                                   \
+                    result.list = (char**)s_##ID##_ENG;             \
+                    result.count = Array_Lenght(s_##ID##_ENG);      \
+                }break;                                             \
+                                                                    \
+                case Language::finnish:                             \
+                {                                                   \
+                    result.list = (char**)s_##ID##_FIN;             \
+                    result.count = Array_Lenght(s_##ID##_FIN);      \
+                }break;                                             \
+            }                                                       \
+        }break;
+        
+        #include "Localisation_Multi.h"
+        #undef L
     }
     
     return result;
 }
 
-#undef MULTI
+
 #define LN(X) Get_Localised_Texts(Loc_List_Identifier::##X)
+
+#define LN1(X, I) Get_Localised_Texts(Loc_List_Identifier::##X).list[I]

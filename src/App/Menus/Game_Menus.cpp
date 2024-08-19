@@ -746,7 +746,7 @@ static void Do_Day_Counter_Display_Frame()
             
             for(u32 s = 0; s < u32(Character_Stats::COUNT); ++s)
             {
-                GUI_Do_Text(context, AUTO, (char*)s_stat_names[s]);
+                GUI_Do_Text(context, AUTO, LN1(stat_names, s));
                 GUI_Push_Layout(context);
                 
                 context->layout.build_direction = GUI_Build_Direction::right_center;
@@ -1135,7 +1135,9 @@ static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
     f32 title_width = context->layout.last_element.dim.x;
     
     GUI_Do_Text(context, AUTO, L1(for_game_functionality_they_have_been_removed));
-
+    
+    f32 sub_title_width = context->layout.last_element.dim.x;
+    
     if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(continue_anyway)))
     {
         Game_State game_state;
@@ -1209,7 +1211,8 @@ static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
 
         if(container_height >= 1.f)
         {
-            v2f sub_canvas_dim = v2f{title_width, container_height};
+            f32 w = title_width > sub_title_width? title_width : sub_title_width;
+            v2f sub_canvas_dim = v2f{w, container_height};
             v2f sub_canvas_pos = context->layout.last_element.pos - context->anchor_base; 
             sub_canvas_pos.x -= context->layout.last_element.dim.x / 2;
             sub_canvas_pos.y -= 
@@ -1250,7 +1253,9 @@ static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
                     
                     f32 x = sub_context->layout.last_element.pos.x - sub_context->anchor_base.x;
                     
-                    for(u32 i = 0; i < Array_Lenght(Event_Errors::names); ++i)
+                    CSTR_List error_names = LN(event_error_names);
+                    
+                    for(u32 i = 0; i < error_names.count; ++i)
                     {
                         if(IEFR->reasons & (1 << i))
                         {
@@ -1260,7 +1265,7 @@ static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
                             
                             sub_context->layout.build_direction = GUI_Build_Direction::right_center;
                             
-                            GUI_Do_Text(sub_context, AUTO, (char*)Event_Errors::names[i]);
+                            GUI_Do_Text(sub_context, AUTO, error_names.list[i]);
                             
                             GUI_Pop_Layout(sub_context);
                         }
@@ -1279,12 +1284,8 @@ static void Do_GM_Campaign_Was_Unusable_Popup(GUI_Context* context)
     context->layout.build_direction = GUI_Build_Direction::down_left;
     context->layout.anchor = GUI_Anchor::center;
     
-    v2f panel_dim = v2f
-        {
-            900,
-            500
-        };
-        
+    v2f panel_dim = v2f{900, 500};
+
     v2f panel_center = Get_Middle(context->canvas);
     
     GUI_Get_Placement(context, &panel_dim, &GUI_AUTO_MIDDLE);
@@ -1309,10 +1310,12 @@ static void Do_GM_Campaign_Was_Unusable_Popup(GUI_Context* context)
     {
         GUI_Do_Title_Text(sub_context, &GUI_AUTO_TOP_LEFT, L1(errors), GUI_DEFAULT_TEXT_SCALE);
 
-        for(u32 i = 0; i < Array_Lenght(Game_Errors::names); ++i)
+        CSTR_List game_error_names = LN(game_error_names);
+        
+        for(u32 i = 0; i < game_error_names.count; ++i)
         {
             if(s_global_data.GM_conversion_errors & (1 << i))
-                GUI_Do_Text(sub_context, AUTO, (char*)Game_Errors::names[i]);
+                GUI_Do_Text(sub_context, AUTO, game_error_names.list[i]);
         }
     
         GUI_End_Context(sub_context);

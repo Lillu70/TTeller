@@ -98,15 +98,12 @@ static void Do_Settings_Menu_Frame()
             }            
         }
         
-        String_List languages = LN(languages);
-        
         if(u32 s = GUI_Do_Dropdown_Button(
             context, 
             AUTO, 
             &GUI_AUTO_FIT, 
-            languages.list[u32(s_settings.language)],
-            languages.count,
-            languages.list))
+            u32(s_settings.language),
+            LN(languages)))
         {
             s_settings.language = Language(s - 1);
         }
@@ -168,7 +165,7 @@ static void Do_Main_Menu_Frame()
     
     context->layout.build_direction = GUI_Build_Direction::down_center;
     
-    String_List button_texts = LN(main_menu_buttons);
+    CSTR_List button_texts = LN(main_menu_buttons);
     
     constexpr f32 s = 2.f;
 

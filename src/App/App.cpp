@@ -307,7 +307,15 @@ void Update_App()
         
         Draw_Memory_Display(&s_mem, &canvas);
     }
+    #endif
     
+    #if 1
+    if(s_hotkeys[Global_Hotkeys::toggle_language].Is_Released())
+    {
+        s_settings.language = Language((u32(s_settings.language) + 1) % u32(Language::COUNT));
+        s_global_data.popup_panel_rect = Create_Rect_Min_Max_HZ(v2f{0,0}, v2f{0,0});
+        s_global_data.popup_panel_dim = v2f{0.f, 0.f};
+    }
     #endif
     
     s_scrach_buffer.clear();

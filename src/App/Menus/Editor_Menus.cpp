@@ -123,7 +123,7 @@ static void Do_Event_Editor_All_Events_Frame()
         
         context->layout.build_direction = GUI_Build_Direction::right_center;
         
-        if(GUI_Do_Button(context, AUTO, AUTO, L1(create_new_night_event)))
+        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(create_new_night_event)))
         {
             if(jump_into_new_event)
             {
@@ -512,9 +512,8 @@ static void Do_Event_Editor_Participants_Frame()
                 
                 if(u32 s = GUI_Do_Dropdown_Button(
                     context, AUTO, AUTO, 
-                    (char*)s_exists_statement_names[u32(gmr->mark_exists)],
-                    Array_Lenght(s_exists_statement_names),
-                    (char**)s_exists_statement_names))
+                    u32(gmr->mark_exists),
+                    LN(exists_statement_names)))
                 {
                     gmr->mark_exists = Exists_Statement(s - 1);
                 }
@@ -525,7 +524,9 @@ static void Do_Event_Editor_Participants_Frame()
                     
                     // Numerical_Relation
                     if(u32 s = GUI_Do_Dropdown_Button(
-                        context, AUTO, &GUI_AUTO_FIT, 
+                        context, 
+                        AUTO, 
+                        &GUI_AUTO_FIT, 
                         (char*)s_numerical_relation_names[u32(gmr->numerical_relation)],
                         Array_Lenght(s_numerical_relation_names),
                         (char**)s_numerical_relation_names))
@@ -537,12 +538,16 @@ static void Do_Event_Editor_Participants_Frame()
                     
                     context->layout.build_direction = GUI_Build_Direction::right_center;
                     
+                    CSTR_List duration_names = LN(duration_names);
+                    
                     // Target value
                     if(u32 s = GUI_Do_Dropdown_Button(
-                        context, AUTO, &GUI_AUTO_FIT, 
-                        (char*)s_duration_names[gmr->relation_target],
-                        Array_Lenght(s_duration_names) - 1,
-                        (char**)s_duration_names + 1))
+                        context, 
+                        AUTO, 
+                        &GUI_AUTO_FIT, 
+                        duration_names.list[gmr->relation_target],
+                        duration_names.count - 1,
+                        duration_names.list + 1))
                     {
                         gmr->relation_target = i8(s);
                     }
@@ -610,12 +615,11 @@ static void Do_Event_Editor_Participants_Frame()
             GUI_Pop_Layout(context);
             
             if(u32 s = GUI_Do_Dropdown_Button(
-                context, 
-                AUTO, 
+                context,
+                AUTO,
                 &GUI_AUTO_FIT, 
                 L1(add_req), 
-                (u32)Participation_Requirement_Type::COUNT, 
-                (char**)Participation_Requirement::type_names))
+                LN(req_names)))
             {
                 if(parti->reqs->count < parti->max_requirements)
                 {
@@ -623,6 +627,8 @@ static void Do_Event_Editor_Participants_Frame()
                     Init_Participation_Requirement(Push(&parti->reqs, &s_allocator), new_type, &s_allocator);
                 }
             }
+            
+            f32 new_req_width = context->layout.last_element.dim.x;
             
             GUI_Do_Spacing(context, AUTO);
             
@@ -648,28 +654,23 @@ static void Do_Event_Editor_Participants_Frame()
                 
                 context->layout.build_direction = GUI_Build_Direction::right_center;
                 
-                char* req_type_text = (char*)Participation_Requirement::type_names[(u32)req->type];
-                GUI_Do_Text(context, AUTO, req_type_text, GUI_Highlight_Prev(context));
+                GUI_Do_Text(context, AUTO, LN1(req_names, (u32)req->type), GUI_Highlight_Prev(context));
                 
-                f32 right_side_x = context->layout.last_element.pos.x + context->layout.last_element.dim.x / 2;
-                    
                 GUI_Pop_Layout(context);
-                
-                f32 left_side_x = context->layout.last_element.pos.x - context->layout.last_element.dim.x / 2; 
                 
                 switch(req->type)
                 {
                     case Participation_Requirement_Type::mark_item:
                     case Participation_Requirement_Type::mark_personal:
                     {
-                        f32 width = right_side_x - left_side_x;
-                        GUI_Do_SL_Input_Field(context, AUTO, &width, &req->mark);
+                        GUI_Do_SL_Input_Field(context, AUTO, &new_req_width, &req->mark);
                         
                         if(u32 s = GUI_Do_Dropdown_Button(
-                            context, AUTO, AUTO, 
-                            (char*)s_exists_statement_names[u32(req->mark_exists)],
-                            Array_Lenght(s_exists_statement_names),
-                            (char**)s_exists_statement_names))
+                            context, 
+                            AUTO, 
+                            AUTO, 
+                            u32(req->mark_exists),
+                            LN(exists_statement_names)))
                         {
                             req->mark_exists = Exists_Statement(s - 1);
                         }
@@ -678,10 +679,11 @@ static void Do_Event_Editor_Participants_Frame()
                         {
                             GUI_Do_Text(context, AUTO, L1(duration_remaining), GUI_Highlight_Next(context, 2));
                             
-                            
                             // Numerical_Relation
                             if(u32 s = GUI_Do_Dropdown_Button(
-                                context, AUTO, &GUI_AUTO_FIT, 
+                                context, 
+                                AUTO, 
+                                &GUI_AUTO_FIT, 
                                 (char*)s_numerical_relation_names[u32(req->numerical_relation)],
                                 Array_Lenght(s_numerical_relation_names),
                                 (char**)s_numerical_relation_names))
@@ -693,12 +695,16 @@ static void Do_Event_Editor_Participants_Frame()
                             
                             context->layout.build_direction = GUI_Build_Direction::right_center;
                             
+                            CSTR_List duration_names = LN(duration_names);
+                            
                             // Target value
                             if(u32 s = GUI_Do_Dropdown_Button(
-                                context, AUTO, &GUI_AUTO_FIT, 
-                                (char*)s_duration_names[req->relation_target],
-                                Array_Lenght(s_duration_names) - 1,
-                                (char**)s_duration_names + 1))
+                                context, 
+                                AUTO, 
+                                &GUI_AUTO_FIT, 
+                                duration_names.list[req->relation_target],
+                                duration_names.count - 1,
+                                duration_names.list + 1))
                             {
                                 req->relation_target = u16(s);
                             }
@@ -711,10 +717,11 @@ static void Do_Event_Editor_Participants_Frame()
                     {
                         // Stat
                         if(u32 s = GUI_Do_Dropdown_Button(
-                            context, AUTO, &GUI_AUTO_FIT, 
-                            (char*)s_stat_names[u32(req->stat_type)],
-                            Array_Lenght(s_stat_names),
-                            (char**)s_stat_names))
+                            context, 
+                            AUTO, 
+                            &GUI_AUTO_FIT, 
+                            u32(req->stat_type),
+                            LN(stat_names)))
                         {
                             req->stat_type = Character_Stats(s - 1);
                         }
@@ -724,9 +731,11 @@ static void Do_Event_Editor_Participants_Frame()
                         context->layout.build_direction = GUI_Build_Direction::right_center;
                         
                         // Numerical_Relation
-                        static const char* value_option_names[] = {"0", "1", "2", "3"};
+                        constexpr char* value_option_names[] = {"0", "1", "2", "3"};
                         if(u32 s = GUI_Do_Dropdown_Button(
-                            context, AUTO, &GUI_AUTO_FIT, 
+                            context, 
+                            AUTO, 
+                            &GUI_AUTO_FIT, 
                             (char*)s_numerical_relation_names[u32(req->numerical_relation)],
                             Array_Lenght(s_numerical_relation_names),
                             (char**)s_numerical_relation_names))
@@ -736,7 +745,9 @@ static void Do_Event_Editor_Participants_Frame()
                         
                         // Target value
                         if(u32 s = GUI_Do_Dropdown_Button(
-                            context, AUTO, AUTO, 
+                            context, 
+                            AUTO, 
+                            AUTO, 
                             (char*)value_option_names[req->relation_target],
                             Array_Lenght(value_option_names),
                             (char**)value_option_names))
@@ -1003,9 +1014,8 @@ static void Do_Event_Editor_Consequences_Frame()
                     context, 
                     AUTO, 
                     &dim, 
-                    (char*)s_duration_names[u32(gmc->mark_duration)], 
-                    Array_Lenght(s_duration_names),
-                    (char**)s_duration_names))
+                    u32(gmc->mark_duration),
+                    LN(duration_names)))
                 {
                     gmc->mark_duration = i8(s - 1);
                 }
@@ -1066,8 +1076,7 @@ static void Do_Event_Editor_Consequences_Frame()
                 AUTO, 
                 &GUI_AUTO_FIT, 
                 L1(add_con), 
-                Array_Lenght(Event_Consequens::type_names),
-                (char**)Event_Consequens::type_names))
+                LN(con_names)))
             {
                 multiple_death_cons_error_time = 0;
                 
@@ -1098,14 +1107,12 @@ static void Do_Event_Editor_Consequences_Frame()
                 time <= multiple_death_cons_error_time &&
                 multiple_death_cons_error_idx == i)
             {
-                char* text = L1(only_one_death_con_is_allowed);
-                GUI_Do_Title_Text(context, AUTO, text, GUI_Scale_Default(0.5f));
+                GUI_Do_Title_Text(context, AUTO, L1(only_one_death_con_is_allowed), GUI_Scale_Default(0.5f));
             }
             
             if(contains_death_con && parti->cons->count >= 2)
             {
-                char* text = L1(only_death_happens);
-                GUI_Do_Title_Text(context, AUTO, text, GUI_Scale_Default(0.5f));
+                GUI_Do_Title_Text(context, AUTO, L1(only_death_happens), GUI_Scale_Default(0.5f));
             }
             
             Event_Consequens* cons = Begin(parti->cons);
@@ -1122,9 +1129,7 @@ static void Do_Event_Editor_Consequences_Frame()
                 GUI_Push_Layout(context);
                 context->layout.build_direction = GUI_Build_Direction::right_center;
                 
-                
-                char* con_type_name = (char*)Event_Consequens::type_names[u32(con->type)];
-                GUI_Do_Text(context, AUTO, con_type_name, GUI_Highlight_Prev(context));
+                GUI_Do_Text(context, AUTO, LN1(con_names, u32(con->type)), GUI_Highlight_Prev(context));
                 
                 GUI_Pop_Layout(context);
                 
@@ -1173,9 +1178,8 @@ static void Do_Event_Editor_Consequences_Frame()
                             context, 
                             AUTO, 
                             &GUI_AUTO_FIT, 
-                            (char*)s_stat_names[u32(con->stat)], 
-                            Array_Lenght(s_stat_names),
-                            (char**)s_stat_names))
+                            u32(con->stat),
+                            LN(stat_names)))
                         {
                             con->stat = Character_Stats(s - 1);
                         }
@@ -1235,10 +1239,9 @@ static void Do_Event_Editor_Consequences_Frame()
                         if(u32 s = GUI_Do_Dropdown_Button(
                             context, 
                             AUTO, 
-                            &GUI_AUTO_FIT, 
-                            (char*)s_mark_type_names[u32(con->mark_type)], 
-                            Array_Lenght(s_mark_type_names),
-                            (char**)s_mark_type_names))
+                            AUTO, 
+                            u32(con->mark_type),
+                            LN(mark_type_names)))
                         {
                             con->mark_type = Mark_Type(s - 1);
                         }
@@ -1251,9 +1254,8 @@ static void Do_Event_Editor_Consequences_Frame()
                             context, 
                             AUTO, 
                             &dim, 
-                            (char*)s_duration_names[u32(con->mark_duration)], 
-                            Array_Lenght(s_duration_names),
-                            (char**)s_duration_names))
+                            u32(con->mark_duration), 
+                            LN(duration_names)))
                         {
                             con->mark_duration = i8(s - 1);
                         }
@@ -1267,10 +1269,9 @@ static void Do_Event_Editor_Consequences_Frame()
                         if(u32 s = GUI_Do_Dropdown_Button(
                             context, 
                             AUTO, 
-                            &GUI_AUTO_FIT, 
-                            (char*)s_mark_type_names[u32(con->mark_type)], 
-                            Array_Lenght(s_mark_type_names),
-                            (char**)s_mark_type_names))
+                            AUTO, 
+                            u32(con->mark_type),
+                            LN(mark_type_names)))
                         {
                             con->mark_type = Mark_Type(s - 1);
                         }
@@ -1556,10 +1557,12 @@ static void Do_Event_Editor_Display_Active_Event_Errors_Popup(GUI_Context* conte
             GUI_Do_Title_Text(sub_context, pos, L1(errors), GUI_DEFAULT_TEXT_SCALE);
             pos = 0;
             
-            for(u32 i = 0; i < Array_Lenght(Event_Errors::names); ++i)
+            CSTR_List error_names = LN(event_error_names);
+            
+            for(u32 i = 0; i < error_names.count; ++i)
             {
                 if(event->issues.errors & (1 << i))
-                    GUI_Do_Text(sub_context, AUTO, (char*)Event_Errors::names[i]);
+                    GUI_Do_Text(sub_context, AUTO, error_names.list[i]);
             }
         }
         
@@ -1572,10 +1575,12 @@ static void Do_Event_Editor_Display_Active_Event_Errors_Popup(GUI_Context* conte
             
             GUI_Do_Title_Text(sub_context, pos, L1(warnings), GUI_DEFAULT_TEXT_SCALE);
             
-            for(u32 i = 0; i < Array_Lenght(Event_Warnings::names); ++i)
+            CSTR_List warning_names = LN(event_warning_names);
+            
+            for(u32 i = 0; i < warning_names.count; ++i)
             {
                 if(event->issues.warnings & (1 << i))
-                    GUI_Do_Text(sub_context, AUTO, (char*)Event_Warnings::names[i]);
+                    GUI_Do_Text(sub_context, AUTO, warning_names.list[i]);
             }        
         }
         

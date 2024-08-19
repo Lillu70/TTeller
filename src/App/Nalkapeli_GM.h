@@ -303,13 +303,6 @@ namespace Game_Errors
         does_not_contain_a_night_event  = 1 << 1,
         does_not_contain_any_events     = 1 << 2,
     };
-    
-    char* names[] = 
-    {
-        "Peli ei sis\xE4ll\xE4 p\xE4iv\xE4 tapahtumaa!",
-        "Peli ei sis\xE4ll\xE4 y\xF6 tapahtumaa!",
-        "Peli ei sis\xE4ll\xE4 yht\xE4\xE4n tapahtumaa!",
-    };
 }
 
 

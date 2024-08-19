@@ -2489,6 +2489,48 @@ static u32 GUI_Do_Dropdown_Button(
 }
 
 
+static inline u32 GUI_Do_Dropdown_Button(GUI_Context* context, 
+    v2f* pos,
+    v2f* dim,
+    char* text,
+    CSTR_List elements,
+    v2f text_scale = GUI_DEFAULT_TEXT_SCALE)
+{
+    u32 result = GUI_Do_Dropdown_Button(
+        context,
+        pos,
+        dim,
+        text,
+        elements.count,
+        elements.list,
+        text_scale);
+    
+    return result;
+}
+
+
+static inline u32 GUI_Do_Dropdown_Button(GUI_Context* context, 
+    v2f* pos,
+    v2f* dim,
+    u32 selected_element,
+    CSTR_List elements,
+    v2f text_scale = GUI_DEFAULT_TEXT_SCALE)
+{
+    Assert(selected_element < elements.count);
+    
+    u32 result = GUI_Do_Dropdown_Button(
+        context,
+        pos,
+        dim,
+        elements.list[selected_element],
+        elements.count,
+        elements.list,
+        text_scale);
+        
+    return result;
+}
+
+
 static bool GUI_Do_SL_Input_Field(
     GUI_Context* context, 
     v2f* pos, 

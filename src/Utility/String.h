@@ -35,6 +35,13 @@ struct String_View
 };
 
 
+struct CSTR_List
+{
+    char** list;
+    u32 count;
+};
+
+
 static String_View Create_String_View(String* str)
 {
     Assert(str);
