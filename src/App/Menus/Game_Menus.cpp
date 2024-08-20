@@ -660,7 +660,7 @@ static void Do_Day_Counter_Display_Frame()
         char* num = U32_To_Char_Buffer((u8*)&index_text_buffer, s_game_state.day_counter);
         GUI_Do_Text(context, AUTO, num, {},  GUI_Scale_Default(s));
         
-        if(GUI_Do_Button(context, AUTO, &title_dim, L1(_continue)))
+        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(_continue)))
         {
             if(!Assign_Events_To_Participants(&s_game_state, Event_List::day, &s_allocator))
             {
@@ -1120,21 +1120,34 @@ static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
 {
     Assert(s_global_data.IEFR);
 
-    context->layout.anchor = GUI_Anchor::top;
+    context->layout.anchor = GUI_Anchor::left;
     context->layout.build_direction = GUI_Build_Direction::down_left;
     
     f32 sh = f32(context->canvas->dim.y);
     f32 pf = .5f;
     f32 offset = sh * (pf / 2);
     
-    v2f title_pos = {Get_Middle(context->canvas).x, sh - offset};
+    f32 m = Get_Middle(context->canvas).x;
     
-    char* text = L1(campaign_contains_invalid_events);
-    GUI_Do_Title_Text(context, &title_pos, text);
+    char* title_text = L1(campaign_contains_invalid_events);
+    char* sub_title_text = L1(for_game_functionality_they_have_been_removed);
+    
+    f32 char_width_title = 
+        GUI_Character_Width(context, GUI_DEFAULT_TEXT_SCALE.x * GUI_DEFAULT_TITLE_SCALER.x);
+    
+    f32 char_width = GUI_Character_Width(context);
+    
+    f32 len_title = (f32)Null_Terminated_Buffer_Lenght(title_text) * char_width_title;
+    f32 len_sub_title = (f32)Null_Terminated_Buffer_Lenght(sub_title_text) * char_width;
+    
+    f32 longest_text = len_title > len_sub_title? len_title : len_sub_title;
+    v2f title_pos = {m - longest_text / 2, sh - offset};
+    
+    GUI_Do_Title_Text(context, &title_pos, title_text);
     
     f32 title_width = context->layout.last_element.dim.x;
     
-    GUI_Do_Text(context, AUTO, L1(for_game_functionality_they_have_been_removed));
+    GUI_Do_Text(context, AUTO, sub_title_text);
     
     f32 sub_title_width = context->layout.last_element.dim.x;
     

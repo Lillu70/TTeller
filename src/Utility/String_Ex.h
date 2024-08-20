@@ -55,6 +55,16 @@ static u32 Convert_String_View_Into_U32(String_View view)
 }
 
 
+static inline u32 Get_Longest_CSTR_Length(char* a, char* b)
+{
+    u32 a_len = Null_Terminated_Buffer_Lenght(a);
+    u32 b_len = Null_Terminated_Buffer_Lenght(b);
+    
+    u32 result = a_len > b_len? a_len : b_len;
+    return result;
+}
+
+
 static inline char* Get_Longest_CSTR(char* a, char* b)
 {
     u32 a_len = Null_Terminated_Buffer_Lenght(a);
