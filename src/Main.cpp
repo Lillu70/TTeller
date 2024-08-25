@@ -25,7 +25,7 @@ static const wchar_t* APP_TITLE = L"TTELLER";
 Declare_Timing_Tables();
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
-{
+{    
 	Win32_Init(620 * 2, 480 * 2, CW_USEDEFAULT, CW_USEDEFAULT, APP_TITLE);
 	
 	Platform_Calltable calltable = Win32_Get_Calltable();

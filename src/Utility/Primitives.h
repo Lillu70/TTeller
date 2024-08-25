@@ -29,25 +29,25 @@ typedef i32 b32;
 
 // CONSIDER: Use #define or constexpr here?
 
-static constexpr f64 PI = 3.141592653589793;
-static constexpr f32 PI32 = f32(PI);
-static constexpr f32 HALF_PI32 = PI32 / 2;
-static constexpr f64 TAU = 6.283185307179586;
-static constexpr f32 TAU32 = f32(TAU);
-static constexpr u32 DEG_FULL_CIRCLE = 360;
-static constexpr u32 DEG_HALF_CIRCLE = DEG_FULL_CIRCLE / 2;
-static constexpr u32 X_AXIS = 0;
-static constexpr u32 Y_AXIS = 1;
+constexpr f64 PI = 3.141592653589793;
+constexpr f32 PI32 = f32(PI);
+constexpr f32 HALF_PI32 = PI32 / 2;
+constexpr f64 TAU = 6.283185307179586;
+constexpr f32 TAU32 = f32(TAU);
+constexpr u32 DEG_FULL_CIRCLE = 360;
+constexpr u32 DEG_HALF_CIRCLE = DEG_FULL_CIRCLE / 2;
+constexpr u32 X_AXIS = 0;
+constexpr u32 Y_AXIS = 1;
 
 // TODO: Define all mins (for signed types) and maxes.
-static constexpr f32 F32_MAX = 3.402823466e+38F;
-static constexpr f64 F64_MAX = 1.7976931348623157E+308;
-static constexpr u64 U64_MAX = 0xFFFFFFFFFFFFFFFF;
-static constexpr u32 U32_MAX = 0xFFFFFFFF;
-static constexpr i32 I32_MAX = 2147483647;
-static constexpr u16 U16_MAX = 0xFFFF;
-static constexpr u8 U8_MAX = 0xFF;
-static constexpr i8 I8_MAX = 127;
+constexpr f32 F32_MAX = 3.402823466e+38F;
+constexpr f64 F64_MAX = 1.7976931348623157E+308;
+constexpr u64 U64_MAX = 0xFFFFFFFFFFFFFFFF;
+constexpr u32 U32_MAX = 0xFFFFFFFF;
+constexpr i32 I32_MAX = 2147483647;
+constexpr u16 U16_MAX = 0xFFFF;
+constexpr u8 U8_MAX = 0xFF;
+constexpr i8 I8_MAX = 127;
 
 
 // NOTE: Structure of this union is endianess dependant. And actually platform dependant. 
@@ -76,13 +76,13 @@ union Color
 
 
 //TODO: Again, endianess.
-static constexpr Color WHITE = { U32_MAX };
-static constexpr Color BLACK = { 0xFF000000 };
-static constexpr Color RED = { 0xFFFF0000 };
-static constexpr Color YELLOW = { 0xFFFFFF00 };
-static constexpr Color GREEN = { 0xFF00FF00 };
-static constexpr Color BLUE = { 0xFF0000FF };
-static constexpr Color MAGENTA = { 0xFFFF00FF };
+constexpr Color WHITE = { U32_MAX };
+constexpr Color BLACK = { 0xFF000000 };
+constexpr Color RED = { 0xFFFF0000 };
+constexpr Color YELLOW = { 0xFFFFFF00 };
+constexpr Color GREEN = { 0xFF00FF00 };
+constexpr Color BLUE = { 0xFF0000FF };
+constexpr Color MAGENTA = { 0xFFFF00FF };
 
 
 #include "Vector.h" // v2i, v2u, v2f 

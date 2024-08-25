@@ -89,7 +89,6 @@ struct Global_Data
     void(*popup_func)(GUI_Context*) = 0;
     void(*on_popup_close)() = 0;
     
-    GUI_Theme popup_panel_theme;
     v2f popup_panel_dim = v2f{0.f, 0.f};
     v2f title_scale = v2f{2.f, 2.f};
 
@@ -286,9 +285,11 @@ static void Run_Popup_GUI_Frame()
     
     if(panel_prop_set)
     {
-        s_gui_pop_up.theme = &s_global_data.popup_panel_theme;
-        GUI_Do_Panel(&s_gui_pop_up, s_global_data.popup_panel_rect);
-        s_gui_pop_up.theme = &s_theme;
+        GUI_Do_Panel(
+            &s_gui_pop_up, 
+            s_global_data.popup_panel_rect, 
+            &s_banner_background_color, 
+            GUI_Highlight_Everything());
     }
     
     s_global_data.popup_func(&s_gui_pop_up);
@@ -369,15 +370,6 @@ static inline void Init_GUI()
     s_theme.font.data_buffer_sc = (u8*)&s_terminus_font_special_characters[0];
     s_theme.font.char_width = s_terminus_font_char_width;
     s_theme.font.char_height = s_terminus_font_char_height;
-    
-    // CONSIDER: Why am I doing this like this again??? Just to flext with the lambda call?
-    s_global_data.popup_panel_theme = [](GUI_Theme* global_theme)
-    { 
-        GUI_Theme result = *global_theme;
-        result.background_color = s_banner_background_color;
-        result.outline_color = global_theme->selected_color;
-        return result;
-    }(&s_theme);
     
     s_warning_theme = s_theme;
     {
@@ -486,7 +478,6 @@ static GUI_Context* Get_GUI_Context_From_Pool_(u64 line_id, u64 func_id)
 
 
 // NOTE: Crazy shit happens here. Please don't look at it xD
-
 
 enum class Loc_Identifier : u32
 {

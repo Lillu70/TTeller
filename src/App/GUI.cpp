@@ -209,6 +209,12 @@ static inline GUI_Highlight GUI_Highlight_Nothing()
 }
 
 
+static inline GUI_Highlight GUI_Highlight_Everything()
+{
+    return {0, I32_MAX};
+}
+
+
 static inline GUI_Highlight GUI_Highlight_Next(GUI_Context* context, i32 num_elements)
 {
     return { context->widget_count, num_elements };
@@ -1305,6 +1311,18 @@ static inline bool GUI_Is_Element_Selected(GUI_Context* context, bool cursor_on_
 }
 
 
+static inline bool GUI_Is_Static_Element_Highlighted(GUI_Context* context, GUI_Highlight highlight)
+{
+    bool result = (Bit_Not_Set(context->flags, GUI_Make_Ignore_Selection_Mask()) && 
+        highlight.count && context->selected_index >= highlight.idx && 
+        context->selected_index < highlight.idx + highlight.count) ||
+        highlight.count == I32_MAX && highlight.idx == 0;
+        
+    return result;
+}
+
+
+
 static inline bool GUI_On_Release_Action(
     GUI_Context* context, bool cursor_on_selection, bool* is_pressed_down)
 {
@@ -1333,7 +1351,7 @@ static inline bool GUI_On_Release_Action(
 }
 
 
-bool GUI_Input_Field_Begin_Or_End_Text_Select_Mode(GUI_SL_Input_Field_State* state, bool shift_down, u32 wcp)
+static bool GUI_Input_Field_Begin_Or_End_Text_Select_Mode(GUI_SL_Input_Field_State* state, bool shift_down, u32 wcp)
 {
     bool pre_text_select = state->text_select_mode;
     u32 pre_start_point = state->text_select_start_point;
@@ -1606,7 +1624,7 @@ static void GUI_Do_Spacing(GUI_Context* context, v2f* dim)
 }
 
 
-static void GUI_Do_Spacing(GUI_Context* context, v2f dim)
+static inline void GUI_Do_Spacing(GUI_Context* context, v2f dim)
 {
     GUI_Do_Spacing(context, &dim);
 }
@@ -1638,15 +1656,16 @@ static void GUI_Do_Text(
     
     if(Rects_Overlap(p.rect, context->canvas_rect))
     {
-        bool is_highlighted = Bit_Not_Set(context->flags, GUI_Make_Ignore_Selection_Mask()) && 
-            highlight.highlight_count && context->selected_index >= highlight.idx && 
-            context->selected_index < highlight.idx + highlight.highlight_count;
-        
         Color color;
         if(is_title)
+        {
             color = theme->title_color;
+        }
         else
-            color = is_highlighted? theme->selected_color : theme->text_color;
+        {
+            color = GUI_Is_Static_Element_Highlighted(context, highlight)?
+                theme->selected_color : theme->text_color;
+        }
         
         Draw_Text(context->canvas, (u8*)text, text_p, color, &theme->font, text_scale);
     }
@@ -1655,14 +1674,20 @@ static void GUI_Do_Text(
 
 static inline void GUI_Do_Title_Text(
     GUI_Context* context, 
-    v2f* pos, char* text, 
+    v2f* pos, 
+    char* text, 
     v2f text_scale = Hadamar_Product(GUI_DEFAULT_TEXT_SCALE, GUI_DEFAULT_TITLE_SCALER))
 {
     GUI_Do_Text(context, pos, text, {}, text_scale, true);
 }
 
 
-static void GUI_Do_Panel(GUI_Context* context, v2f* pos, v2f* dim)
+static void GUI_Do_Panel(
+    GUI_Context* context, 
+    v2f* pos, 
+    v2f* dim, 
+    Color* bg_color_ptr = 0,
+    GUI_Highlight highlight = GUI_Highlight_Nothing())
 {
     // --------------------------------------------------------------------------
     GUI_Placement p = GUI_Get_Placement(context, dim, pos);
@@ -1673,38 +1698,26 @@ static void GUI_Do_Panel(GUI_Context* context, v2f* pos, v2f* dim)
     // Draw
     if(Rects_Overlap(p.rect, context->canvas_rect))
     {
-        Draw_Filled_Rect_With_Outline(
-            context->canvas, 
-            p.rect, 
-            context->theme->background_color,
-            context->theme->outline_thickness, 
-            context->theme->outline_color);
-    }
-}
-
-
-static void GUI_Do_Panel(GUI_Context* context, v2f* pos, v2f* dim, Color bg_color)
-{
-    // --------------------------------------------------------------------------
-    GUI_Placement p = GUI_Get_Placement(context, dim, pos);
-    if(!Is_Rect_Valid(p.rect) || context->mode == GUI_Mode::layout_only)
-        return;
-    // --------------------------------------------------------------------------
-    
-    // Draw
-    if(Rects_Overlap(p.rect, context->canvas_rect))
-    {
+        GUI_Theme* theme = context->theme;
+        
+        Color bg_color = bg_color_ptr? *bg_color_ptr : theme->background_color;
+        Color outline_color = GUI_Is_Static_Element_Highlighted(context, highlight)?
+            theme->selected_color : theme->outline_color;
+        
         Draw_Filled_Rect_With_Outline(
             context->canvas, 
             p.rect, 
             bg_color,
-            context->theme->outline_thickness, 
-            context->theme->outline_color);
+            theme->outline_thickness, 
+            outline_color);
     }
 }
 
 
-static void GUI_Do_Panel(GUI_Context* context, Rect rect)
+static void GUI_Do_Panel(GUI_Context* context, 
+    Rect rect, 
+    Color* bg_color_ptr = 0,
+    GUI_Highlight highlight = GUI_Highlight_Nothing())
 {
     v2f dim = Get_Rect_Dimensions(rect);
     v2f pos = rect.min + dim * 0.5f;
@@ -1716,7 +1729,7 @@ static void GUI_Do_Panel(GUI_Context* context, Rect rect)
     // we already have a rect,
     // BUT it does additional book keeping (for auto layout stuff) so by-passing it,
     // would be more trouble than it's worth.
-    GUI_Do_Panel(context, &pos, &dim);
+    GUI_Do_Panel(context, &pos, &dim, bg_color_ptr, highlight);
     
     context->layout.anchor = a;
 }
@@ -3863,16 +3876,16 @@ static bool GUI_Do_Sub_Context(
     Color* bg_color = 0,
     GUI_Link_Direction::Type ld = GUI_Link_Direction::up)
 {
-    if(bg_color)
-    {
-        GUI_Do_Panel(master, pos, dim, *bg_color);
-    }
-    else
-    {
-        GUI_Do_Panel(master, pos, dim);        
-    }
+    GUI_Highlight highlight = GUI_Is_Context_Active(sub_context)? 
+        GUI_Highlight_Everything() : GUI_Highlight_Nothing();
+    
+    GUI_Do_Panel(master, pos, dim, bg_color, highlight);
     
     GUI_Placement p = master->layout.last_element;
+    
+    bool cursor_on_selection = Is_Point_Inside_Rect(master->cursor_fpos, p.rect);
+    if(cursor_on_selection)
+        GUI_Activate_Context(sub_context);
     
     f32 outline_thickness = f32(master->theme->outline_thickness);
     p.rect.min += outline_thickness;

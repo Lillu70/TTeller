@@ -29,7 +29,7 @@ static void Do_Settings_Menu_Frame()
     {
         GUI_Highlight highlight = GUI_Highlight_Next(context, 2);
         if(s_settings.allow_non_uniform_text_scale)
-            highlight = {};
+            highlight.count = 3;
         
         GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, L1(text_size), highlight);
         
@@ -97,6 +97,8 @@ static void Do_Settings_Menu_Frame()
                 GUI_DEFAULT_TEXT_SCALE = s_settings.text_scale;
             }            
         }
+        
+        GUI_Do_Text(context, AUTO, L1(language), GUI_Highlight_Next(context));
         
         if(u32 s = GUI_Do_Dropdown_Button(
             context, 

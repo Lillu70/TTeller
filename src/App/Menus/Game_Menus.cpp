@@ -643,9 +643,6 @@ static void Do_Event_Display_Frame()
 
 static void Do_Day_Counter_Display_Frame()
 {
-    static bool skip_frame;
-    skip_frame = false;
-    
     void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
     {
         constexpr f32 s = 2.f;
@@ -667,7 +664,7 @@ static void Do_Day_Counter_Display_Frame()
                 s_global_data.active_menu = Menus::GM_event_assignement_failed;
             }
             else
-            {            
+            {
                 s_global_data.active_menu = Menus::GM_event_display;
             }
         }
@@ -676,8 +673,7 @@ static void Do_Day_Counter_Display_Frame()
         if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &GUI_AUTO_FIT, L1(quit_game)))
         {
             Delete_Game(&s_game_state, &s_allocator);
-            s_global_data.active_menu = Menus::main_menu;
-            skip_frame = true;
+            s_global_data.active_menu = Menus::main_menu;           
             return;
         }
         
@@ -685,9 +681,11 @@ static void Do_Day_Counter_Display_Frame()
 
     void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
     {
-        if(skip_frame)
+        if(s_global_data.active_menu != Menus::GM_day_counter)
             return;
-    
+        
+        Assert(s_game_state.memory);
+        
         context->layout.anchor = GUI_Anchor::top;
         context->layout.build_direction = GUI_Build_Direction::down_center;
         

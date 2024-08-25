@@ -58,7 +58,7 @@ struct GUI_Input_Acceleration_Behavior
 struct GUI_Highlight
 {
     i32 idx = 0;
-    i32 highlight_count = 0;
+    i32 count = 0;
 };
 
 
