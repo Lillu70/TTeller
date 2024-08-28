@@ -101,6 +101,7 @@ struct Global_Data
     u32 campaing_idx_to_delete = 0;
     
     Image edit_image = {};
+    Image delete_image = {};
 };
 static Global_Data s_global_data = Global_Data();
 

@@ -278,12 +278,18 @@ void Update_App()
             case Menus::main_menu:
             {
                 // CONSIDER: Think about this.
-                // Only reason to free this here is so that we can maintin 0 allocations when in the main menu,
+                // Only reason to free this here is so that we can maintain 0 allocations when in the main menu,
                 // This is usefull so it's possible to assert on memory leaks.
                 if(s_global_data.edit_image.buffer)
                 {
                     s_allocator.free(s_global_data.edit_image.buffer);
                     s_global_data.edit_image.buffer = 0;
+                }
+                
+                if(s_global_data.delete_image.buffer)
+                {
+                    s_allocator.free(s_global_data.delete_image.buffer);
+                    s_global_data.delete_image.buffer = 0;
                 }
             }break;
             
@@ -293,8 +299,16 @@ void Update_App()
                 {
                     Load_Image_From_Memory(
                         &s_global_data.edit_image, 
-                        (void*)s_edit_icon, 
-                        Array_Lenght(s_edit_icon));
+                        (void*)s_edit_icon_png, 
+                        Array_Lenght(s_edit_icon_png));
+                }
+                
+                if(!s_global_data.delete_image.buffer)
+                {
+                    Load_Image_From_Memory(
+                        &s_global_data.delete_image, 
+                        (void*)s_delete_icon_png, 
+                        Array_Lenght(s_delete_icon_png));
                 }
             }break;
         }

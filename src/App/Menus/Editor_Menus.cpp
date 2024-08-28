@@ -277,7 +277,8 @@ static void Do_Event_Editor_All_Events_Frame()
                 context->theme = &s_warning_theme;
             
             // Destroy event
-            if(GUI_Do_Button(context, *pos, &GUI_AUTO_FIT, "X"))
+            v2f del_button_dim = v2f{} + GUI_Character_Height(context) + theme->padding;
+            if(GUI_Do_Image_Button(context, *pos, &del_button_dim, &s_global_data.delete_image, v2f{} + 0.9f))
             {
                 s_editor_state.event_idx_to_delete = i;
                 Set_Popup_Function(Do_Event_Editor_Delete_Event_Popup);
@@ -579,14 +580,11 @@ static void Do_Event_Editor_Participants_Frame()
         {
             Participent* parti = Begin(event->participents) + p;
             
-            GUI_Placement rcp = context->layout.last_element;
+            bool defer_del = false;
             
             if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "X"))
             {
-                Delete_Participent(p--, event->participents, &s_allocator);
-                
-                context->layout.last_element = rcp;
-                continue;
+                defer_del = true;
             }
             
             f32 collumn_start = GUI_Get_Collumn_Start(context, X_AXIS);
@@ -607,7 +605,7 @@ static void Do_Event_Editor_Participants_Frame()
                 typing_marker -= 1;
                 *typing_marker = 'k';
                 typing_marker -= 1;
-                *typing_marker = '\\';
+                *typing_marker = '/';
             }
             
             GUI_Do_Text(context, AUTO, typing_marker, GUI_Highlight_Prev(context));
@@ -637,7 +635,7 @@ static void Do_Event_Editor_Participants_Frame()
             {
                 Participation_Requirement* req = requirement_array + r;
                 
-                rcp = context->layout.last_element;
+                GUI_Placement rcp = context->layout.last_element;
                 
                 if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, "X"))
                 {
@@ -762,14 +760,14 @@ static void Do_Event_Editor_Participants_Frame()
                             (req->numerical_relation == Numerical_Relation::less_than &&
                             req->relation_target == 0))
                         {
-                            GUI_Do_Text(context, AUTO, L1(impossible), {0}, v2f{1.f,1.f}, true);
+                            GUI_Do_Title_Text(context, AUTO, L1(impossible), GUI_Scale_Default(v2f{} + 0.5f));
                         }
                         else if((req->numerical_relation == Numerical_Relation::less_than_equals &&
                             req->relation_target == Array_Lenght(value_option_names) - 1) || 
                             (req->numerical_relation == Numerical_Relation::greater_than_equals &&
                             req->relation_target == 0))
                         {
-                            GUI_Do_Text(context, AUTO, L1(always_true), {0}, v2f{1.f,1.f}, true);
+                            GUI_Do_Title_Text(context, AUTO, L1(always_true), GUI_Scale_Default(v2f{} + 0.5f));
                         }
                         
                     }break;
@@ -782,6 +780,11 @@ static void Do_Event_Editor_Participants_Frame()
             GUI_Pop_Layout(context);
             
             GUI_End_Collumn(context, collumn_min_width, collumn_start, X_AXIS);
+            
+            if(defer_del)
+            {
+                Delete_Participent(p--, event->participents, &s_allocator);
+            }
         }
     }; // ----------------------------------------------------------------------------------------
     

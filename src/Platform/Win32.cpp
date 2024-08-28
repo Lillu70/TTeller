@@ -600,7 +600,12 @@ static v2i Win32_Get_Cursor_Position()
 
 static bool Win32_Get_Keyboard_Key_Down(Key_Code key_code)
 {
-    return (GetKeyState(s_keycode_map[(u32)key_code]) & (1 << 15)) > 0;
+    bool result = false;
+    
+    if(key_code != Key_Code::NONE)
+        result = (GetKeyState(s_keycode_map[(u32)key_code]) & (1 << 15)) > 0;
+    
+    return result;
 }
 
 

@@ -193,29 +193,11 @@ static void Do_New_Game_Players()
             Player_Image* player_image = player_images + i; 
             Image* img = &(player_image)->image;
             
-            GUI_Placement rcp = context->layout.last_element;
+            bool defer_del = false;
             
             if(GUI_Do_Button(context, pos, &GUI_AUTO_FIT, "X"))
             {
-                Assert(names->count == s_game_state.player_images->count);
-                
-                Hollow_Player_Name_FI(n);
-                Remove_Element_From_Packed_Array(Begin(names), &names->count, sizeof(*n), i);
-                
-                if(img->buffer)
-                    s_allocator.free(img->buffer);
-                
-                u32* img_count = &s_game_state.player_images->count;
-                Remove_Element_From_Packed_Array(player_images, img_count, sizeof(*player_images), i);
-                
-                if(!i)
-                    pos = &GUI_AUTO_TOP_LEFT;
-                
-                context->layout.last_element = rcp;
-                
-                n -= 1;
-                i -= 1;
-                continue;
+                defer_del = true;
             }
             
             pos = 0;
@@ -344,6 +326,25 @@ static void Do_New_Game_Players()
                 s_player_creation_collumn_min_width_base * GUI_DEFAULT_TEXT_SCALE.x, 
                 collumn_start, 
                 X_AXIS);
+             
+             
+            if(defer_del)
+            {                
+                Assert(names->count == s_game_state.player_images->count);
+                
+                Hollow_Player_Name_FI(n);
+                Remove_Element_From_Packed_Array(Begin(names), &names->count, sizeof(*n), i);
+                
+                if(img->buffer)
+                    s_allocator.free(img->buffer);
+                
+                player_image->file_path.free();
+                u32* img_count = &s_game_state.player_images->count;
+                Remove_Element_From_Packed_Array(player_images, img_count, sizeof(*player_images), i);
+             
+                n -= 1;
+                i -= 1;
+            }
         }
         
     }; // ----------------------------------------------------------------------------------------
@@ -708,7 +709,6 @@ static void Do_Day_Counter_Display_Frame()
             GUI_Pop_Layout(context);
         }
         
-        
         GUI_Do_Title_Text(
             context, 
             AUTO, 
@@ -719,13 +719,22 @@ static void Do_Day_Counter_Display_Frame()
         
         v2f player_picture_dim = Hadamar_Product(s_player_picture_dim_base, GUI_DEFAULT_TEXT_SCALE);
         
-        f32 dx = 
-            (player_picture_dim.x * s_game_state.live_player_count) + 
-            (padding * (s_game_state.live_player_count - 1));
+        f32 f = 25.f * GUI_DEFAULT_TEXT_SCALE.x;
+        v2f d = v2f
+        {
+            player_picture_dim.x + padding * 2 + context->dynamic_slider_girth * 2 + f, 
+            Max(250.f * GUI_DEFAULT_TEXT_SCALE.y, 
+            Min(f32(context->canvas->dim.y - 1) * 0.8f, 400.f * GUI_DEFAULT_TEXT_SCALE.y))
+        };
+        
+        f32 total_width = (d.x + padding) * s_game_state.live_player_count - padding;
         
         v2f p = context->layout.last_element.pos - context->anchor_base;
         p.y -= (context->layout.last_element.dim.y / 2) + (padding * 3) + GUI_DEFAULT_TEXT_SCALE.y;
-        p.x -= dx / 2;
+        p.x -= total_width / 2;
+        
+        GUI_Context* sub_context_a = Get_GUI_Context_From_Pool();
+        GUI_Context* sub_context_b = Get_GUI_Context_From_Pool();
         
         Player_Image* images = Begin(s_game_state.player_images);
         Game_Player_Name_FI* names = Begin(s_game_state.player_names);
@@ -733,83 +742,135 @@ static void Do_Day_Counter_Display_Frame()
         context->layout.anchor = GUI_Anchor::top_left;
         context->layout.build_direction = GUI_Build_Direction::down_left;
         
+
         for(u32 i = 0; i < s_game_state.live_player_count; ++i)
         {
             Game_Player* player = s_game_state.players + i;
             
-            GUI_Do_Text(context, &p, (names + i)->full_name.buffer);
-            p.x += player_picture_dim.x + padding;
+            GUI_Context* sub_context = (i == s_game_state.active_player_card_idx)? 
+                sub_context_a : sub_context_b;
             
-            GUI_Do_Image_Panel(context, AUTO, &player_picture_dim, &((images + i)->image));
-            
-            for(u32 s = 0; s < u32(Character_Stats::COUNT); ++s)
+            bool sub_context_is_active = false;
+            Canvas sub_canvas;
+            if(GUI_Do_Sub_Context(context, sub_context, &sub_canvas, &p, &d))
             {
-                GUI_Do_Text(context, AUTO, LN1(stat_names, s));
-                GUI_Push_Layout(context);
+                sub_context->layout.anchor = GUI_Anchor::top;
+                sub_context->layout.build_direction = GUI_Build_Direction::down_center;
                 
-                context->layout.build_direction = GUI_Build_Direction::right_center;
+                GUI_Do_Title_Text(sub_context, &GUI_AUTO_TOP_CENTER, (names + i)->full_name.buffer);
+                GUI_Do_Image_Panel(sub_context, AUTO, &player_picture_dim, &((images + i)->image));
                 
-                context->flags |= GUI_Context_Flags::one_time_skip_padding;
-                GUI_Do_Text(context, AUTO, ": ");
-                context->flags |= GUI_Context_Flags::one_time_skip_padding;
+                sub_context->layout.build_direction = GUI_Build_Direction::down_left;
                 
-                char* num = U32_To_Char_Buffer((u8*)&num_text_buffer, player->stats[s]);
-                GUI_Do_Text(context, AUTO, num);
+                Color* c = &sub_context->theme->widget_text_color;
                 
-                GUI_Pop_Layout(context);
-            }
-            
-            
-            GUI_Do_Text(context, AUTO, L1(items));
-            for(each(Mark_GM*, mark, player->marks))
-            {
-                if(mark->type == Mark_Type::item)
+                for(u32 s = 0; s < u32(Character_Stats::COUNT); ++s)
                 {
-                    u32 offset = *(((u32*)s_game_state.mark_table.memory) + mark->idx);
-                    char* mark_text = s_game_state.mark_data + offset;
-                    GUI_Do_Text(context, AUTO, mark_text);
+                    GUI_Do_Text(sub_context, AUTO, LN1(stat_names, s), c);
+                    GUI_Push_Layout(sub_context);
                     
-                    GUI_Push_Layout(context);
+                    sub_context->layout.build_direction = GUI_Build_Direction::right_center;
                     
-                    context->layout.build_direction = GUI_Build_Direction::right_center;
+                    sub_context->flags |= GUI_Context_Flags::one_time_skip_padding;
+                    GUI_Do_Text(sub_context, AUTO, ": ", c);
+                    sub_context->flags |= GUI_Context_Flags::one_time_skip_padding;
                     
-                    context->flags |= GUI_Context_Flags::one_time_skip_padding;
-                    GUI_Do_Text(context, AUTO, ": ");
-                    context->flags |= GUI_Context_Flags::one_time_skip_padding;
+                    char* num = U32_To_Char_Buffer((u8*)&num_text_buffer, player->stats[s]);
+                    GUI_Do_Text(sub_context, AUTO, num, c);
                     
-                    char* num = U32_To_Char_Buffer((u8*)&num_text_buffer, mark->duration);
-                    
-                    GUI_Do_Text(context, AUTO, num);
-                    
-                    GUI_Pop_Layout(context);
+                    GUI_Pop_Layout(sub_context);
                 }
-            }
-            
-            
-            GUI_Do_Text(context, AUTO, L1(character_marks));
-            for(each(Mark_GM*, mark, player->marks))
-            {
-                if(mark->type == Mark_Type::personal)
+                
+                u32 mark_counts[u32(Mark_Type::COUNT)] = {};
+                for(each(Mark_GM*, mark, player->marks))
                 {
-                    u32 offset = *(((u32*)s_game_state.mark_table.memory) + mark->idx);
-                    char* mark_text = s_game_state.mark_data + offset;
-                    GUI_Do_Text(context, AUTO, mark_text);
-                    
-                    GUI_Push_Layout(context);
-                    
-                    context->layout.build_direction = GUI_Build_Direction::right_center;
-                    
-                    context->flags |= GUI_Context_Flags::one_time_skip_padding;
-                    GUI_Do_Text(context, AUTO, ": ");
-                    context->flags |= GUI_Context_Flags::one_time_skip_padding;
-                    
-                    char* num = U32_To_Char_Buffer((u8*)&num_text_buffer, mark->duration);
-                    
-                    GUI_Do_Text(context, AUTO, num);
-                    
-                    GUI_Pop_Layout(context);
+                    // CONSIDER: break out after all counts are > 0?
+                    mark_counts[u32(mark->type)] += 1;
                 }
+                
+                if(mark_counts[u32(Mark_Type::item)])
+                {
+                    GUI_Do_Text(sub_context, AUTO, L1(items), c);
+                    
+                    for(each(Mark_GM*, mark, player->marks))
+                    {
+                        if(mark->type == Mark_Type::item)
+                        {
+                            u32 offset = *(((u32*)s_game_state.mark_table.memory) + mark->idx);
+                            char* mark_text = s_game_state.mark_data + offset;
+                            
+                            GUI_Do_Text(sub_context, AUTO , " ", c);
+                            
+                            GUI_Push_Layout(sub_context);
+                            sub_context->layout.build_direction = GUI_Build_Direction::right_center;
+                            
+                            sub_context->flags |= GUI_Context_Flags::one_time_skip_padding;
+                            GUI_Do_Text(sub_context, AUTO, mark_text, c);
+                            
+                            if(mark->duration)
+                            {
+                                sub_context->flags |= GUI_Context_Flags::one_time_skip_padding;
+                                GUI_Do_Text(sub_context, AUTO, ": ", c);
+                                sub_context->flags |= GUI_Context_Flags::one_time_skip_padding;
+                                
+                                char* num = U32_To_Char_Buffer((u8*)&num_text_buffer, mark->duration);
+                                
+                                GUI_Do_Text(sub_context, AUTO, num, c);                            
+                            }
+                            
+                            GUI_Pop_Layout(sub_context);
+                        }
+                    }
+                }
+                
+                
+                if(mark_counts[u32(Mark_Type::personal)])
+                {
+                    GUI_Do_Text(sub_context, AUTO, L1(character_marks), c);
+                    for(each(Mark_GM*, mark, player->marks))
+                    {
+                        if(mark->type == Mark_Type::personal)
+                        {
+                            u32 offset = *(((u32*)s_game_state.mark_table.memory) + mark->idx);
+                            char* mark_text = s_game_state.mark_data + offset;
+                            
+                            GUI_Do_Text(sub_context, AUTO , " ", c);
+                            
+                            GUI_Push_Layout(sub_context);
+                            sub_context->layout.build_direction = GUI_Build_Direction::right_center;
+                            
+                            sub_context->flags |= GUI_Context_Flags::one_time_skip_padding;
+                            GUI_Do_Text(sub_context, AUTO, mark_text, c);
+                            
+                            if(mark->duration)
+                            {
+                                sub_context->flags |= GUI_Context_Flags::one_time_skip_padding;
+                                GUI_Do_Text(sub_context, AUTO, ": ", c);
+                                sub_context->flags |= GUI_Context_Flags::one_time_skip_padding;
+                                
+                                char* num = U32_To_Char_Buffer((u8*)&num_text_buffer, mark->duration);
+                                
+                                GUI_Do_Text(sub_context, AUTO, num, c);
+                            }
+                            
+                            GUI_Pop_Layout(sub_context);
+                        }
+                    }                    
+                }
+                
+                sub_context_is_active = GUI_Is_Context_Active(sub_context);
+                
+                GUI_End_Context(sub_context);
             }
+            
+            if(sub_context_is_active && s_game_state.active_player_card_idx != i)
+            {
+                Swap(sub_context_a, sub_context_b);
+                GUI_Reset_Context(sub_context_b);
+                s_game_state.active_player_card_idx = i;  
+            }
+            
+            p.x += d.x + padding;
         }
         
     }; // ----------------------------------------------------------------------------------------

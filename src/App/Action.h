@@ -16,7 +16,6 @@ enum class Input_Mode : u8
 
 struct Action_Context
 {
-    //u64 last_polled_frame_count = U64_MAX;
     Input_Mode last_used_mode = Input_Mode::keyboard;
     bool disable_for_one_frame = false;
 };

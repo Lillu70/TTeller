@@ -35,7 +35,7 @@ struct GUI_Theme
     Color down_color            = Make_Color(50, 50, 50);
     Color outline_color         = Make_Color(110, 110, 130);
     Color text_color            = WHITE;
-    Color widget_text_color     = MAGENTA;
+    Color widget_text_color     = BLACK;
     Color title_color           = Make_Color(210, 210, 230);
     Color write_cursor_color    = BLACK;
     Color write_cursor_limit_color = RED;
@@ -208,12 +208,20 @@ struct GUI_SL_Input_Field_State
 };
 
 
+struct GUI_Sub_Context_State
+{
+    bool is_pressed_down;
+    bool is_active;
+};
+
+
 union GUI_Element_State
 {
     GUI_Button_State button;
     GUI_Slider_State slider;
     GUI_Dropdown_Button_State dropdown_button;
     GUI_SL_Input_Field_State sl_input_field;
+    GUI_Sub_Context_State sub_context;
 };
 
 
@@ -227,7 +235,7 @@ namespace GUI_Context_Flags
         cursor_mask_validation          = 1 << 2,
         cursor_mask_enabled             = 1 << 3,
         disable_wrapping                = 1 << 4,
-        disable_kc_navigation           = 1 << 5,
+        one_time_disable_kc_navigation  = 1 << 5,
         disable_mouse_scroll            = 1 << 6,
         context_ready                   = 1 << 7,
         maxout_vertical_slider          = 1 << 8,
@@ -236,6 +244,7 @@ namespace GUI_Context_Flags
         one_time_skip_padding           = 1 << 11,
         dont_auto_activate              = 1 << 12,
         one_time_ignore_id              = 1 << 13, // CONSIDER: This is really hacky, but do we event need ids?
+        one_time_taking_control_of_external_input = 1 << 14,
     }; // max shift is 31
 }
 
@@ -272,6 +281,7 @@ struct GUI_Context
     Rect bounds_rel_anchor_base = {};
     GUI_Theme* theme = 0;
     
+    u32 _master_id = 0;
     u32 _context_id = 0;
     u32 flags = 0;
     i32 selected_index = 0;

@@ -233,6 +233,7 @@ struct Game_State
     String seed_input;
     // ----------------------------------------
     
+    u32 active_player_card_idx;
     u32 day_counter;
     f64 night_falls_start_time;
     

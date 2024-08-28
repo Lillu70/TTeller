@@ -41,6 +41,8 @@ static inline v2f GUI_Character_Size(GUI_Context* context, v2f scale_factor = GU
     f32 x = f32(context->theme->font.char_width);
     
     v2f result = Hadamar_Product(v2f{x, y}, scale_factor);
+    
+    return result;
 }
 
 
@@ -630,8 +632,6 @@ static inline void GUI_Activate_Context(GUI_Context* context)
 {
     Assert(context->_context_id);
     GUI_Context::active_context_id = context->_context_id;
-    
-    //Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::hard_ignore_selection);
 }
 
 
@@ -725,26 +725,27 @@ static void GUI_Begin_Context(
     if(Bit_Not_Set(context->flags, GUI_Context_Flags::soft_ignore_selection))
         Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::dont_auto_activate);
     
-    if(GUI_Context::active_context_id == context->_context_id)
+    if(Bit_Not_Set(context->flags, GUI_Context_Flags::hard_ignore_selection))
     {
-        if(Bit_Not_Set(context->flags, GUI_Context_Flags::dont_auto_activate))
-            Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::soft_ignore_selection);
-    }
-    else
-    {
-        context->flags |= GUI_Context_Flags::soft_ignore_selection;
+        if(GUI_Context::active_context_id == context->_context_id)
+        {
+            if(Bit_Not_Set(context->flags, GUI_Context_Flags::dont_auto_activate))
+                Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::soft_ignore_selection);
+        }
+        else
+        {
+            context->flags |= GUI_Context_Flags::soft_ignore_selection;
+        }        
     }
     
     Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::cursor_mask_validation);
     
-    
     if(Is_Flag_Set(app_flags, (u32)App_Flags::is_focused))
     {
-        if(context->flags & GUI_Context_Flags::disable_kc_navigation)
-        {
-            Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::disable_kc_navigation);
-        }
-        else if(Bit_Not_Set(context->flags, GUI_Make_Ignore_Selection_Mask()))
+        u32 action_mask = GUI_Make_Ignore_Selection_Mask() | 
+            GUI_Context_Flags::one_time_disable_kc_navigation;
+        
+        if(Bit_Not_Set(context->flags, action_mask))
         {
             if(context->actions[GUI_Menu_Actions::up].Is_Pressed())
             {
@@ -762,6 +763,11 @@ static void GUI_Begin_Context(
         context->cursor_position = context->platform->Get_Cursor_Position() - context->canvas_pos;
         context->cursor_fpos = v2i::Cast<f32>(context->cursor_position);
     }
+    
+    u32 flags_to_kill = GUI_Context_Flags::one_time_taking_control_of_external_input | 
+        GUI_Context_Flags::one_time_disable_kc_navigation;
+    
+    Inverse_Bit_Mask(&context->flags, flags_to_kill);
 }
 
 
@@ -829,6 +835,12 @@ static inline void GUI_End_Context(GUI_Context* context)
         
         context->defered_render = GUI_Defered_Render_Type::none;
         
+        if(context->external_action_context && (context->flags & 
+            GUI_Context_Flags::one_time_taking_control_of_external_input))
+        {
+            context->external_action_context->disable_for_one_frame = true;
+        }
+        
         if(Bit_Not_Set(context->flags, GUI_Context_Flags::cursor_mask_validation))
         {
             Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::cursor_mask_enabled);
@@ -836,6 +848,8 @@ static inline void GUI_End_Context(GUI_Context* context)
         }
         
         u32 ignore_selection_mask = GUI_Make_Ignore_Selection_Mask();
+        
+        bool allow_snap_to_selected = true;
         
         // Selection wrapping.
         if(Bit_Not_Set(context->flags, ignore_selection_mask | GUI_Context_Flags::disable_wrapping))
@@ -845,18 +859,22 @@ static inline void GUI_End_Context(GUI_Context* context)
                 context->widget_count < context->last_widget_count)
             {
                 context->selected_index = context->widget_count - 1;
+                GUI_Reset_Selection_State(context);
+                allow_snap_to_selected = false;
             }
             
             if(context->selected_index < 0)
             {
                 context->selected_index = context->widget_count - 1;
                 GUI_Reset_Selection_State(context);
+                allow_snap_to_selected = false;
             }
             
             if(context->selected_index >= context->widget_count)
             {
                 context->selected_index = 0;
                 GUI_Reset_Selection_State(context);
+                allow_snap_to_selected = false;
             }
         }
         
@@ -922,7 +940,6 @@ static inline void GUI_End_Context(GUI_Context* context)
             f32 selected_element_max_x = context->selected_element_pos.x + selected_element_half_dim.x;
             f32 selected_element_min_x = context->selected_element_pos.x - selected_element_half_dim.x;    
             
-            bool selected_element_is_window_slider = false;
             bool shift_down = context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT) || 
                 context->platform->Get_Keyboard_Key_Down(Key_Code::LSHIFT);
             
@@ -1012,7 +1029,7 @@ static inline void GUI_End_Context(GUI_Context* context)
                 
                 if(enable_vertical_slider && enable_horizontal_slider)
                 {
-                    v2f min = v2f{context->canvas->dim.x - 1 - slider_girth, 0};
+                    v2f min = v2f{context->canvas->dim.x - slider_girth, 0};
                     v2f dim = v2f{} + slider_girth;
                     
                     Color color = context->theme->outline_color;
@@ -1020,7 +1037,11 @@ static inline void GUI_End_Context(GUI_Context* context)
                 }
                 
                 f32 mouse_scroll;
-                u32 mouse_scroll_mask = GUI_Context_Flags::disable_mouse_scroll | ignore_selection_mask;
+                u32 mouse_scroll_mask = 
+                    GUI_Context_Flags::disable_mouse_scroll | 
+                    GUI_Context_Flags::one_time_disable_kc_navigation |
+                    ignore_selection_mask;
+
                 if(Bit_Not_Set(context->flags, mouse_scroll_mask) &&
                     Is_Point_Inside_Rect(context->cursor_fpos, context->canvas_rect) &&
                     Is_Flag_Set(context->platform->Get_Flags(), (u32)App_Flags::is_focused))
@@ -1072,8 +1093,8 @@ static inline void GUI_End_Context(GUI_Context* context)
                     if(Bit_Not_Set(context->flags, ignore_selection_mask) && 
                         context->selected_index == context->widget_count - 1)
                     {
-                        selected_element_is_window_slider = true;
-                        context->flags |= GUI_Context_Flags::disable_kc_navigation;
+                        allow_snap_to_selected = false;
+                        context->flags |= GUI_Context_Flags::one_time_disable_kc_navigation;
                         context->flags |= GUI_Context_Flags::disable_wrapping;
                         
                         v2f pos = context->layout.last_element.pos;
@@ -1140,8 +1161,8 @@ static inline void GUI_End_Context(GUI_Context* context)
                     if(Bit_Not_Set(context->flags, ignore_selection_mask) && 
                         context->selected_index == context->widget_count - 1)
                     {
-                        selected_element_is_window_slider = true;
-                        context->flags |= GUI_Context_Flags::disable_kc_navigation;
+                        allow_snap_to_selected = false;
+                        context->flags |= GUI_Context_Flags::one_time_disable_kc_navigation;
                         context->flags |= GUI_Context_Flags::disable_wrapping;
                         
                         v2f pos = context->layout.last_element.pos;
@@ -1175,7 +1196,7 @@ static inline void GUI_End_Context(GUI_Context* context)
             }
             
             if(Bit_Not_Set(context->flags, ignore_selection_mask) 
-                && !selected_element_is_window_slider && context->selected_id)
+                && allow_snap_to_selected && context->selected_id)
             {
                 f32 true_canvas_height = canvas_dim.y;
             
@@ -1230,7 +1251,13 @@ static inline void GUI_End_Context(GUI_Context* context)
                 GUI_Context_Flags::maxout_vertical_slider;
             
             Inverse_Bit_Mask(&context->flags, reset_mask);
-        }   
+            
+            if(context->_master_id)
+            {
+                context->active_context_id = context->_master_id;
+                context->_master_id = 0;
+            }
+        }
     }
     else if(context->mode == GUI_Mode::layout_only)
     {
@@ -1636,7 +1663,7 @@ static void GUI_Do_Text(
     char* text,
     GUI_Highlight highlight = GUI_Highlight_Nothing(),
     v2f text_scale = GUI_DEFAULT_TEXT_SCALE,
-    bool is_title = false)
+    Color* color_override = 0)
 {
     Assert(GUI_Is_Context_Ready(context));
     
@@ -1650,16 +1677,14 @@ static void GUI_Do_Text(
     if(!Is_Rect_Valid(p.rect) || context->mode == GUI_Mode::layout_only)
         return;
     
-    v2f text_p = GUI_Calc_Centered_Text_Position(text, text_scale, p.pos, &theme->font);
-    
     // --------------------------------------------------------------------------
     
     if(Rects_Overlap(p.rect, context->canvas_rect))
     {
         Color color;
-        if(is_title)
+        if(color_override)
         {
-            color = theme->title_color;
+            color = *color_override;
         }
         else
         {
@@ -1667,8 +1692,20 @@ static void GUI_Do_Text(
                 theme->selected_color : theme->text_color;
         }
         
+        v2f text_p = GUI_Calc_Centered_Text_Position(text, text_scale, p.pos, &theme->font);
         Draw_Text(context->canvas, (u8*)text, text_p, color, &theme->font, text_scale);
     }
+}
+
+
+static inline void GUI_Do_Text(
+    GUI_Context* context, 
+    v2f* pos, 
+    char* text, 
+    Color* color_override,
+    v2f text_scale = GUI_DEFAULT_TEXT_SCALE)
+{
+    GUI_Do_Text(context, pos, text, {}, text_scale, color_override);
 }
 
 
@@ -1678,7 +1715,7 @@ static inline void GUI_Do_Title_Text(
     char* text, 
     v2f text_scale = Hadamar_Product(GUI_DEFAULT_TEXT_SCALE, GUI_DEFAULT_TITLE_SCALER))
 {
-    GUI_Do_Text(context, pos, text, {}, text_scale, true);
+    GUI_Do_Text(context, pos, text, {}, text_scale, &context->theme->title_color);
 }
 
 
@@ -2369,8 +2406,7 @@ static u32 GUI_Do_Dropdown_Button(
         
         if(state->is_open)
         {
-            if(context->external_action_context)
-                context->external_action_context->disable_for_one_frame = true;
+            context->flags |= GUI_Context_Flags::one_time_taking_control_of_external_input;
             
             if(context->actions[GUI_Menu_Actions::back].Is_Pressed() || 
                 (context->actions[GUI_Menu_Actions::mouse].Is_Pressed() && !cursor_is_in_open_rect))
@@ -2384,7 +2420,7 @@ static u32 GUI_Do_Dropdown_Button(
                 context->selected_element_pos = open_center;
                 context->selected_element_dim = open_dim;
                 
-                context->flags |= GUI_Context_Flags::disable_kc_navigation;
+                context->flags |= GUI_Context_Flags::one_time_disable_kc_navigation;
                 
                 // KC controls
                 if(context->actions[GUI_Menu_Actions::up].Is_Pressed())
@@ -2643,8 +2679,7 @@ static bool GUI_Do_SL_Input_Field(
         
         if(state->is_active)
         {
-            if(context->external_action_context)
-                context->external_action_context->disable_for_one_frame = true;
+            context->flags |= GUI_Context_Flags::one_time_taking_control_of_external_input;
             
             if(context->actions[GUI_Menu_Actions::back].Is_Pressed() || 
                 (!cursor_on_selection && mouse_pressed_down))
@@ -2999,9 +3034,8 @@ static void GUI_Do_ML_Input_Field(
 {
     Assert(GUI_Is_Context_Ready(context));
     
-    static constexpr f32 scroll_bar_width = 20.f;
-    static constexpr f32 min_handle_height = 3.f;
-    
+    constexpr f32 scroll_bar_width = 20.f;
+    constexpr f32 min_handle_height = 3.f;
     
     // --------------------------------------------------------------------------
     
@@ -3078,8 +3112,7 @@ static void GUI_Do_ML_Input_Field(
         
         if(state->is_active)
         {
-            if(context->external_action_context)
-                context->external_action_context->disable_for_one_frame = true;
+            context->flags |= GUI_Context_Flags::one_time_taking_control_of_external_input;
             
             // Handle input
             bool mouse_pressed_down = context->actions[GUI_Menu_Actions::mouse].Is_Pressed();
@@ -3093,7 +3126,7 @@ static void GUI_Do_ML_Input_Field(
                 state->view_offset = 0;
                 
                 u32 mask = GUI_Context_Flags::cursor_mask_validation | 
-                    GUI_Context_Flags::disable_kc_navigation;
+                    GUI_Context_Flags::one_time_disable_kc_navigation;
                 
                 Inverse_Bit_Mask(&context->flags, mask);
             }
@@ -3101,7 +3134,7 @@ static void GUI_Do_ML_Input_Field(
             {
                 context->flags |= GUI_Context_Flags::cursor_mask_validation;
                 context->flags |= GUI_Context_Flags::cursor_mask_enabled;
-                context->flags |= GUI_Context_Flags::disable_kc_navigation;
+                context->flags |= GUI_Context_Flags::one_time_disable_kc_navigation;
                 
                 context->cursor_mask_area = context->canvas_rect;
                 
@@ -3873,40 +3906,91 @@ static bool GUI_Do_Sub_Context(
     Canvas* sub_canvas, 
     v2f* pos,
     v2f* dim,
-    Color* bg_color = 0,
+    Color* bg_color_ptr = 0,
     GUI_Link_Direction::Type ld = GUI_Link_Direction::up)
 {
-    GUI_Highlight highlight = GUI_Is_Context_Active(sub_context)? 
-        GUI_Highlight_Everything() : GUI_Highlight_Nothing();
+    // --------------------------------------------------------------------------
+    GUI_Placement p = GUI_Get_Placement(master, dim, pos);
+    if(!Is_Rect_Valid(p.rect) || master->mode == GUI_Mode::layout_only)
+        return false;
     
-    GUI_Do_Panel(master, pos, dim, bg_color, highlight);
-    
-    GUI_Placement p = master->layout.last_element;
+    u32 id = GUI_Generate_ID(p.rect, __LINE__);
     
     bool cursor_on_selection = Is_Point_Inside_Rect(master->cursor_fpos, p.rect);
-    if(cursor_on_selection)
-        GUI_Activate_Context(sub_context);
+    bool is_selected = GUI_Is_Element_Selected(master, cursor_on_selection, id);
+    bool is_sub_context_active = false;
     
-    f32 outline_thickness = f32(master->theme->outline_thickness);
-    p.rect.min += outline_thickness;
+    if(is_selected)
+    {
+        GUI_Sub_Context_State* state = &master->selection_state.sub_context;
+
+        if(GUI_On_Release_Action(master, cursor_on_selection, &state->is_pressed_down))
+        {
+            state->is_active = true;
+        }
+        
+        if(master->actions[GUI_Menu_Actions::back].Is_Pressed() &&
+            Bit_Not_Set(sub_context->flags, GUI_Context_Flags::one_time_taking_control_of_external_input))
+        {
+            state->is_active = false;
+        }
+        
+        is_sub_context_active = state->is_active;
+    }
+    
+    if(is_sub_context_active)
+    {
+        master->flags |= GUI_Context_Flags::one_time_disable_kc_navigation;
+        
+        if(master->external_action_context)
+            master->external_action_context->disable_for_one_frame = true;
+    }
+    
+    // --------------------------------------------------------------------------
+    
     
     bool result = false;
     if(Is_Rect_Valid(p.rect) && Rects_Overlap(p.rect, master->canvas_rect))
     {
-        v2f cp = Round(p.rect.min);
+        GUI_Theme* theme = master->theme;
+        f32 outline_thickness = f32(theme->outline_thickness);
+        
+        // Drawing
+        {
+            
+            Color bg_color = bg_color_ptr? *bg_color_ptr : theme->background_color;
+            Color outline_color = theme->outline_color;
+            
+            if(is_selected)
+            {
+                outline_color = is_sub_context_active?  theme->selected_color : theme->down_color;
+            }
+            
+            Draw_Filled_Rect_With_Outline(
+                master->canvas, 
+                p.rect, 
+                bg_color,
+                theme->outline_thickness, 
+                outline_color);
+        }
+        
+        v2f pf = p.rect.min - Trunc(p.rect.min);
+        
+        p.rect.min += outline_thickness;
+        v2f cp = Floor(p.rect.min);
         cp.x = Max(cp.x, 0.f);
         cp.y = Max(cp.y, 0.f);
         
-        v2f rendering_offset;
+        v2f rendering_offset = {};
         rendering_offset.x = (p.rect.min.x < 0)? p.rect.min.x : 0.f;
         rendering_offset.y = (p.rect.min.y < 0)? p.rect.min.y : 0.f;
        
         v2i canvas_pos = cp.As<i32>();
         v2u buffer_offset = canvas_pos.As<u32>();
         
-        if(buffer_offset.x < master->canvas->dim.x && buffer_offset.y < master->canvas->dim.y)
+        if(buffer_offset.x < master->canvas->dim.x - 1 && buffer_offset.y < master->canvas->dim.y - 1)
         {
-            v2f sub_dim_f32 = Round(p.dim + rendering_offset - outline_thickness * 2);
+            v2f sub_dim_f32 = Ceil(p.dim + rendering_offset - outline_thickness * 2);
             if(sub_dim_f32.x > 0 && sub_dim_f32.y > 0)
             {
                 v2u sub_dim = sub_dim_f32.As<u32>();
@@ -3916,24 +4000,28 @@ static bool GUI_Do_Sub_Context(
                 sub_canvas_dim.x = Min(sub_dim.x, sub_canvas_dim_max.x);
                 sub_canvas_dim.y = Min(sub_dim.y, sub_canvas_dim_max.y);
                 
+                Assert(sub_canvas_dim.x && sub_canvas_dim.y);
+                
                 *sub_canvas = Create_Sub_Canvas(
                     master->canvas,
                     sub_canvas_dim,
                     buffer_offset);
                 
                 {
-                    if(master->flags & GUI_Context_Flags::hard_ignore_selection)
+                    if(master->flags & GUI_Context_Flags::hard_ignore_selection || !is_sub_context_active)
                         sub_context->flags |= GUI_Context_Flags::hard_ignore_selection;
-                    
-                    if(master->flags & GUI_Context_Flags::disable_mouse_scroll)
-                        sub_context->flags |= GUI_Context_Flags::disable_mouse_scroll;
-                    
-                    if(master->flags & GUI_Context_Flags::disable_kc_navigation)
-                        sub_context->flags |= GUI_Context_Flags::disable_kc_navigation;
+                    else
+                        Inverse_Bit_Mask(&sub_context->flags, GUI_Context_Flags::hard_ignore_selection);
                     
                     if(master->flags & GUI_Context_Flags::enable_dynamic_sliders)
                         sub_context->flags |= GUI_Context_Flags::enable_dynamic_sliders;   
                 }
+                
+                if(is_sub_context_active)
+                {
+                    sub_context->_master_id = master->_context_id;
+                    GUI_Context::active_context_id = sub_context->_context_id;
+                }                
                 
                 GUI_Begin_Context(
                     sub_context, 
@@ -3946,7 +4034,8 @@ static bool GUI_Do_Sub_Context(
                     ld);
 
                 sub_context->canvas_space_dim = sub_dim - Ceil(rendering_offset).As<u32>();
-                sub_context->rendering_offset = rendering_offset;
+                
+                sub_context->rendering_offset = rendering_offset + v2f{pf.x, 1.f - pf.y};
                 
                 result = true;                
             }
