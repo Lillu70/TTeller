@@ -526,22 +526,28 @@ static void Do_Event_Display_Frame()
         &active_event_header);    
     
     void(*banner_func)(GUI_Context* context) = [](GUI_Context* context)
-    { 
-        char* event_name = active_event_header->event_name.buffer;
-        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_LEFT, event_name, GUI_Scale_Default(2.f));
+    {
+        context->layout.build_direction = GUI_Build_Direction::right_center;
         
         if(s_game_state.display_event_idx < s_game_state.active_events->count - 1)
         {
-            if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(next_event)))
+            if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &GUI_AUTO_FIT, L1(next_event)))
             {
                 skip_frame = true;
                 s_game_state.display_event_idx += 1;
                 Generate_Display_Text(&s_game_state);
             }
+            
+            GUI_Push_Layout(context);
+            if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(skip)))
+            {
+                
+            }
+            GUI_Pop_Layout(context);
         }
         else
         {
-            if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(_continue)))
+            if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &GUI_AUTO_FIT, L1(_continue)))
             {
                 Resolve_Current_Event_Set(&s_game_state, &s_allocator);
                 skip_frame = true;
@@ -576,6 +582,39 @@ static void Do_Event_Display_Frame()
                 return;
             }
         }
+        
+        context->layout.build_direction = GUI_Build_Direction::down_center;
+        context->layout.anchor = GUI_Anchor::top;
+        
+        v2f player_picture_dim = Hadamar_Product(s_player_picture_dim_base, GUI_DEFAULT_TEXT_SCALE);
+        
+        Player_Image* player_images = Begin(s_game_state.player_images);
+        
+        f32 padding = f32(context->theme->padding);
+        
+        v2f name_pos = v2f{padding, context->layout.last_element.pos.y};
+        name_pos.y -= context->layout.last_element.dim.y / 2 + padding; 
+        
+        f32 min_half_lenght = player_picture_dim.x / 2.f;
+        
+        for(u32 i = 0; i < active_event->participant_count; ++i)
+        {
+            u32 player_idx = active_event->player_indices[i];
+            Game_Player_Name_FI* player_name = Begin(s_game_state.player_names) + player_idx;
+            
+            f32 name_lenght = GUI_Character_Width(context) * f32(player_name->full_name.lenght);
+            f32 half_lenght = Max(name_lenght / 2.f, min_half_lenght);
+            
+            name_pos.x += half_lenght;
+            
+            GUI_Do_Text(context, &name_pos, player_name->full_name.buffer);
+            
+            name_pos.x += half_lenght + padding;            
+            
+            Player_Image* player_image = player_images + player_idx;
+            GUI_Do_Image_Panel(context, AUTO, &player_picture_dim, &player_image->image);
+        }
+        
     }; // ----------------------------------------------------------------------------------------
 
     void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
@@ -583,59 +622,22 @@ static void Do_Event_Display_Frame()
         if(skip_frame)
             return;
         
-        Assert(active_event->participant_count);
-        Player_Image* player_images = Begin(s_game_state.player_images);
+        v2f text_box_dim = v2f{f32(context->canvas->dim.x - 1), f32(context->canvas->dim.y - 1)};
+        text_box_dim -= 50.f * GUI_DEFAULT_TEXT_SCALE;
         
-        v2f player_picture_dim = Hadamar_Product(s_player_picture_dim_base, GUI_DEFAULT_TEXT_SCALE);
-        
-        f32 collumn_start;
-        v2f* p = &GUI_AUTO_TOP_LEFT;
-        for(u32 i = 0; i < active_event->participant_count; ++i)
+        if(text_box_dim.x > 0 && text_box_dim.y > 0)
         {
-            u32 player_idx = *(active_event->player_indices + i);
-            Game_Player_Name_FI* player_name 
-                = Begin(s_game_state.player_names) + player_idx;
+            context->layout.anchor = GUI_Anchor::center;
             
-            GUI_Do_Text(context, p, player_name->full_name.buffer);
-            if(i == 0)
-            {
-                p = AUTO;
-                GUI_Push_Layout(context);
-                collumn_start = GUI_Get_Collumn_Start(context, X_AXIS);
-            }
-            
-            Player_Image* player_image = player_images + player_idx;
-            GUI_Do_Image_Panel(context, AUTO, &player_picture_dim, &player_image->image);
+            GUI_Do_ML_Input_Field(
+                context, 
+                &GUI_AUTO_MIDDLE, 
+                &text_box_dim,
+                &s_game_state.display_text, 
+                0, 
+                GUI_DEFAULT_TEXT_SCALE,
+                GUI_Character_Check_View_Only);
         }
-        
-        GUI_Pop_Layout(context);
-        GUI_End_Collumn(
-            context, 
-            s_player_creation_collumn_min_width_base * GUI_DEFAULT_TEXT_SCALE.x, 
-            collumn_start, 
-            X_AXIS);
-        
-        Rect bounds = GUI_Get_Bounds_In_Pixel_Space(context);
-        f32 h = bounds.max.y - bounds.min.y;
-        
-        f32 last_element_x = context->layout.last_element.dim.x;
-        f32 w = context->layout.last_element.pos.x + last_element_x - context->anchor_base.x;
-        f32 text_box_width = f32(context->canvas->dim.x) - w - f32(context->theme->padding) * 2 - 50;
-        text_box_width = Max(text_box_width, 500.f);
-        
-        v2f text_box_dim = v2f{text_box_width, h};
-    
-    
-        context->layout.build_direction = GUI_Build_Direction::right_top;
-        
-        GUI_Do_ML_Input_Field(
-            context, 
-            AUTO, 
-            &text_box_dim,
-            &s_game_state.display_text, 
-            0, 
-            GUI_DEFAULT_TEXT_SCALE,
-            GUI_Character_Check_View_Only);
     }; // ----------------------------------------------------------------------------------------
 
     Do_GUI_Frame_With_Banner(banner_func, menu_func);
@@ -670,8 +672,8 @@ static void Do_Day_Counter_Display_Frame()
             }
         }
         
-        context->layout.anchor = GUI_Anchor::top_left;
-        if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &GUI_AUTO_FIT, L1(quit_game)))
+        context->layout.anchor = GUI_Anchor::top_right;
+        if(GUI_Do_Button(context, &GUI_AUTO_TOP_RIGHT, &GUI_AUTO_FIT, L1(quit_game)))
         {
             Delete_Game(&s_game_state, &s_allocator);
             s_global_data.active_menu = Menus::main_menu;           

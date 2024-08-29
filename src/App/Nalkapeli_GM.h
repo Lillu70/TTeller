@@ -197,8 +197,6 @@ struct Game_State
         Table event_table_night;
     // -------------------------------------
     
-    
-    
     // -------------------------------------------------------------------
     // Player data create after all players have been entered ------------
         

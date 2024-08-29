@@ -19,7 +19,6 @@ struct Mark_Hash_Bucket_Header
 {
     Mark_Hash_Bucket_Header* next_bucket;
     
-    // --- methods ---
     Mark_Hash_Element* begin();
 };
 
@@ -837,18 +836,24 @@ static inline void Hollow_Player_Name_FI(Game_Player_Name_FI* player)
 static inline void Hollow_Game_Player(Game_Player* player, Allocator_Shell* allocator)
 {
     Assert(player->marks);
-    allocator->free(player->marks);
+    if(player->marks)
+        allocator->free(player->marks);
+    
+    player->marks = 0;
 }
 
 
 static void Delete_Game(Game_State* game, Allocator_Shell* allocator)
 {
+    Assert(!game->memory);
+    
     if(game->total_player_count)
     {
         for(u32 i = 0; i < game->total_player_count; ++i)
             Hollow_Game_Player(game->players + i, allocator);
         
         allocator->free(game->players);
+        game->players = 0;
     }
     
     allocator->free(game->memory);
@@ -869,7 +874,11 @@ static void Delete_Game(Game_State* game, Allocator_Shell* allocator)
     allocator->free(game->player_names);
     
     for(each(Event*, e, game->active_events))
-        allocator->free(e->player_indices);
+    {
+        if(e->player_indices)
+            allocator->free(e->player_indices);
+        e->player_indices = 0;
+    }
     
     allocator->free(game->active_events);
     allocator->free(game->global_marks);
@@ -888,7 +897,9 @@ static void Reset_Game(Game_State* game, Allocator_Shell* allocator)
         for(u32 i = 0; i < game->total_player_count; ++i)
             Hollow_Game_Player(game->players + i, allocator);
         
-        allocator->free(game->players);
+        if(game->players)
+            allocator->free(game->players);
+        game->players = 0;
     }
     game->players = 0;
     
@@ -968,7 +979,11 @@ static inline void Free_Event_List(Dynamic_Array<Event>* events, Allocator_Shell
     Assert(events);
     
     for(auto e = Begin(events); e < End(events); ++e)
-        allocator->free(e->player_indices);
+    {
+        if(e->player_indices)
+            allocator->free(e->player_indices);
+        e->player_indices = 0;
+    }
     
     allocator->free(events);
 }
@@ -1123,8 +1138,12 @@ static inline bool Player_Satisfies_Requirement(
 static inline void Hollow_Active_Events(Game_State* game, Allocator_Shell* allocator)
 {
     for(each(Event*, e, game->active_events))
+    {
+        if(e->player_indices)
             allocator->free(e->player_indices);
-        
+        e->player_indices = 0;
+    }
+
     game->active_events->count = 0;
 }
 
