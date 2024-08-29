@@ -451,7 +451,6 @@ static void Do_Default_Quit_Popup(GUI_Context* context)
     if(GUI_Do_Button(context, AUTO, &button_dim, t1))
         Close_Popup();
     
-    
     if(GUI_Do_Button(context, AUTO, &button_dim, t2))
         s_platform.Set_Flag(App_Flags::is_running, false);
 }

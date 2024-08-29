@@ -179,7 +179,6 @@ static inline v2f Get_Title_Bar_Row_Placement(
 }
 
 
-
 static inline void Set_Additional_Colors_Based_On_Default_Theme(GUI_Default_Theme_Names theme)
 {
     switch(theme)
@@ -239,6 +238,55 @@ static void Set_Settings_To_Default()
     s_settings.error_theme.background_color         = Make_Color(180, 70, 70);
     s_settings.error_theme.outline_color            = Make_Color(255, 235, 235);
     // -------------------------------------------------
+}
+
+
+static inline bool Try_Save_Settings()
+{
+    bool result = false;
+    
+    char exe_path[255];
+    if(s_platform.Get_Executable_Path(exe_path, Array_Lenght(exe_path)))
+    {
+        String settings_path = Create_String(&s_allocator, exe_path, data_folder_path, "SETTINGS");
+        result = s_platform.Write_File(settings_path.buffer, (u8*)&s_settings, sizeof(s_settings));
+        
+        settings_path.free();
+    }
+    
+    return result;
+}
+
+
+static inline bool Try_Load_Settings()
+{
+    bool result = false;
+    
+    char exe_path[255];
+    if(s_platform.Get_Executable_Path(exe_path, Array_Lenght(exe_path)))
+    {
+        String settings_path = Create_String(&s_allocator, exe_path, data_folder_path, "SETTINGS");
+        
+        u32 file_size;
+        if(s_platform.Get_File_Size(settings_path.buffer, &file_size))
+        {
+            if(sizeof(s_settings) == file_size)
+            {
+                result = s_platform.Read_File(settings_path.buffer, (u8*)&s_settings, file_size);
+                if(result)
+                {
+                    s_settings.theme.font = s_font;
+                    s_settings.warning_theme.font = s_font;
+                    s_settings.error_theme.font = s_font;
+                    GUI_DEFAULT_TEXT_SCALE = s_settings.text_scale;
+                }
+            }
+        }
+        
+        settings_path.free();
+    }
+    
+    return result;
 }
 
 

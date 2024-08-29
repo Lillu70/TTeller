@@ -23,7 +23,11 @@ void Init_App(Platform_Calltable platform_calltable)
     }
     
     Init_GUI();
-    Set_Settings_To_Default();
+    
+    if(!Try_Load_Settings())
+    {
+        Set_Settings_To_Default();
+    }
 }
 
 
@@ -337,6 +341,11 @@ void Update_App()
     s_scrach_buffer.clear();
     
     s_global_data.pooled_contexes_in_use_count = 0;
+    
+    if(!Is_Flag_Set(s_platform.Get_Flags(), (u32)App_Flags::is_running))
+    {
+        Try_Save_Settings();
+    }
     
     End_Timing_Block(internal_run_time);
 }
