@@ -97,6 +97,12 @@ struct Global_Data
     void(*popup_func)(GUI_Context*) = 0;
     void(*on_popup_close)() = 0;
     
+    // ------------------
+    u32 color_edit_title_idx = 0;
+    Color* color_edit_color = 0;
+    v3f color_edit_color_up = {};
+    // ------------------
+    
     v2f popup_panel_dim = v2f{0.f, 0.f};
     v2f title_scale = v2f{2.f, 2.f};
 
@@ -209,7 +215,6 @@ static inline void Set_Additional_Colors_Based_On_Default_Theme(GUI_Default_Them
 }
 
 
-
 static void Set_Settings_To_Default()
 {
     s_settings = {};
@@ -219,7 +224,7 @@ static void Set_Settings_To_Default()
     GUI_DEFAULT_TEXT_SCALE = s_settings.text_scale;
     // -------------------------------------------------
     
-    GUI_Default_Theme_Names def_theme = GUI_Default_Theme_Names::oasis;
+    GUI_Default_Theme_Names def_theme = GUI_Default_Theme_Names::vintage;
     s_settings.theme = GUI_Create_Default_Theme(def_theme, s_font);
     Set_Additional_Colors_Based_On_Default_Theme(def_theme);
     

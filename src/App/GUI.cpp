@@ -1465,6 +1465,17 @@ static bool GUI_Input_Field_Begin_Or_End_Text_Select_Mode(GUI_SL_Input_Field_Sta
 }
 
 
+static bool GUI_Was_Last_Selected(GUI_Context* context)
+{
+    u32 mask = GUI_Make_Ignore_Selection_Mask();
+    
+    bool result = 
+        context->selected_index == context->widget_count - 1 && Bit_Not_Set(context->flags, mask);
+    
+    return result;
+}
+
+
 static bool GUI_Input_Field_Insert_Characters(
     Platform_Calltable* platform, 
     GUI_SL_Input_Field_State* state, 

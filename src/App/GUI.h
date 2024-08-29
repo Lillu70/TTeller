@@ -30,18 +30,18 @@ static thread_local u32 GUI_NO_CHARACTER_LIMIT      = 0;
 
 struct GUI_Theme
 {
-    Color selected_color        = Make_Color(250, 220, 115);
-    Color background_color      = Make_Color(20, 20, 20);
-    Color down_color            = Make_Color(50, 50, 50);
-    Color outline_color         = Make_Color(110, 110, 130);
-    Color text_color            = WHITE;
-    Color widget_text_color     = BLACK;
-    Color title_color           = Make_Color(210, 210, 230);
-    Color write_cursor_color    = BLACK;
-    Color write_cursor_limit_color = RED;
+    Color selected_color;
+    Color background_color;
+    Color down_color;
+    Color outline_color;
+    Color text_color;
+    Color widget_text_color;
+    Color title_color;
+    Color write_cursor_color;
+    Color write_cursor_limit_color;
     
-    u32 outline_thickness = 2;
-    f32 padding = 10;
+    u32 outline_thickness;
+    f32 padding;
     
     Font font;
 };
