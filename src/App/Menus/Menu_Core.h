@@ -9,17 +9,17 @@
 
 #define AUTO 0
 
-static Color s_background_color         = Make_Color(20, 20, 20);
-static Color s_banner_background_color  = Make_Color(40, 40, 40);
-static Color s_list_bg_color            = Make_Color(10, 10, 10);
-
-static GUI_Theme s_theme = {};
-static GUI_Theme s_error_theme = {};
-static GUI_Theme s_warning_theme = {};
-
 static GUI_Context s_gui;
 static GUI_Context s_gui_banner;
 static GUI_Context s_gui_pop_up;
+
+
+static Font s_font = {
+    s_terminus_font_char_width, 
+    s_terminus_font_char_height, 
+    (u8*)&s_terminus_font[0], 
+    (u8*)&s_terminus_font_special_characters[0]
+};
 
 
 struct Pooled_GUI_Context
@@ -68,7 +68,15 @@ static Action s_hotkeys[s_hotkey_count] = {};
 struct Settings
 {
     bool allow_non_uniform_text_scale;
-    v2f text_scale;
+    v2f text_scale; // NOTE/CONSIDER: <- Redundant value. Actual text scale is handled by GUI_DEFAULT_TEXT_SCALE inside the GUI.h.
+    
+    GUI_Theme theme;
+    GUI_Theme error_theme;
+    GUI_Theme warning_theme;
+    
+    Color background_color;
+    Color banner_background_color;
+    Color list_bg_color;
     
     Language language;
 };
@@ -165,6 +173,70 @@ static inline v2f Get_Title_Bar_Row_Placement(
 }
 
 
+
+static inline void Set_Additional_Colors_Based_On_Default_Theme(GUI_Default_Theme_Names theme)
+{
+    switch(theme)
+    {
+        case GUI_Default_Theme_Names::cyper:
+        case GUI_Default_Theme_Names::vintage:
+        {
+            s_settings.background_color         = Make_Color(20, 20, 20);
+            s_settings.banner_background_color  = Make_Color(40, 40, 40);
+            s_settings.list_bg_color            = Make_Color(10, 10, 10);
+        }break;
+        
+        case GUI_Default_Theme_Names::document:
+        {
+            s_settings.background_color         = Make_Color(240, 240, 240);
+            s_settings.banner_background_color  = Make_Color(194, 248, 247);
+            s_settings.list_bg_color            = WHITE;
+        }break;
+        
+        case GUI_Default_Theme_Names::oasis:
+        {
+            s_settings.background_color         = Make_Color(255, 217, 159);
+            s_settings.banner_background_color  = Make_Color(159, 232, 255);
+            s_settings.list_bg_color            = Make_Color(10, 10, 10);
+        }break;
+        
+        
+        default:
+        {
+            Terminate;
+        }
+    }
+}
+
+
+
+static void Set_Settings_To_Default()
+{
+    s_settings = {};
+    
+    // -------------------------------------------------
+    s_settings.text_scale = v2f{2.f, 2.f};
+    GUI_DEFAULT_TEXT_SCALE = s_settings.text_scale;
+    // -------------------------------------------------
+    
+    GUI_Default_Theme_Names def_theme = GUI_Default_Theme_Names::oasis;
+    s_settings.theme = GUI_Create_Default_Theme(def_theme, s_font);
+    Set_Additional_Colors_Based_On_Default_Theme(def_theme);
+    
+    // -------------------------------------------------
+    s_settings.warning_theme = s_settings.theme;
+    s_settings.warning_theme.selected_color         = Make_Color(128, 0, 0);
+    s_settings.warning_theme.background_color       = Make_Color(255, 255, 128);
+    s_settings.warning_theme.outline_color          = Make_Color(234, 143, 21);
+    // -------------------------------------------------    
+    s_settings.error_theme = s_settings.theme;
+    s_settings.error_theme.selected_color           = Make_Color(128, 0, 0);
+    s_settings.error_theme.background_color         = Make_Color(180, 70, 70);
+    s_settings.error_theme.outline_color            = Make_Color(255, 235, 235);
+    // -------------------------------------------------
+}
+
+
 // Usage
 /*
 
@@ -211,7 +283,7 @@ static void Do_GUI_Frame_With_Banner(
         }
     }
     
-    GUI_Begin_Context_In_Layout_Only_Mode(&s_gui_banner, &s_canvas, &s_theme);
+    GUI_Begin_Context_In_Layout_Only_Mode(&s_gui_banner, &s_canvas, &s_settings.theme);
     {
         banner_func(&s_gui_banner);
     }
@@ -221,7 +293,7 @@ static void Do_GUI_Frame_With_Banner(
     
     f32 banner_height = Get_Rect_Dimensions(banner_rect).y;
     banner_height = Ceil(banner_height);
-    banner_height += f32(s_theme.padding * 2) + s_gui.dynamic_slider_girth;
+    banner_height += f32(s_settings.theme.padding * 2) + s_gui.dynamic_slider_girth;
     banner_height = Clamp_Zero_To_Max(banner_height, f32(s_canvas.dim.y));
     
     v2u banner_dim = v2u{s_canvas.dim.x, u32(banner_height)};
@@ -233,13 +305,13 @@ static void Do_GUI_Frame_With_Banner(
     Canvas banner_canvas = Create_Sub_Canvas(&s_canvas, banner_dim, banner_buffer_offset);
     
     // Clear works on vertical sub canvases
-    Clear_Canvas(&banner_canvas, s_banner_background_color);
+    Clear_Canvas(&banner_canvas, s_settings.banner_background_color);
     
     v2i banner_canvas_pos = v2i{0, i32(s_canvas.dim.y - banner_dim.y)};
 
     Action_Context* ac = &s_global_data.action_context;
     
-    GUI_Begin_Context(&s_gui_banner, &banner_canvas, ac, &s_theme, banner_canvas_pos);
+    GUI_Begin_Context(&s_gui_banner, &banner_canvas, ac, &s_settings.theme, banner_canvas_pos);
     {
         banner_func(&s_gui_banner);
     }
@@ -255,9 +327,9 @@ static void Do_GUI_Frame_With_Banner(
     Canvas menu_canvas = Create_Sub_Canvas(&s_canvas, menu_dim);
     
     // Clear works on vertical sub canvases
-    Clear_Canvas(&menu_canvas, s_background_color);
+    Clear_Canvas(&menu_canvas, s_settings.background_color);
     
-    GUI_Begin_Context(&s_gui, &menu_canvas, ac, &s_theme);
+    GUI_Begin_Context(&s_gui, &menu_canvas, ac, &s_settings.theme);
     {
         menu_func(&s_gui);
     }
@@ -276,7 +348,7 @@ static void Run_Popup_GUI_Frame()
         &s_gui_pop_up,
         &s_canvas, 
         &s_global_data.action_context, 
-        &s_theme, 
+        &s_settings.theme, 
         v2i{0, 0}, 
         GUI_Anchor::top);
     
@@ -289,7 +361,7 @@ static void Run_Popup_GUI_Frame()
         GUI_Do_Panel(
             &s_gui_pop_up, 
             s_global_data.popup_panel_rect, 
-            &s_banner_background_color, 
+            &s_settings.banner_background_color, 
             GUI_Highlight_Everything());
     }
     
@@ -342,49 +414,6 @@ static inline void Init_GUI()
     s_gui.flags |= GUI_Context_Flags::enable_dynamic_sliders;
     
     GUI_Set_Default_Menu_Actions();
-
-    GUI_DEFAULT_TEXT_SCALE = v2f{2.f, 2.f};
-    
-    v3<u8> c;
-    f32 g;
-    {        
-        c = {165, 80, 80};
-        s_theme.selected_color = Make_Color(c.r, c.g, c.b);
-        
-        g = 0.5f;
-        s_theme.down_color = Make_Color(u8(c.r * g), u8(c.g * g), u8(c.b * g));
-        
-        g = 1.3f;
-        s_theme.title_color = Make_Color(u8(c.r * g), u8(c.g * g), u8(c.b * g));
-    }
-    
-    {
-        c = {80, 55, 50};
-        s_theme.background_color = Make_Color(c.r, c.g, c.b);
-        g = 2.f;
-        s_theme.text_color = Make_Color(u8(c.r * g), u8(c.g * g), u8(c.b * g));
-    }
-    s_theme.widget_text_color = BLACK;
-    s_theme.outline_color = BLACK;
-    s_theme.write_cursor_color = Make_Color(180, 130, 150);    
-    s_theme.font.data_buffer = (u8*)&s_terminus_font[0];
-    s_theme.font.data_buffer_sc = (u8*)&s_terminus_font_special_characters[0];
-    s_theme.font.char_width = s_terminus_font_char_width;
-    s_theme.font.char_height = s_terminus_font_char_height;
-    
-    s_warning_theme = s_theme;
-    {
-        s_warning_theme.selected_color      = Make_Color(128, 0, 0);
-        s_warning_theme.background_color    = Make_Color(255, 255, 128);
-        s_warning_theme.outline_color       = Make_Color(234, 143, 21);
-    }
-    
-    s_error_theme = s_theme;
-    {
-        s_error_theme.selected_color        = Make_Color(128, 0, 0);
-        s_error_theme.background_color      = Make_Color(180, 70, 70);
-        s_error_theme.outline_color         = Make_Color(255, 235, 235);
-    }
 }
 
 

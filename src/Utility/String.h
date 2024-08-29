@@ -319,7 +319,7 @@ static void Reserve_String_Memory(String* str, u32 min_capacity, bool copy_into_
         if(copy_into_new_memory)
             Mem_Copy(new_buffer, str->buffer, str->lenght + 1);
         
-        if(str->buffer)
+        if(&str->buffer)
             str->alloc->free(str->buffer);
         
         str->buffer = new_buffer;

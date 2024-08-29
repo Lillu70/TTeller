@@ -172,4 +172,29 @@ L(game_error_names,
 })
 
 
+L(game_actions,
+{
+    "Quit game" E
+    "Reset game"
+},
+{
+    "Lopeta peli" E
+    "Palaa alkuun"
+})
+
+
+L(theme_names,
+{
+    "Vintage" E
+    "Document" E
+    "Cyper" E
+    "Oasis"
+},
+{
+    "Vuosikerta" E
+    "Dokumentti" E
+    "Kyper" E
+    "Keidas"
+})
+
 #undef E

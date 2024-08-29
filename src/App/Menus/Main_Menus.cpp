@@ -19,19 +19,46 @@ static void Do_Settings_Menu_Frame()
             s_global_data.active_menu = Menus::main_menu;
         }
         
+        GUI_Push_Layout(context);
+        
         context->layout.build_direction = GUI_Build_Direction::right_center;
         
         GUI_Do_Title_Text(context, AUTO, L1(settings_title), GUI_Scale_Default(s));
+        
+        GUI_Pop_Layout(context);
+        
+        context->layout.build_direction = GUI_Build_Direction::down_left;
+        
+        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(reset_defaults)))
+        {
+            Set_Settings_To_Default();
+        }
         
     }; // ----------------------------------------------------------------------------------------
 
     void(*menu_func)(GUI_Context* context) = [](GUI_Context* context)
     {
+        GUI_Do_Title_Text(context, &GUI_AUTO_TOP_LEFT, L1(language));
+        
+        if(u32 s = GUI_Do_Dropdown_Button(
+            context, 
+            AUTO, 
+            &GUI_AUTO_FIT, 
+            u32(s_settings.language),
+            LN(languages)))
+        {
+            s_settings.language = Language(s - 1);
+        }
+        
+        GUI_Do_Spacing(context, AUTO);
+        
+        GUI_Do_Title_Text(context, AUTO, L1(app_appearance));
+        
         GUI_Highlight highlight = GUI_Highlight_Next(context, 2);
         if(s_settings.allow_non_uniform_text_scale)
             highlight.count = 3;
         
-        GUI_Do_Text(context, &GUI_AUTO_TOP_LEFT, L1(text_size), highlight);
+        GUI_Do_Text(context, AUTO, L1(text_size), highlight);
         
         v2f check_box_dim = v2f{1.f, 1.f} * context->layout.last_element.dim.y;
         
@@ -98,16 +125,18 @@ static void Do_Settings_Menu_Frame()
             }            
         }
         
-        GUI_Do_Text(context, AUTO, L1(language), GUI_Highlight_Next(context));
-        
-        if(u32 s = GUI_Do_Dropdown_Button(
-            context, 
-            AUTO, 
-            &GUI_AUTO_FIT, 
-            u32(s_settings.language),
-            LN(languages)))
+        GUI_Do_Text(context, AUTO, L1(theme), GUI_Highlight_Next(context, 2));
+
+        if(u32 s = GUI_Do_Dropdown_Button(context, AUTO, &GUI_AUTO_FIT, L1(prebuild), LN(theme_names)))
         {
-            s_settings.language = Language(s - 1);
+            GUI_Default_Theme_Names name = GUI_Default_Theme_Names(s - 1);
+            s_settings.theme = GUI_Create_Default_Theme(name, s_font);
+            Set_Additional_Colors_Based_On_Default_Theme(name);
+        }
+        
+        if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(create_custom)))
+        {
+            
         }
         
     }; // ----------------------------------------------------------------------------------------
@@ -149,14 +178,14 @@ static void Do_Main_Menu_Frame()
 {
     Assert(s_mem.push_call_count == s_mem.free_call_count);
     
-    Clear_Canvas(&s_canvas, s_background_color);
+    Clear_Canvas(&s_canvas, s_settings.background_color);
     
     GUI_Context* context = &s_gui_banner;
     GUI_Begin_Context(
         context,
         &s_canvas, 
         &s_global_data.action_context, 
-        &s_theme,
+        &s_settings.theme,
         v2i{0, 0},
         GUI_Anchor::top);
     

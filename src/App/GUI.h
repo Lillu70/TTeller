@@ -327,3 +327,12 @@ static bool GUI_Do_Handle_Slider(
     GUI_Cardinal_Direction cardinal_dir = GUI_Cardinal_Direction::left_right,
     f32 step_count = 0,
     GUI_Input_Acceleration_Behavior inp_accel = GUI_Input_Acceleration_Behavior());
+
+
+enum class GUI_Default_Theme_Names : u8
+{
+    vintage,
+    document,
+    cyper,
+    oasis,
+};

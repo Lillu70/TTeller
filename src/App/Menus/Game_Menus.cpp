@@ -21,10 +21,7 @@ static void Do_GM_Campaign_Was_Unusable_Popup(GUI_Context* context);
 
 static void Do_Create_Player_FI_Instruction_Popup(GUI_Context* context)
 {
-    static String instruction_text = {};
-    if(!instruction_text.buffer)
-    {
-        Init_String(&instruction_text, &s_allocator, 
+    char* instruction_text_cstr = 
         "Here is another video inspired by the Deus Ex series!\n"
         "I hope you all enjoy it.\n"
         "I love making music like this that has more tense rhythmic elements,\n"
@@ -34,8 +31,13 @@ static void Do_Create_Player_FI_Instruction_Popup(GUI_Context* context)
         "possibly to hack into a system or quietly take down a target.\n" 
         "I hope it helps you feel energized and productive!\n"
         "Please help my channel by sharing, liking, commenting and subscribing!\n"
-        "\n\nSee you in the next one");
-    }
+        "\n\nSee you in the next one";
+    
+    String instruction_text = {
+        instruction_text_cstr, 
+        0, 
+        Null_Terminated_Buffer_Lenght(instruction_text_cstr),
+        0};
     
     v2f title_scale = Hadamar_Product(GUI_DEFAULT_TEXT_SCALE, GUI_DEFAULT_TITLE_SCALER);
     
@@ -529,59 +531,65 @@ static void Do_Event_Display_Frame()
     {
         context->layout.build_direction = GUI_Build_Direction::right_center;
         
-        if(s_game_state.display_event_idx < s_game_state.active_events->count - 1)
+        v2f* p = &GUI_AUTO_TOP_LEFT;
+        
+        bool not_last_event_in_set = 
+            s_game_state.display_event_idx < s_game_state.active_events->count - 1;
+        
+        if(not_last_event_in_set)
         {
-            if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &GUI_AUTO_FIT, L1(next_event)))
+            if(GUI_Do_Button(context, p, &GUI_AUTO_FIT, L1(next_event)))
             {
                 skip_frame = true;
                 s_game_state.display_event_idx += 1;
                 Generate_Display_Text(&s_game_state);
             }
-            
+            p = 0;
             GUI_Push_Layout(context);
-            if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(skip)))
-            {
-                
-            }
-            GUI_Pop_Layout(context);
         }
-        else
+        
+        char* t = (not_last_event_in_set)? L1(skip_set) : L1(_continue);
+        if(GUI_Do_Button(context, p, &GUI_AUTO_FIT, t))
         {
-            if(GUI_Do_Button(context, &GUI_AUTO_TOP_LEFT, &GUI_AUTO_FIT, L1(_continue)))
+            Resolve_Current_Event_Set(&s_game_state, &s_allocator);
+
+            if(!s_game_state.live_player_count)
             {
-                Resolve_Current_Event_Set(&s_game_state, &s_allocator);
-                skip_frame = true;
-                
-                if(!s_game_state.live_player_count)
-                {
-                    s_global_data.active_menu = Menus::GM_everyone_is_dead;
-                }
-                else if(s_game_state.live_player_count == 1)
-                {
-                    s_global_data.active_menu = Menus::GM_we_have_a_winner;
-                }
-                else
-                {
-                    switch(s_game_state.active_event_list)
-                    {
-                        case Event_List::day:
-                        {
-                            s_global_data.active_menu = Menus::GM_night_falls;
-                            f64 time = s_platform.Get_Time_Stamp();
-                            s_game_state.night_falls_start_time = time;
-                        }break;
-                        
-                        case Event_List::night:
-                        {
-                            s_game_state.day_counter += 1;
-                            Tickdown_Marks(&s_game_state);
-                            s_global_data.active_menu = Menus::GM_day_counter;
-                        }break;
-                    }                    
-                }
-                return;
+                s_global_data.active_menu = Menus::GM_everyone_is_dead;
             }
+            else if(s_game_state.live_player_count == 1)
+            {
+                s_global_data.active_menu = Menus::GM_we_have_a_winner;
+            }
+            else
+            {
+                switch(s_game_state.active_event_list)
+                {
+                    case Event_List::day:
+                    {
+                        s_global_data.active_menu = Menus::GM_night_falls;
+                        f64 time = s_platform.Get_Time_Stamp();
+                        s_game_state.night_falls_start_time = time;
+                    }break;
+                    
+                    case Event_List::night:
+                    {
+                        s_game_state.day_counter += 1;
+                        Tickdown_Marks(&s_game_state);
+                        s_global_data.active_menu = Menus::GM_day_counter;
+                    }break;
+                }
+            }
+            
+            while(context->layout_stack_count)
+                GUI_Pop_Layout(context);
+            
+            skip_frame = true;
+            return;
         }
+        
+        while(context->layout_stack_count)
+            GUI_Pop_Layout(context);
         
         context->layout.build_direction = GUI_Build_Direction::down_center;
         context->layout.anchor = GUI_Anchor::top;
@@ -673,11 +681,31 @@ static void Do_Day_Counter_Display_Frame()
         }
         
         context->layout.anchor = GUI_Anchor::top_right;
-        if(GUI_Do_Button(context, &GUI_AUTO_TOP_RIGHT, &GUI_AUTO_FIT, L1(quit_game)))
+        
+        
+        
+        if(u32 s = GUI_Do_Dropdown_Button(
+            context, 
+            &GUI_AUTO_TOP_RIGHT, 
+            &GUI_AUTO_FIT,
+            L1(game_actions),
+            LN(game_actions)))
         {
-            Delete_Game(&s_game_state, &s_allocator);
-            s_global_data.active_menu = Menus::main_menu;           
-            return;
+            switch(s - 1)
+            {
+                case 0: // Quit
+                {
+                    Delete_Game(&s_game_state, &s_allocator);
+                    s_global_data.active_menu = Menus::main_menu;
+                    return;
+                }break;
+                
+                case 1: // Reset
+                {
+                    Reset_Game(&s_game_state, &s_allocator);
+                    s_global_data.active_menu = Menus::GM_let_the_games_begin;
+                }break;
+            }
         }
         
     }; // ----------------------------------------------------------------------------------------
@@ -694,21 +722,39 @@ static void Do_Day_Counter_Display_Frame()
         
         GUI_Do_Text(context, &GUI_AUTO_TOP_CENTER, L1(active_global_marks));
         
+        GUI_Push_Layout(context);
+        
+        context->layout.build_direction = GUI_Build_Direction::left_center;
+        
+        v2f checkbox_dim = v2f{} + GUI_Character_Height(context);
+        GUI_Do_Checkbox(context, AUTO, &checkbox_dim, &s_game_state.show_global_marks);
+        
+        GUI_Pop_Layout(context);
+        
         char num_text_buffer[12] = {0};
         
-        for(each(Mark_GM*, gmark, s_game_state.global_marks))
+        if(s_game_state.show_global_marks)
         {
-            u32 offset = *(((u32*)s_game_state.mark_table.memory) + gmark->idx);
-            char* mark_text = s_game_state.mark_data + offset;
-            GUI_Do_Text(context, AUTO, mark_text);
-            
-            GUI_Push_Layout(context);
-            
-            context->layout.build_direction = GUI_Build_Direction::right_center;
-            char* num = U32_To_Char_Buffer((u8*)&num_text_buffer, gmark->duration);
-            GUI_Do_Text(context, AUTO, num);
-            
-            GUI_Pop_Layout(context);
+            for(each(Mark_GM*, gmark, s_game_state.global_marks))
+            {
+                u32 offset = *(((u32*)s_game_state.mark_table.memory) + gmark->idx);
+                char* mark_text = s_game_state.mark_data + offset;
+                GUI_Do_Text(context, AUTO, mark_text);
+                
+                GUI_Push_Layout(context);
+                
+                if(gmark->duration)
+                {
+                    context->flags |= GUI_Context_Flags::one_time_skip_padding;
+                    GUI_Do_Text(context, AUTO, ":");
+                    
+                    context->layout.build_direction = GUI_Build_Direction::right_center;
+                    char* num = U32_To_Char_Buffer((u8*)&num_text_buffer, gmark->duration);
+                    GUI_Do_Text(context, AUTO, num);
+                }
+                
+                GUI_Pop_Layout(context);
+            }            
         }
         
         GUI_Do_Title_Text(
@@ -886,13 +932,13 @@ static void Do_Night_Falls_Frame()
     GUI_Context* context = &s_gui_banner;
     Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::enable_dynamic_sliders);
     
-    Clear_Canvas(&s_canvas, s_background_color);
+    Clear_Canvas(&s_canvas, s_settings.background_color);
     
     GUI_Begin_Context(
         context,
         &s_canvas,
         &s_global_data.action_context, 
-        &s_theme,
+        &s_settings.theme,
         v2i{0, 0},
         GUI_Anchor::center,
         GUI_Build_Direction::down_center);
@@ -1303,7 +1349,7 @@ static void Do_Display_Invalid_Event_Filter_Results_Popup(GUI_Context* context)
                 &canvas, 
                 &sub_canvas_pos, 
                 &sub_canvas_dim,
-                &s_list_bg_color))
+                &s_settings.list_bg_color))
             {
                 sub_context->layout.anchor = GUI_Anchor::top_left;
                 
@@ -1380,7 +1426,13 @@ static void Do_GM_Campaign_Was_Unusable_Popup(GUI_Context* context)
                 (panel_center.y - panel_dim.y / 2)
         };
     
-    if(GUI_Do_Sub_Context(context, sub_context, &sub_canvas, AUTO, &sub_space_dim, &s_list_bg_color))
+    if(GUI_Do_Sub_Context(
+        context,
+        sub_context, 
+        &sub_canvas, 
+        AUTO, 
+        &sub_space_dim, 
+        &s_settings.list_bg_color))
     {
         GUI_Do_Title_Text(sub_context, &GUI_AUTO_TOP_LEFT, L1(errors), GUI_DEFAULT_TEXT_SCALE);
 
@@ -1394,7 +1446,6 @@ static void Do_GM_Campaign_Was_Unusable_Popup(GUI_Context* context)
     
         GUI_End_Context(sub_context);
     }
-    
     
     context->layout.anchor = GUI_Anchor::top_right;
     

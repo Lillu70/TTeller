@@ -7,7 +7,7 @@
 
 #pragma once
 
-#define CNB *((int*)0) = 666
+#define CNB *((volatile int*)0) = 666
 
 #ifdef _DB
 

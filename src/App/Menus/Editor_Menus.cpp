@@ -7,6 +7,7 @@
 
 #pragma once
 
+
 static void Do_Main_Menu_Name_New_Campaign_Popup(GUI_Context*);
 static void Do_Event_Editor_On_Exit_Editor(GUI_Context*);
 static void Do_Event_Editor_Delete_Event_Popup(GUI_Context*);
@@ -272,9 +273,9 @@ static void Do_Event_Editor_All_Events_Frame()
             GUI_Theme* theme = context->theme;
             
             if(event->issues.errors)
-                context->theme = &s_error_theme;                
+                context->theme = &s_settings.error_theme;                
             else if(event->issues.warnings)
-                context->theme = &s_warning_theme;
+                context->theme = &s_settings.warning_theme;
             
             // Destroy event
             v2f del_button_dim = v2f{} + GUI_Character_Height(context) + theme->padding;
@@ -322,7 +323,7 @@ static void Do_Event_Editor_All_Events_Frame()
         {
             v2u day_list_buffer_offset = v2u{border_width, border_width};
             Canvas event_list_day_canvas = Create_Sub_Canvas(&s_canvas, sub_dim, day_list_buffer_offset);
-            Clear_Sub_Canvas(&event_list_day_canvas, s_list_bg_color);
+            Clear_Sub_Canvas(&event_list_day_canvas, s_settings.list_bg_color);
             
             Inverse_Bit_Mask(&gui_event_list_day->flags,  GUI_Context_Flags::hard_ignore_selection);
             u32 set_mask = GUI_Context_Flags::enable_dynamic_sliders;
@@ -333,7 +334,7 @@ static void Do_Event_Editor_All_Events_Frame()
                 gui_event_list_day,
                 &event_list_day_canvas,
                 &s_global_data.action_context,
-                &s_theme,
+                &s_settings.theme,
                 day_list_buffer_offset.As<i32>());
             {
                 Editor_Event* events = Begin(s_editor_state.event_container.events);
@@ -352,7 +353,7 @@ static void Do_Event_Editor_All_Events_Frame()
         {
             v2u night_list_buffer_offset = v2u{border_width * 3 + sub_x, border_width};
             Canvas event_list_night_canvas = Create_Sub_Canvas(&s_canvas, sub_dim, night_list_buffer_offset);
-            Clear_Sub_Canvas(&event_list_night_canvas, s_list_bg_color);
+            Clear_Sub_Canvas(&event_list_night_canvas, s_settings.list_bg_color);
             
             Inverse_Bit_Mask(&gui_event_list_night->flags,  GUI_Context_Flags::hard_ignore_selection);
             u32 set_mask = GUI_Context_Flags::enable_dynamic_sliders;
@@ -363,7 +364,7 @@ static void Do_Event_Editor_All_Events_Frame()
                 gui_event_list_night,
                 &event_list_night_canvas,
                 &s_global_data.action_context,
-                &s_theme,
+                &s_settings.theme,
                 night_list_buffer_offset.As<i32>());
             {
                 Editor_Event* events = Begin(s_editor_state.event_container.events);
@@ -773,7 +774,7 @@ static void Do_Event_Editor_Participants_Frame()
                     }break;
                 }
                 
-                v2f spacing = v2f{context->layout.last_element.dim.x, s_theme.padding * 2};
+                v2f spacing = v2f{context->layout.last_element.dim.x, context->theme->padding * 2};
                 GUI_Do_Spacing(context, &spacing);    
             }
             
@@ -1282,7 +1283,7 @@ static void Do_Event_Editor_Consequences_Frame()
                     }break;
                 }
                 
-                v2f spacing = v2f{context->layout.last_element.dim.x, s_theme.padding * 2};
+                v2f spacing = v2f{context->layout.last_element.dim.x, context->theme->padding * 2};
                 GUI_Do_Spacing(context, &spacing);
             }
             
@@ -1551,7 +1552,13 @@ static void Do_Event_Editor_Display_Active_Event_Errors_Popup(GUI_Context* conte
             context->layout.last_element.dim.y / 2) - (panel_center.y - panel_dim.y / 2)
         };
     
-    if(GUI_Do_Sub_Context(context, sub_context, &sub_canvas, AUTO, &sub_space_dim, &s_list_bg_color))
+    if(GUI_Do_Sub_Context(
+        context, 
+        sub_context, 
+        &sub_canvas, 
+        AUTO, 
+        &sub_space_dim, 
+        &s_settings.list_bg_color))
     {
         v2f* pos = &GUI_AUTO_TOP_LEFT;
         

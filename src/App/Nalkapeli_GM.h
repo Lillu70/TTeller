@@ -235,6 +235,8 @@ struct Game_State
     u32 day_counter;
     f64 night_falls_start_time;
     
+    bool show_global_marks;
+    
     Random_Machine rm;
     static inline f64 night_falls_time = 1.5;
 };

@@ -845,7 +845,7 @@ static inline void Hollow_Game_Player(Game_Player* player, Allocator_Shell* allo
 
 static void Delete_Game(Game_State* game, Allocator_Shell* allocator)
 {
-    Assert(!game->memory);
+    Assert(game->memory);
     
     if(game->total_player_count)
     {
@@ -853,7 +853,6 @@ static void Delete_Game(Game_State* game, Allocator_Shell* allocator)
             Hollow_Game_Player(game->players + i, allocator);
         
         allocator->free(game->players);
-        game->players = 0;
     }
     
     allocator->free(game->memory);

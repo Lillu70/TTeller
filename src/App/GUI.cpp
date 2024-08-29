@@ -7,6 +7,73 @@
 
 #pragma once
 
+static inline GUI_Theme GUI_Create_Default_Theme(GUI_Default_Theme_Names name, Font font)
+{
+    GUI_Theme result = {};
+    
+    switch(name)
+    {
+        case GUI_Default_Theme_Names::vintage:
+        {
+            result.selected_color              = Make_Color(165, 80, 80);
+            result.background_color            = Make_Color(80, 55, 50);
+            result.down_color                  = Make_Color(82, 40, 40);
+            result.outline_color               = BLACK;
+            result.text_color                  = Make_Color(160, 110, 100);
+            result.widget_text_color           = BLACK;
+            result.title_color                 = Make_Color(214, 104, 104);
+            result.write_cursor_color          = Make_Color(180, 130, 150);
+            result.write_cursor_limit_color    = RED;
+        }break;
+        
+        case GUI_Default_Theme_Names::document:
+        {
+            result.selected_color              = Make_Color(140, 200, 200);
+            result.background_color            = WHITE;
+            result.down_color                  = GRAY;
+            result.outline_color               = BLACK;
+            result.text_color                  = Make_Color(60, 90, 90);
+            result.widget_text_color           = BLACK;
+            result.title_color                 = BLACK;
+            result.write_cursor_color          = GRAY;
+            result.write_cursor_limit_color    = RED;
+        }break;
+        
+        case GUI_Default_Theme_Names::cyper:
+        {
+            result.selected_color              = Make_Color(165, 245, 90);
+            result.background_color            = Make_Color(50, 50, 50);
+            result.down_color                  = Make_Color(82, 122, 45);
+            result.outline_color               = Make_Color(125, 125, 15);
+            result.text_color                  = Make_Color(210, 190, 100);
+            result.widget_text_color           = Make_Color(242, 225, 21);
+            result.title_color                 = Make_Color(244, 11, 227);
+            result.write_cursor_color          = Make_Color(180, 0, 180);
+            result.write_cursor_limit_color    = RED;
+        }break;
+        
+        case GUI_Default_Theme_Names::oasis:
+        {
+            result.selected_color              = Make_Color(230, 115, 150);
+            result.background_color            = Make_Color(253, 228, 196);
+            result.down_color                  = Make_Color(82, 40, 40);
+            result.outline_color               = Make_Color(0, 155, 151);
+            result.text_color                  = Make_Color(0, 80, 80);
+            result.widget_text_color           = Make_Color(131, 75, 24);
+            result.title_color                 = Make_Color(205, 202, 167);
+            result.write_cursor_color          = Make_Color(180, 130, 150);
+            result.write_cursor_limit_color    = RED;
+        }break;
+    }
+    
+    result.font = font;
+    
+    result.outline_thickness = 2;
+    result.padding = 10;
+    
+    return result;
+}
+
 
 static bool GUI_Character_Check_Numbers_Only(char* c)
 {
@@ -2529,8 +2596,10 @@ static u32 GUI_Do_Dropdown_Button(
         
         if(text)
         {
+            Color text_color = is_selected? outline_color : theme->widget_text_color;
+            
             v2f text_p = GUI_Calc_Centered_Text_Position(text, text_scale, p.pos, &theme->font);
-            Draw_Text(context->canvas, (u8*)text, text_p, outline_color, &theme->font, text_scale);
+            Draw_Text(context->canvas, (u8*)text, text_p, text_color, &theme->font, text_scale);
         }
     }
     
@@ -2962,7 +3031,7 @@ static bool GUI_Do_SL_Input_Field(
                     
                     Rect select_rect = Create_Rect_Min_Dim(selection_pos, selection_dim);
                     
-                    Draw_Filled_Rect(context->canvas, select_rect, theme->title_color);
+                    Draw_Filled_Rect(context->canvas, select_rect, theme->write_cursor_color);
                 }
             }
         }
@@ -3804,6 +3873,8 @@ static void GUI_Do_ML_Input_Field(
                     // Draw highlight
                     if(text_select_mode && hl_dif)
                     {
+                        Color hl_color = theme->write_cursor_color;
+                        
                         u32 effct_line_start = line_start + char_skip_count;
                         
                         u32 effct_len = exclusive_lenght + is_last_char;
@@ -3822,7 +3893,7 @@ static void GUI_Do_ML_Input_Field(
                                 v2f hl_dim = v2f{char_width * f32(hl_len), char_height};
                                 Rect hl_rect = Create_Rect_Min_Dim(hl_pos, hl_dim);
                                 
-                                Draw_Filled_Rect(context->canvas, hl_rect, theme->selected_color);
+                                Draw_Filled_Rect(context->canvas, hl_rect, hl_color);
                             }
                         }
                         
@@ -3842,7 +3913,7 @@ static void GUI_Do_ML_Input_Field(
                             v2f hl_dim = v2f{char_width * f32(hl_len), char_height};
                             Rect hl_rect = Create_Rect_Min_Dim(text_p, hl_dim);
                             
-                            Draw_Filled_Rect(context->canvas, hl_rect, theme->selected_color);
+                            Draw_Filled_Rect(context->canvas, hl_rect, hl_color);
                         }
                         
                         // Highlight start on previous line, but ends on this line.
@@ -3853,7 +3924,7 @@ static void GUI_Do_ML_Input_Field(
                             
                             Rect hl_rect = Create_Rect_Min_Dim(text_p, hl_dim);
                             
-                            Draw_Filled_Rect(context->canvas, hl_rect, theme->selected_color);
+                            Draw_Filled_Rect(context->canvas, hl_rect, hl_color);
                         }
                     }
                     
@@ -4035,7 +4106,17 @@ static bool GUI_Do_Sub_Context(
 
                 sub_context->canvas_space_dim = sub_dim - Ceil(rendering_offset).As<u32>();
                 
-                sub_context->rendering_offset = rendering_offset + v2f{pf.x, 1.f - pf.y};
+                if(rendering_offset.x == 0)
+                {
+                    rendering_offset.x = pf.x;
+                }
+                
+                if(rendering_offset.y == 0)
+                {
+                    rendering_offset.y = pf.y;
+                }
+                
+                sub_context->rendering_offset = rendering_offset;
                 
                 result = true;                
             }

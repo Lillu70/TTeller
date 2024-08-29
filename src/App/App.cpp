@@ -21,7 +21,9 @@ void Init_App(Platform_Calltable platform_calltable)
         s_scrach_buffer.init(&s_platform, MiB);
         s_mem.init(&s_platform, 1);
     }
+    
     Init_GUI();
+    Set_Settings_To_Default();
 }
 
 
