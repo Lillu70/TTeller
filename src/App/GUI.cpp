@@ -1882,7 +1882,8 @@ static bool GUI_Do_Button(
     v2f* pos, 
     v2f* dim, 
     char* text, 
-    v2f text_scale = GUI_DEFAULT_TEXT_SCALE)
+    v2f text_scale = GUI_DEFAULT_TEXT_SCALE,
+    Color* background_color_override = 0)
 {
     Assert(GUI_Is_Context_Ready(context));
     
@@ -1932,7 +1933,7 @@ static bool GUI_Do_Button(
         Draw_Filled_Rect_With_Outline(
             context->canvas, 
             p.rect, 
-            theme->background_color,
+            (background_color_override)? *background_color_override : theme->background_color,
             theme->outline_thickness, 
             outline_color);
         

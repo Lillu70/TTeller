@@ -107,40 +107,63 @@ static void Do_Color_Editor_Popup(GUI_Context* context)
     v2f num_pos;
     char* num_text;
     
-    v = &s_global_data.color_edit_color_up.r;
-    GUI_Do_Fill_Slider(context, AUTO, &slider_dim, v, 255.f, 0.f, 1.f);
-    f32 top = context->layout.last_element.pos.y + context->layout.last_element.dim.y / 2;
-    GUI_Push_Layout(context);
+    f32 top;
+    f32 bot;
+
+    GUI_Placement rcp;
+    {
+        GUI_Do_Text(context, AUTO, L1(R_Red));
+        GUI_Push_Layout(context);
+        context->layout.build_direction = GUI_Build_Direction::right_center;
+        v = &s_global_data.color_edit_color_up.r;
+        GUI_Do_Fill_Slider(context, AUTO, &slider_dim, v, 255.f, 0.f, 1.f);
+        top = context->layout.last_element.pos.y + context->layout.last_element.dim.y / 2;
+        rcp = context->layout.last_element;
+        num_text = U32_To_Char_Buffer((u8*)num_buffer, u32(*v));
+        num_pos = context->layout.last_element.pos - context->anchor_base;
+        context->layout.anchor = GUI_Anchor::center;
+        GUI_Do_Text(
+            context, 
+            &num_pos, 
+            num_text, 
+            GUI_Was_Last_Selected(context)? &inv_selected_color : &inv_outline_color);
+        GUI_Pop_Layout(context);        
+    }
+
+    {
+        GUI_Do_Text(context, AUTO, L1(G_Green));
+        GUI_Push_Layout(context);
+        context->layout.build_direction = GUI_Build_Direction::right_center;
+        v = &s_global_data.color_edit_color_up.g;
+        GUI_Do_Fill_Slider(context, AUTO, &slider_dim, v, 255.f, 0.f, 1.f);
+        num_text = U32_To_Char_Buffer((u8*)num_buffer, u32(*v));
+        num_pos = context->layout.last_element.pos - context->anchor_base;
+        context->layout.anchor = GUI_Anchor::center;
+        GUI_Do_Text(
+            context, 
+            &num_pos, 
+            num_text, 
+            GUI_Was_Last_Selected(context)? &inv_selected_color : &inv_outline_color);
+        GUI_Pop_Layout(context);
+    }
     
-    GUI_Push_Layout(context);
-    num_text = U32_To_Char_Buffer((u8*)num_buffer, u32(*v));
-    num_pos = context->layout.last_element.pos - context->anchor_base;
-    context->layout.anchor = GUI_Anchor::center;
-    GUI_Do_Text(
-        context, 
-        &num_pos, 
-        num_text, 
-        GUI_Was_Last_Selected(context)? &inv_selected_color : &inv_outline_color);
-    GUI_Pop_Layout(context);
-    
-    v = &s_global_data.color_edit_color_up.g;
-    GUI_Do_Fill_Slider(context, AUTO, &slider_dim, v, 255.f, 0.f, 1.f);
-    GUI_Push_Layout(context);
-    num_text = U32_To_Char_Buffer((u8*)num_buffer, u32(*v));
-    num_pos = context->layout.last_element.pos - context->anchor_base;
-    context->layout.anchor = GUI_Anchor::center;
-    GUI_Do_Text(
-        context, 
-        &num_pos, 
-        num_text, 
-        GUI_Was_Last_Selected(context)? &inv_selected_color : &inv_outline_color);
-    GUI_Pop_Layout(context);
-    
-    v = &s_global_data.color_edit_color_up.b;
-    GUI_Do_Fill_Slider(context, AUTO, &slider_dim, v, 255.f, 0.f, 1.f);
-    f32 bot = context->layout.last_element.pos.y - context->layout.last_element.dim.y / 2;
-    bool last_slider_selected = GUI_Was_Last_Selected(context);
-    GUI_Push_Layout(context);
+    {
+        GUI_Do_Text(context, AUTO, L1(B_Blue));
+        GUI_Push_Layout(context);
+        context->layout.build_direction = GUI_Build_Direction::right_center;
+        v = &s_global_data.color_edit_color_up.b;
+        GUI_Do_Fill_Slider(context, AUTO, &slider_dim, v, 255.f, 0.f, 1.f);
+        bot = context->layout.last_element.pos.y - context->layout.last_element.dim.y / 2;
+        num_text = U32_To_Char_Buffer((u8*)num_buffer, u32(*v));
+        num_pos = context->layout.last_element.pos - context->anchor_base;
+        context->layout.anchor = GUI_Anchor::center;
+        GUI_Do_Text(
+            context, 
+            &num_pos, 
+            num_text, 
+            GUI_Was_Last_Selected(context)? &inv_selected_color : &inv_outline_color);
+        GUI_Pop_Layout(context);
+    }
     
     Color preview_color = Pack_Color(s_global_data.color_edit_color_up);
     if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(apply)))
@@ -155,26 +178,11 @@ static void Do_Color_Editor_Popup(GUI_Context* context)
         Close_Popup();
     }
     
-    GUI_Pop_Layout(context);
-    
-    GUI_Push_Layout(context);
-    num_text = U32_To_Char_Buffer((u8*)num_buffer, u32(*v));
-    num_pos = context->layout.last_element.pos - context->anchor_base;
-    context->layout.anchor = GUI_Anchor::center;
-    GUI_Do_Text(
-        context, 
-        &num_pos, 
-        num_text, 
-        last_slider_selected? &inv_selected_color : &inv_outline_color);
-    
-    GUI_Pop_Layout(context);
-    GUI_Pop_Layout(context);
-    
     f32 h = top - bot;
     v2f panel_dim = v2f{h, h};
     
     context->layout.build_direction = GUI_Build_Direction::right_top;
-    
+    context->layout.last_element = rcp;
     GUI_Do_Panel(context, AUTO, &panel_dim, &preview_color);
 }
 
@@ -309,18 +317,16 @@ static void Do_Settings_Menu_Frame()
         {
             v2f color_panel_dim = 
                 v2f{} + GUI_Character_Height(context) + f32(context->theme->padding);
-            
-            GUI_Do_Panel(context, AUTO, &color_panel_dim, color, GUI_Highlight_Next(context));
-            GUI_Push_Layout(context);
-            context->layout.build_direction = GUI_Build_Direction::right_center;
-            
-            if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(edit)))
+
+            if(GUI_Do_Button(context, AUTO, &color_panel_dim, 0, GUI_DEFAULT_TEXT_SCALE, color))
             {
                 s_global_data.color_edit_title_idx = u32(name);
                 s_global_data.color_edit_color = color;
                 s_global_data.color_edit_color_up = Unpack_Color(*color);
                 Set_Popup_Function(Do_Color_Editor_Popup);
             }
+            GUI_Push_Layout(context);
+            context->layout.build_direction = GUI_Build_Direction::right_center;
             
             GUI_Do_Text(context, AUTO, Get_Localised_Text(name));
             

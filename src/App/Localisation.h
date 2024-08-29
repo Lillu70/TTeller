@@ -138,3 +138,6 @@ L(warning_theme_outline_color, "Warning theme widget outline color", "Varoitus t
 L(error_theme_selected_color, "Error theme selected widget color", "Virhe teeman valittun hilavitkuttimen v\xE4ri")
 L(error_theme_background_color, "Error theme widget background color", "Virhe teeman hilavitkuttimien tausta v\xE4ri")
 L(error_theme_outline_color, "Error theme widget outline color", "Virhe teeman hilavitkuttimien reuna v\xE4ri")
+L(R_Red, "R", "P")
+L(G_Green, "G", "V")
+L(B_Blue, "B", "S")
