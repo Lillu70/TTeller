@@ -197,4 +197,19 @@ L(theme_names,
     "Keidas"
 })
 
+
+L(text_scale_names,
+{
+    "Small" E
+    "Medium" E
+    "Large" E
+    "Custom"
+},
+{
+    "Pieni" E
+    "Keskikokoinen" E
+    "Iso" E
+    "Mukautettu"
+})
+
 #undef E

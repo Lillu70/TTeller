@@ -272,14 +272,27 @@ static void Do_Event_Editor_All_Events_Frame()
             
             GUI_Theme* theme = context->theme;
             
+            GUI_Theme issue_theme = *theme;
+            
             if(event->issues.errors)
-                context->theme = &s_settings.error_theme;                
+            {
+                issue_theme.selected_color = s_settings.error_theme_selected_color;
+                issue_theme.background_color = s_settings.error_theme_background_color;
+                issue_theme.outline_color = s_settings.error_theme_outline_color;
+                
+                context->theme = &issue_theme;
+            }
             else if(event->issues.warnings)
-                context->theme = &s_settings.warning_theme;
+            {
+                issue_theme.selected_color = s_settings.warning_theme_selected_color;
+                issue_theme.background_color = s_settings.warning_theme_background_color;
+                issue_theme.outline_color = s_settings.warning_theme_outline_color;
+                
+                context->theme = &issue_theme;
+            }
             
             // Destroy event
-            v2f del_button_dim = v2f{} + GUI_Character_Height(context) + theme->padding;
-            if(GUI_Do_Image_Button(context, *pos, &del_button_dim, &s_global_data.delete_image, v2f{} + 0.9f))
+            if(GUI_Do_Button(context, *pos, &GUI_AUTO_FIT, "X"))
             {
                 s_editor_state.event_idx_to_delete = i;
                 Set_Popup_Function(Do_Event_Editor_Delete_Event_Popup);

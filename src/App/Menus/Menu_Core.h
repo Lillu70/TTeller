@@ -14,14 +14,6 @@ static GUI_Context s_gui_banner;
 static GUI_Context s_gui_pop_up;
 
 
-static Font s_font = {
-    s_terminus_font_char_width, 
-    s_terminus_font_char_height, 
-    (u8*)&s_terminus_font[0], 
-    (u8*)&s_terminus_font_special_characters[0]
-};
-
-
 struct Pooled_GUI_Context
 {
     GUI_Context context;
@@ -65,23 +57,6 @@ static constexpr u32 s_hotkey_count = Editor_Hotkeys::COUNT;
 static Action s_hotkeys[s_hotkey_count] = {};
 // ----------------------------------------- 
 
-struct Settings
-{
-    bool allow_non_uniform_text_scale;
-    v2f text_scale; // NOTE/CONSIDER: <- Redundant value. Actual text scale is handled by GUI_DEFAULT_TEXT_SCALE inside the GUI.h.
-    
-    GUI_Theme theme;
-    GUI_Theme error_theme;
-    GUI_Theme warning_theme;
-    
-    Color background_color;
-    Color banner_background_color;
-    Color list_bg_color;
-    
-    Language language;
-};
-static Settings s_settings = {};
-
 
 struct Global_Data
 {
@@ -115,7 +90,6 @@ struct Global_Data
     u32 campaing_idx_to_delete = 0;
     
     Image edit_image = {};
-    Image delete_image = {};
 };
 static Global_Data s_global_data = Global_Data();
 
@@ -175,117 +149,6 @@ static inline v2f Get_Title_Bar_Row_Placement(
     f32 back_button_y = f32(context->canvas->dim.y - 1) - padding;
     
     v2f result = v2f{back_button_x, back_button_y};
-    return result;
-}
-
-
-static inline void Set_Additional_Colors_Based_On_Default_Theme(GUI_Default_Theme_Names theme)
-{
-    switch(theme)
-    {
-        case GUI_Default_Theme_Names::cyper:
-        case GUI_Default_Theme_Names::vintage:
-        {
-            s_settings.background_color         = Make_Color(20, 20, 20);
-            s_settings.banner_background_color  = Make_Color(40, 40, 40);
-            s_settings.list_bg_color            = Make_Color(10, 10, 10);
-        }break;
-        
-        case GUI_Default_Theme_Names::document:
-        {
-            s_settings.background_color         = Make_Color(240, 240, 240);
-            s_settings.banner_background_color  = Make_Color(194, 248, 247);
-            s_settings.list_bg_color            = WHITE;
-        }break;
-        
-        case GUI_Default_Theme_Names::oasis:
-        {
-            s_settings.background_color         = Make_Color(255, 217, 159);
-            s_settings.banner_background_color  = Make_Color(159, 232, 255);
-            s_settings.list_bg_color            = Make_Color(10, 10, 10);
-        }break;
-        
-        
-        default:
-        {
-            Terminate;
-        }
-    }
-}
-
-
-static void Set_Settings_To_Default()
-{
-    s_settings = {};
-    
-    // -------------------------------------------------
-    s_settings.text_scale = v2f{2.f, 2.f};
-    GUI_DEFAULT_TEXT_SCALE = s_settings.text_scale;
-    // -------------------------------------------------
-    
-    GUI_Default_Theme_Names def_theme = GUI_Default_Theme_Names::vintage;
-    s_settings.theme = GUI_Create_Default_Theme(def_theme, s_font);
-    Set_Additional_Colors_Based_On_Default_Theme(def_theme);
-    
-    // -------------------------------------------------
-    s_settings.warning_theme = s_settings.theme;
-    s_settings.warning_theme.selected_color         = Make_Color(128, 0, 0);
-    s_settings.warning_theme.background_color       = Make_Color(255, 255, 128);
-    s_settings.warning_theme.outline_color          = Make_Color(234, 143, 21);
-    // -------------------------------------------------    
-    s_settings.error_theme = s_settings.theme;
-    s_settings.error_theme.selected_color           = Make_Color(128, 0, 0);
-    s_settings.error_theme.background_color         = Make_Color(180, 70, 70);
-    s_settings.error_theme.outline_color            = Make_Color(255, 235, 235);
-    // -------------------------------------------------
-}
-
-
-static inline bool Try_Save_Settings()
-{
-    bool result = false;
-    
-    char exe_path[255];
-    if(s_platform.Get_Executable_Path(exe_path, Array_Lenght(exe_path)))
-    {
-        String settings_path = Create_String(&s_allocator, exe_path, data_folder_path, "SETTINGS");
-        result = s_platform.Write_File(settings_path.buffer, (u8*)&s_settings, sizeof(s_settings));
-        
-        settings_path.free();
-    }
-    
-    return result;
-}
-
-
-static inline bool Try_Load_Settings()
-{
-    bool result = false;
-    
-    char exe_path[255];
-    if(s_platform.Get_Executable_Path(exe_path, Array_Lenght(exe_path)))
-    {
-        String settings_path = Create_String(&s_allocator, exe_path, data_folder_path, "SETTINGS");
-        
-        u32 file_size;
-        if(s_platform.Get_File_Size(settings_path.buffer, &file_size))
-        {
-            if(sizeof(s_settings) == file_size)
-            {
-                result = s_platform.Read_File(settings_path.buffer, (u8*)&s_settings, file_size);
-                if(result)
-                {
-                    s_settings.theme.font = s_font;
-                    s_settings.warning_theme.font = s_font;
-                    s_settings.error_theme.font = s_font;
-                    GUI_DEFAULT_TEXT_SCALE = s_settings.text_scale;
-                }
-            }
-        }
-        
-        settings_path.free();
-    }
-    
     return result;
 }
 

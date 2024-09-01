@@ -228,13 +228,13 @@ static inline void GUI_Pop_Layout(GUI_Context* context)
 
 static inline void GUI_Set_Default_Menu_Actions()
 {
-    GUI_Context::actions[GUI_Menu_Actions::mouse]/**/= Make_Action(Key_Code::MOUSE_LEFT, Button::NONE);
-    GUI_Context::actions[GUI_Menu_Actions::up]/*****/= Make_Action(Key_Code::UP, Button::DPAD_UP);
-    GUI_Context::actions[GUI_Menu_Actions::down]/***/= Make_Action(Key_Code::DOWN, Button::DPAD_DOWN);
-    GUI_Context::actions[GUI_Menu_Actions::left]/***/= Make_Action(Key_Code::LEFT, Button::DPAD_LEFT);
-    GUI_Context::actions[GUI_Menu_Actions::right]/**/= Make_Action(Key_Code::RIGHT, Button::DPAD_RIGHT);
-    GUI_Context::actions[GUI_Menu_Actions::enter]/**/= Make_Action(Key_Code::ENTER, Button::BUT_A);
-    GUI_Context::actions[GUI_Menu_Actions::back]/***/= Make_Action(Key_Code::ESC, Button::BUT_Y);
+    GUI_Context::actions[GUI_Menu_Actions::mouse] = Make_Action(Key_Code::MOUSE_LEFT, Button::NONE);
+    GUI_Context::actions[GUI_Menu_Actions::up]    = Make_Action(Key_Code::UP, Button::DPAD_UP);
+    GUI_Context::actions[GUI_Menu_Actions::down]  = Make_Action(Key_Code::DOWN, Button::DPAD_DOWN);
+    GUI_Context::actions[GUI_Menu_Actions::left]  = Make_Action(Key_Code::LEFT, Button::DPAD_LEFT);
+    GUI_Context::actions[GUI_Menu_Actions::right] = Make_Action(Key_Code::RIGHT, Button::DPAD_RIGHT);
+    GUI_Context::actions[GUI_Menu_Actions::enter] = Make_Action(Key_Code::ENTER, Button::BUT_A);
+    GUI_Context::actions[GUI_Menu_Actions::back]  = Make_Action(Key_Code::ESC, Button::BUT_Y);
 }
 
 
@@ -2097,6 +2097,10 @@ static bool GUI_Do_Fill_Slider(
         
         if(state->is_held_down)
         {
+            context->cursor_mask_area = context->canvas_rect;
+            context->flags |= GUI_Context_Flags::cursor_mask_enabled;
+            context->flags |= GUI_Context_Flags::cursor_mask_validation;
+            
             f32 internal_width = p.dim.x - (f32(theme->outline_thickness) * 2);
             f32 rel_cursor_x = Min(internal_width, Max(0.f, context->cursor_fpos.x - p.rect.min.x));
             
@@ -2106,7 +2110,6 @@ static bool GUI_Do_Fill_Slider(
             
             *value = min + steps * step;
         }
-        
         
         // Handle input Keyboard/Controller.
         Action* left = context->actions + GUI_Menu_Actions::left;

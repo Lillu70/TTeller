@@ -14,6 +14,7 @@ enum class Menus : u32
     settings_menu,
     campaigns_menu,
     select_campaign_to_play_menu,
+    choose_language,
     
     EVENT_EDITOR_BEGIN,
         EE_all_events,

@@ -11,6 +11,68 @@
 static void Do_Settings_Menu_Frame();
 
 
+static void Do_Choose_Language_Frame()
+{
+    static Image eng_flag;
+    static Image fin_flag;
+    if(!eng_flag.buffer)
+    {
+        Load_Image_From_Memory(&eng_flag, (void*)s_eng_flag_png, Array_Lenght(s_eng_flag_png));
+        Load_Image_From_Memory(&fin_flag, (void*)s_fin_flag_png, Array_Lenght(s_fin_flag_png));
+    }
+    
+    Clear_Canvas(&s_canvas, s_settings.background_color);
+    
+    GUI_Context* context = &s_gui_banner;
+    GUI_Begin_Context(
+        context,
+        &s_canvas, 
+        &s_global_data.action_context, 
+        &s_settings.theme,
+        v2i{0, 0},
+        GUI_Anchor::top);
+    
+    GUI_Do_Title_Text(context, &GUI_AUTO_TOP_CENTER, L1(choose_language), GUI_Scale_Default(4.f));
+    
+    context->layout.build_direction = GUI_Build_Direction::down_center;
+    
+    v2f flag_size = v2f{200, 100};
+    
+    if(GUI_Do_Image_Button(context, AUTO, &flag_size, &eng_flag, v2f{1.f, 1.f}, GUI_Theme_Coloring::do_not_apply))
+    {
+        s_settings.language = Language::english;
+        s_global_data.active_menu = Menus::main_menu;
+    }
+    if(GUI_Was_Last_Selected(context))
+    {
+        s_settings.language = Language::english;
+    }
+
+    GUI_Do_Spacing(context, v2f{100, 30});
+    
+    if(GUI_Do_Image_Button(context, AUTO, &flag_size, &fin_flag, v2f{1.f, 1.f}, GUI_Theme_Coloring::do_not_apply))
+    {
+        s_settings.language = Language::finnish;
+        s_global_data.active_menu = Menus::main_menu;
+    }
+    if(GUI_Was_Last_Selected(context))
+    {
+        s_settings.language = Language::finnish;
+    }
+    
+    GUI_End_Context(context);
+    
+    if(s_global_data.active_menu != Menus::choose_language)
+    {
+        s_allocator.free(eng_flag.buffer);
+        eng_flag.buffer = 0;
+        
+        s_allocator.free(fin_flag.buffer);
+        fin_flag.buffer = 0;
+    }
+}
+
+
 static void Do_Main_Menu_Frame()
 {
     Assert(s_mem.push_call_count == s_mem.free_call_count);
@@ -43,42 +105,45 @@ static void Do_Main_Menu_Frame()
         button_texts.count, GUI_Scale_Default(s));
     
     dim += context->theme->padding;
-    
-    u32 i = 0;
+
+    #if 0
     // Continue
-    if(GUI_Do_Button(context, AUTO, &dim, button_texts.list[i++], GUI_Scale_Default(s)))
+    if(GUI_Do_Button(context, AUTO, &dim, button_texts.list[0], GUI_Scale_Default(s)))
     {
         
     }
+    #endif
     
     // New game
-    if(GUI_Do_Button(context, AUTO, AUTO, button_texts.list[i++], GUI_Scale_Default(s)))
+    if(GUI_Do_Button(context, AUTO, &dim, button_texts.list[1], GUI_Scale_Default(s)))
     {
         Gather_Editor_Format_Campaigns();
         s_global_data.active_menu = Menus::select_campaign_to_play_menu;
     }
     
+    #if 0
     // Load game
-    if(GUI_Do_Button(context, AUTO, AUTO, button_texts.list[i++], GUI_Scale_Default(s)))
+    if(GUI_Do_Button(context, AUTO, &dim, button_texts.list[2], GUI_Scale_Default(s)))
     {
         
     }
+    #endif
     
     // Open editor
-    if(GUI_Do_Button(context, AUTO, AUTO, button_texts.list[i++], GUI_Scale_Default(s)))
+    if(GUI_Do_Button(context, AUTO, &dim, button_texts.list[3], GUI_Scale_Default(s)))
     {
         Gather_Editor_Format_Campaigns();
         s_global_data.active_menu = Menus::campaigns_menu;
     }
     
     // Settings
-    if(GUI_Do_Button(context, AUTO, AUTO, button_texts.list[i++], GUI_Scale_Default(s)))
+    if(GUI_Do_Button(context, AUTO, &dim, button_texts.list[4], GUI_Scale_Default(s)))
     {
         s_global_data.active_menu = Menus::settings_menu;
     }
     
     // Close 
-    if(GUI_Do_Button(context, AUTO, AUTO, button_texts.list[i++], GUI_Scale_Default(s)))
+    if(GUI_Do_Button(context, AUTO, &dim, button_texts.list[5], GUI_Scale_Default(s)))
     {
         s_global_data.force_quit_popup = true;
     }
@@ -210,7 +275,7 @@ static void Do_Settings_Menu_Frame()
         
         if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(reset_defaults)))
         {
-            Set_Settings_To_Default();
+            Set_Settings_To_Default(true);
         }
         
     }; // ----------------------------------------------------------------------------------------
@@ -233,195 +298,191 @@ static void Do_Settings_Menu_Frame()
         
         GUI_Do_Title_Text(context, AUTO, L1(app_appearance));
         
-        GUI_Highlight highlight = GUI_Highlight_Next(context, 2);
-        if(s_settings.allow_non_uniform_text_scale)
-            highlight.count = 3;
-        
-        GUI_Do_Text(context, AUTO, L1(text_size), highlight);
-        
-        v2f check_box_dim = v2f{1.f, 1.f} * context->layout.last_element.dim.y;
-        
-        GUI_Do_Checkbox(context, AUTO, &check_box_dim, &s_settings.allow_non_uniform_text_scale);
-        v2f slider_dim = v2f{300, context->layout.last_element.dim.y};
-        
+        GUI_Do_Text(context, AUTO, L1(text_size));
         GUI_Push_Layout(context);
-        
         context->layout.build_direction = GUI_Build_Direction::right_center;
-        
-        GUI_Do_Text(context, AUTO, L1(allow_non_uniform_text_scale), GUI_Highlight_Prev(context));
+        u32 opt = u32(s_settings.text_scale);
+        if(u32 s = GUI_Do_Dropdown_Button(context, AUTO, &GUI_AUTO_FIT, opt, LN(text_scale_names)))
+        {
+            s_settings.text_scale = Text_Scale(s - 1);
+            s_settings.allow_non_uniform_text_scale = false;
+            GUI_DEFAULT_TEXT_SCALE = Get_Size_For_Text_Scale_Name(s_settings.text_scale);
+        }
         
         GUI_Pop_Layout(context);
         
-        s_settings.text_scale = GUI_DEFAULT_TEXT_SCALE;
+        v2f check_box_dim = v2f{} + GUI_Character_Height(context);
+        if(s_settings.text_scale == Text_Scale::custom)
+        {            
+            GUI_Do_Checkbox(context, AUTO, &check_box_dim, &s_settings.allow_non_uniform_text_scale);
+            v2f slider_dim = v2f{300, context->layout.last_element.dim.y};
+            
+            GUI_Push_Layout(context);
+            
+            context->layout.build_direction = GUI_Build_Direction::right_center;
+            
+            GUI_Do_Text(context, AUTO, L1(allow_non_uniform_text_scale), GUI_Highlight_Prev(context));
+            
+            GUI_Pop_Layout(context);
+            
+            if(s_settings.allow_non_uniform_text_scale)
+            {
+                f32* x = &GUI_DEFAULT_TEXT_SCALE.x;
+                context->flags |= GUI_Context_Flags::one_time_ignore_id;
+                GUI_Do_Fill_Slider(context, AUTO, &slider_dim, x, 5.f, 1.f, 0.1f);
+
+                
+                f32* y = &GUI_DEFAULT_TEXT_SCALE.y;
+                context->flags |= GUI_Context_Flags::one_time_ignore_id;
+                GUI_Do_Fill_Slider(context, AUTO, &slider_dim, y, 5.f, 1.f, 0.1f);   
+            }
+            else
+            {
+                f32 v = GUI_DEFAULT_TEXT_SCALE.x;
+                
+                context->flags |= GUI_Context_Flags::one_time_ignore_id;
+                if(GUI_Do_Fill_Slider(context, AUTO, &slider_dim, &v, 5.f, 1.f, 0.1f))
+                {
+                    GUI_DEFAULT_TEXT_SCALE = v2f{v, v};
+                }
+            }
+            
+        }
         
-        if(s_settings.allow_non_uniform_text_scale)
-        {
-            context->flags |= GUI_Context_Flags::one_time_ignore_id;
-            if(GUI_Do_Fill_Slider(
-                context, 
-                AUTO, 
-                &slider_dim, 
-                &s_settings.text_scale.x, 
-                5.f, 
-                1.f, 
-                0.1f))
-            { 
-                GUI_DEFAULT_TEXT_SCALE.x = s_settings.text_scale.x;
-            }
-            
-            context->flags |= GUI_Context_Flags::one_time_ignore_id;
-            if(GUI_Do_Fill_Slider(
-                context, 
-                AUTO, 
-                &slider_dim, 
-                &s_settings.text_scale.y, 
-                5.f, 
-                1.f, 
-                0.1f))
-            {
-                GUI_DEFAULT_TEXT_SCALE.y = s_settings.text_scale.y;
-            }
-        }
-        else
-        {
-            GUI_DEFAULT_TEXT_SCALE.y = GUI_DEFAULT_TEXT_SCALE.x;
-            s_settings.text_scale.y = s_settings.text_scale.x;
-            
-            context->flags |= GUI_Context_Flags::one_time_ignore_id;
-            if(GUI_Do_Fill_Slider(
-                context, 
-                AUTO, 
-                &slider_dim, 
-                &s_settings.text_scale.x, 
-                5.f, 
-                1.f, 
-                0.1f))
-            {
-                s_settings.text_scale.y = s_settings.text_scale.x;
-                GUI_DEFAULT_TEXT_SCALE = s_settings.text_scale;
-            }            
-        }
+        GUI_Do_Spacing(context, AUTO);
         
         GUI_Do_Text(context, AUTO, L1(theme), GUI_Highlight_Next(context));
-
+        GUI_Push_Layout(context);
+        context->layout.build_direction = GUI_Build_Direction::right_center;
         if(u32 s = GUI_Do_Dropdown_Button(context, AUTO, &GUI_AUTO_FIT, L1(prebuild), LN(theme_names)))
         {
+            s_settings.allow_color_customisation = false;
             GUI_Default_Theme_Names name = GUI_Default_Theme_Names(s - 1);
             s_settings.theme = GUI_Create_Default_Theme(name, s_font);
             Set_Additional_Colors_Based_On_Default_Theme(name);
         }
+        GUI_Pop_Layout(context);
         
+        GUI_Do_Checkbox(context, AUTO, &check_box_dim, &s_settings.allow_color_customisation);
+        GUI_Push_Layout(context);
+        context->layout.build_direction = GUI_Build_Direction::right_center;
+        GUI_Do_Text(context, AUTO, L1(allow_color_customisation), GUI_Highlight_Prev(context));
+        GUI_Pop_Layout(context);
         
-        void (*Do_Color_Display_And_Edit)(GUI_Context*, Color*, Loc_Identifier) = 
-            [](GUI_Context* context,Color* color, Loc_Identifier name)
+        if(s_settings.allow_color_customisation)
         {
-            v2f color_panel_dim = 
-                v2f{} + GUI_Character_Height(context) + f32(context->theme->padding);
-
-            if(GUI_Do_Button(context, AUTO, &color_panel_dim, 0, GUI_DEFAULT_TEXT_SCALE, color))
+            void (*Do_Color_Display_And_Edit)(GUI_Context*, Color*, Loc_Identifier) = 
+                [](GUI_Context* context,Color* color, Loc_Identifier name)
             {
-                s_global_data.color_edit_title_idx = u32(name);
-                s_global_data.color_edit_color = color;
-                s_global_data.color_edit_color_up = Unpack_Color(*color);
-                Set_Popup_Function(Do_Color_Editor_Popup);
-            }
-            GUI_Push_Layout(context);
-            context->layout.build_direction = GUI_Build_Direction::right_center;
+                v2f color_panel_dim = 
+                    v2f{} + GUI_Character_Height(context) + f32(context->theme->padding);
+
+                if(GUI_Do_Button(context, AUTO, &color_panel_dim, 0, GUI_DEFAULT_TEXT_SCALE, color))
+                {
+                    s_global_data.color_edit_title_idx = u32(name);
+                    s_global_data.color_edit_color = color;
+                    s_global_data.color_edit_color_up = Unpack_Color(*color);
+                    Set_Popup_Function(Do_Color_Editor_Popup);
+                }
+                GUI_Push_Layout(context);
+                context->layout.build_direction = GUI_Build_Direction::right_center;
+                
+                GUI_Do_Text(context, AUTO, Get_Localised_Text(name), GUI_Highlight_Prev(context));
+                
+                GUI_Pop_Layout(context);
+            };
             
-            GUI_Do_Text(context, AUTO, Get_Localised_Text(name));
             
-            GUI_Pop_Layout(context);
-        };
+            Do_Color_Display_And_Edit(context, 
+                &s_settings.theme.selected_color, 
+                Loc_Identifier::selected_color);
+            
+            Do_Color_Display_And_Edit(
+                context, 
+                &s_settings.theme.background_color, 
+                Loc_Identifier::widget_background_color);
         
-        Do_Color_Display_And_Edit(
-            context, 
-            &s_settings.theme.selected_color, 
-            Loc_Identifier::selected_color);
+            Do_Color_Display_And_Edit(
+                context, 
+                &s_settings.theme.down_color, 
+                Loc_Identifier::widget_down_color);
         
-        Do_Color_Display_And_Edit(
-            context, 
-            &s_settings.theme.background_color, 
-            Loc_Identifier::widget_background_color);
-    
-        Do_Color_Display_And_Edit(
-            context, 
-            &s_settings.theme.down_color, 
-            Loc_Identifier::widget_down_color);
-    
-        Do_Color_Display_And_Edit(
-            context, 
-            &s_settings.theme.outline_color, 
-            Loc_Identifier::widget_outline_color);
-            
-        Do_Color_Display_And_Edit(
-            context, 
-            &s_settings.theme.text_color, 
-            Loc_Identifier::text_color);
-            
-        Do_Color_Display_And_Edit(
-            context, 
-            &s_settings.theme.widget_text_color, 
-            Loc_Identifier::widget_text_color);
+            Do_Color_Display_And_Edit(
+                context, 
+                &s_settings.theme.outline_color, 
+                Loc_Identifier::widget_outline_color);
+                
+            Do_Color_Display_And_Edit(
+                context, 
+                &s_settings.theme.text_color, 
+                Loc_Identifier::text_color);
+                
+            Do_Color_Display_And_Edit(
+                context, 
+                &s_settings.theme.widget_text_color, 
+                Loc_Identifier::widget_text_color);
 
-        Do_Color_Display_And_Edit(
-            context, 
-            &s_settings.theme.title_color, 
-            Loc_Identifier::title_color);
+            Do_Color_Display_And_Edit(
+                context, 
+                &s_settings.theme.title_color, 
+                Loc_Identifier::title_color);
 
-        Do_Color_Display_And_Edit(
-            context, 
-            &s_settings.theme.write_cursor_color, 
-            Loc_Identifier::write_cursor_color);
+            Do_Color_Display_And_Edit(
+                context, 
+                &s_settings.theme.write_cursor_color, 
+                Loc_Identifier::write_cursor_color);
 
-        Do_Color_Display_And_Edit(
-            context, 
-            &s_settings.theme.write_cursor_limit_color, 
-            Loc_Identifier::write_cursor_limit_color);
+            Do_Color_Display_And_Edit(
+                context, 
+                &s_settings.theme.write_cursor_limit_color, 
+                Loc_Identifier::write_cursor_limit_color);
 
-        Do_Color_Display_And_Edit(
-            context, 
-            &s_settings.background_color, 
-            Loc_Identifier::page_background_color);
-            
-        Do_Color_Display_And_Edit(
-            context, 
-            &s_settings.banner_background_color, 
-            Loc_Identifier::banner_background_color);
+            Do_Color_Display_And_Edit(
+                context, 
+                &s_settings.background_color, 
+                Loc_Identifier::page_background_color);
+                
+            Do_Color_Display_And_Edit(
+                context, 
+                &s_settings.banner_background_color, 
+                Loc_Identifier::banner_background_color);
 
-        Do_Color_Display_And_Edit(
-            context, 
-            &s_settings.list_bg_color, 
-            Loc_Identifier::list_bg_color);
+            Do_Color_Display_And_Edit(
+                context, 
+                &s_settings.list_bg_color, 
+                Loc_Identifier::list_bg_color);
 
-        Do_Color_Display_And_Edit(
-            context, 
-            &s_settings.warning_theme.selected_color, 
-            Loc_Identifier::warning_theme_selected_color);
-            
-        Do_Color_Display_And_Edit(
-            context, 
-            &s_settings.warning_theme.background_color, 
-            Loc_Identifier::warning_theme_background_color);
-            
-        Do_Color_Display_And_Edit(
-            context, 
-            &s_settings.warning_theme.outline_color, 
-            Loc_Identifier::warning_theme_outline_color);
-            
-        Do_Color_Display_And_Edit(
-            context, 
-            &s_settings.error_theme.selected_color, 
-            Loc_Identifier::error_theme_selected_color);
-            
-        Do_Color_Display_And_Edit(
-            context, 
-            &s_settings.error_theme.background_color, 
-            Loc_Identifier::error_theme_background_color);
-            
-        Do_Color_Display_And_Edit(
-            context, 
-            &s_settings.warning_theme.outline_color, 
-            Loc_Identifier::error_theme_outline_color);
+            Do_Color_Display_And_Edit(
+                context, 
+                &s_settings.warning_theme_selected_color, 
+                Loc_Identifier::warning_theme_selected_color);
+                
+            Do_Color_Display_And_Edit(
+                context, 
+                &s_settings.warning_theme_background_color, 
+                Loc_Identifier::warning_theme_background_color);
+                
+            Do_Color_Display_And_Edit(
+                context, 
+                &s_settings.warning_theme_outline_color, 
+                Loc_Identifier::warning_theme_outline_color);
+                
+            Do_Color_Display_And_Edit(
+                context, 
+                &s_settings.error_theme_selected_color, 
+                Loc_Identifier::error_theme_selected_color);
+                
+            Do_Color_Display_And_Edit(
+                context, 
+                &s_settings.error_theme_background_color, 
+                Loc_Identifier::error_theme_background_color);
+                
+            Do_Color_Display_And_Edit(
+                context, 
+                &s_settings.warning_theme_outline_color, 
+                Loc_Identifier::error_theme_outline_color);
+        }
+        
     }; // ----------------------------------------------------------------------------------------
 
     Do_GUI_Frame_With_Banner(banner_func, menu_func);

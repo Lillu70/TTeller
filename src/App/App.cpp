@@ -27,6 +27,7 @@ void Init_App(Platform_Calltable platform_calltable)
     if(!Try_Load_Settings())
     {
         Set_Settings_To_Default();
+        s_global_data.active_menu = Menus::choose_language;
     }
 }
 
@@ -185,6 +186,11 @@ void Update_App()
             Do_Event_Assignement_Failed_Frame();
         }break;
         
+        case Menus::choose_language:
+        {
+            Do_Choose_Language_Frame();
+        }break;
+        
         default:
         {
             Terminate;
@@ -291,12 +297,6 @@ void Update_App()
                     s_allocator.free(s_global_data.edit_image.buffer);
                     s_global_data.edit_image.buffer = 0;
                 }
-                
-                if(s_global_data.delete_image.buffer)
-                {
-                    s_allocator.free(s_global_data.delete_image.buffer);
-                    s_global_data.delete_image.buffer = 0;
-                }
             }break;
             
             case Menus::EE_all_events:
@@ -307,15 +307,7 @@ void Update_App()
                         &s_global_data.edit_image, 
                         (void*)s_edit_icon_png, 
                         Array_Lenght(s_edit_icon_png));
-                }
-                
-                if(!s_global_data.delete_image.buffer)
-                {
-                    Load_Image_From_Memory(
-                        &s_global_data.delete_image, 
-                        (void*)s_delete_icon_png, 
-                        Array_Lenght(s_delete_icon_png));
-                }
+                }               
             }break;
         }
     }
@@ -330,7 +322,8 @@ void Update_App()
     #endif
     
     #if 1
-    if(s_hotkeys[Global_Hotkeys::toggle_language].Is_Released())
+    if(s_global_data.active_menu != Menus::choose_language &&
+        s_hotkeys[Global_Hotkeys::toggle_language].Is_Released())
     {
         s_settings.language = Language((u32(s_settings.language) + 1) % u32(Language::COUNT));
         s_global_data.popup_panel_rect = Create_Rect_Min_Max_HZ(v2f{0,0}, v2f{0,0});

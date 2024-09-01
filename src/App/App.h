@@ -54,7 +54,9 @@ static Linear_Allocator s_scrach_buffer = {};
 static Platform_Calltable s_platform;
 static Canvas s_canvas;
 
+#include "Settings.h"
 #include "Menus\Menu_Core.h"
+
 #include "Menus\Main_Menus.cpp"
 #include "Menus\Editor_Menus.cpp"
 #include "Menus\Game_Menus.cpp"
