@@ -28,37 +28,37 @@ static Allocator_Shell s_allocator;
 static Paged_General_Allocator s_mem;
 static Linear_Allocator s_scrach_buffer = {};
 
-#include "Build_In_Assets.cpp"
-#include "Terminus_Font.h"
+#include "Misc\Build_In_Assets.cpp"
+#include "Misc\Terminus_Font.h"
 
-#include "Renderer.h"
-#include "Renderer.cpp"
+#include "Core\Renderer.h"
+#include "Core\Renderer.cpp"
 
-#include "Image_Loader.cpp"
+#include "Misc\Image_Loader.cpp"
 
-#include "Action.h"
+#include "Core\Action.h"
 
-#include "GUI.h"
-#include "GUI.cpp"
+#include "Core\GUI.h"
+#include "Core\GUI.cpp"
 
-#include "Random_Machine.h"
+#include "Misc\Random_Machine.h"
 
 #include "Menus\Menu.h"
 
-#include "Nalkapeli.h"
-#include "Nalkapeli.cpp"
+#include "TTeller\Editor.h"
+#include "TTeller\Editor.cpp"
 
-#include "Nalkapeli_GM.h"
-#include "Nalkapeli_GM.cpp"
+#include "TTeller\Story_Engine.h"
+#include "TTeller\Story_Engine.cpp"
 
 static Platform_Calltable s_platform;
 static Canvas s_canvas;
 
-#include "Settings.h"
+#include "Misc\Settings.h"
 #include "Menus\Menu_Core.h"
 
 #include "Menus\Main_Menus.cpp"
 #include "Menus\Editor_Menus.cpp"
 #include "Menus\Game_Menus.cpp"
 
-#include "Memory_Display.cpp"
+#include "Misc\Memory_Display.cpp"
