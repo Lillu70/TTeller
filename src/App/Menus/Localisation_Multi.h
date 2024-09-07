@@ -212,4 +212,48 @@ L(text_scale_names,
     "Mukautettu"
 })
 
+
+L(genders,
+{
+    "Male" E
+    "Female" 
+},
+{
+    "Mies" E
+    "Nainen"
+})
+
+
+L(prounoun_v1,
+{
+    "he" E
+    "she" 
+},
+{
+    "h\xE4n" E
+    "h\xE4n"
+})
+
+
+L(prounoun_v2,
+{
+    "him" E
+    "her" 
+},
+{
+    "h\xE4n" E
+    "h\xE4n"
+})
+
+
+L(prounoun_v3,
+{
+    "his" E
+    "her" 
+},
+{
+    "h\xE4nen" E
+    "h\xE4nen"
+})
+
 #undef E

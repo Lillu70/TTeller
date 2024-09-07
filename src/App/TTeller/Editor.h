@@ -7,11 +7,6 @@
 
 #pragma once
 
-static constexpr char* s_data_folder_path = "Tiedostot\\";
-static constexpr char* s_campaigns_folder_path = "Tiedostot\\Kampanjat\\";
-static constexpr char* s_campaign_file_extension = ".nalkmp";
-static constexpr char* s_campaign_folder_wildcard_path = "Tiedostot\\Kampanjat\\*.nalkmp";
-
 static constexpr i8 STAT_MINIMUM = 0;
 static constexpr i8 STAT_MAXIMUM = 3;
 
@@ -45,6 +40,13 @@ namespace Event_Warnings
         death_consequence_with_zero_as_inheritor        = 1 << 4,
     };
 }
+
+
+enum class Gender : u8
+{
+    male,
+    female,
+};
 
 
 enum class Exists_Statement : u8

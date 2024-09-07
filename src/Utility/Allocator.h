@@ -10,7 +10,7 @@
 #include "Primitives.h"
 #include "Assert.h"
 
-#define Exhaustive_Memory_Verification
+//#define Exhaustive_Memory_Verification
 //#undef Exhaustive_Memory_Verification
 
 #ifdef Exhaustive_Memory_Verification
@@ -675,6 +675,15 @@ struct Paged_General_Allocator
         Assert(*source_page_idx < active_page_count);
         
         page_table[*source_page_idx].free(source_page_idx);
+    }
+    
+    
+    void validate_heap()
+    {
+        for(u32 i = 0; i < active_page_count; ++i)
+        {
+            page_table[i].test_free_block_allignement();
+        }
     }
     
     

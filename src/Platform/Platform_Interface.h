@@ -100,7 +100,7 @@ struct Platform_Calltable
     
     void  (*Free_Memory)(void* memory) = 0;
     
-    bool (*Open_Select_File_Dialog)(char* result_buffer, u32 result_buffer_size) = 0;
+    bool (*Open_Select_File_Dialog)(char* result_buffer, u32 result_buffer_size, char* dialog_title, char* filter_name, char** filter_file_types, u32 filter_type_count) = 0;
     
     bool (*Get_Executable_Path)(char* result_buffer, u32 result_buffer_size) = 0;
     

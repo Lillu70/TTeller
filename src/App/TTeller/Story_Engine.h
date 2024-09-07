@@ -23,21 +23,17 @@ enum class Event_List : u8
 };
 
 
-enum class Language : u8
-{
-    english,
-    finnish,
-    COUNT
-};
-
-
-struct Game_Player_Name_FI
+struct Player_UD
 {
     String full_name;
     String variant_name_1;
     String variant_name_2;
     
+    // TODO: Document what the fuck this is.
+    // It's hard to explain....
     bool special_char_override;
+    
+    Gender gender;
 };
 
 
@@ -214,12 +210,7 @@ struct Game_State
     // Runtime allocated items -------------------------
     
     Dynamic_Array<Player_Image>* player_images;
-    
-    Language language;
-    union
-    {
-        Dynamic_Array<Game_Player_Name_FI>* player_names;
-    };
+    Dynamic_Array<Player_UD>* player_ud;
     
     Dynamic_Array<Mark_GM>* global_marks;
     
@@ -313,53 +304,54 @@ struct Filler_Name_Data_FI
     char* variant_name_1;
     char* variant_name_2;
     bool special_char_override;
+    Gender gender;
 };
 
 
 Filler_Name_Data_FI s_filler_name_list_FI[]= 
 {
-    {"Matti",        "Mati",           "Matti",      0},
-    {"Pekka",        "Peka",           "Pekka",      0},
-    {"Roosa",        "Roosa",          "Roosa",      0},
-    {"Liisa",        "Liisa",          "Liisa",      0},
-    {"Tuomas",       "Tuomakse",       "Tuomast",    0},
-    {"Thomas",       "Thomakse",       "Thomast",    0},
-    {"Valtteri",     "Valtteri",       "Valtteri",   0},
-    {"Marika",       "Marika",         "Marika",     0},
-    {"Yrj\xF6",      "Yrj\xF6",        "Yrj\xF6",    1},
-    {"Ville",        "Ville",          "Ville",      1},
-    {"Juhani",       "Juhani",         "Juhani",     0},
-    {"Johannes",     "Johannekse",     "Jonnest",    0},
-    {"Mikael",       "Mikaeli",        "Mikaeli",    0},
-    {"Olavi",        "Olavi",          "Olavi",      0},
-    {"Onni",         "Onne",           "Onne",       0},
-    {"Matias",       "Matiakse",       "Matiast",    0},
-    {"Elias",        "Eliakse",        "Eliast",     0},
-    {"Oliver",       "Oliveri",        "Oliveri",    0},
-    {"Ilmari",       "Ilmari",         "Ilmari",     0},
-    {"Eemeli",       "Eemeli",         "Eemeli",     1},
-    {"Maria",        "Maria",          "Maria",      0},
-    {"Sofia",        "Sofia",          "Sofia",      0},
-    {"Emilia",       "Emilia",         "Emilia",     0},
-    {"Olivia",       "Olivia",         "Olivia",     0},
-    {"Aino",         "Aino",           "Aino",       0},
-    {"Amanda",       "Amanda",         "Amanda",     0},
-    {"Matilda",      "Matilda",        "Matilda",    0},
-    {"Helmi",        "Helme",          "Helme",      1},
-    {"Aurora",       "Aurora",         "Aurora",     0},
-    {"Ilona",        "Ilona",          "Ilona",      0},
-    {"Eino",         "Eino",           "Eino",       0},
-    {"Toivo",        "Toivo",          "Toivo",      0},
-    {"Veikko",       "Veiko",          "Veikko",     0},
-    {"Armas",        "Armakse",        "Armast",     0},
-    {"V\xE4in\xF6",  "V\xE4in\xF6",    "V\xE4in\xF6",1},
-    {"Tauno",        "Tauno",          "Tauno",      0},
-    {"Viljo",        "Viljo",          "Viljo",      0},
-    {"Anna",         "Anna",           "Anna",       0},
-    {"Aili",         "Aili",           "Aili",       0},
-    {"Aune",         "Aune",           "Aune",       0},
-    {"Tyyne",        "Tyyne",          "Tyyne",      1},
-    {"Helena",       "Helena",         "Helena",     0},
-    {"Martta",       "Marta",          "Martta",     0},
-    {"Elisabet",     "Elisabeti",      "Elisabeti",  1}
+    {"Matti",        "Mati",           "Matti",      0, Gender::male},
+    {"Pekka",        "Peka",           "Pekka",      0, Gender::male},
+    {"Roosa",        "Roosa",          "Roosa",      0, Gender::female},
+    {"Liisa",        "Liisa",          "Liisa",      0, Gender::female},
+    {"Tuomas",       "Tuomakse",       "Tuomast",    0, Gender::male},
+    {"Thomas",       "Thomakse",       "Thomast",    0, Gender::male},
+    {"Valtteri",     "Valtteri",       "Valtteri",   0, Gender::male},
+    {"Marika",       "Marika",         "Marika",     0, Gender::female},
+    {"Yrj\xF6",      "Yrj\xF6",        "Yrj\xF6",    1, Gender::male},
+    {"Ville",        "Ville",          "Ville",      1, Gender::male},
+    {"Juhani",       "Juhani",         "Juhani",     0, Gender::male},
+    {"Johannes",     "Johannekse",     "Jonnest",    0, Gender::male},
+    {"Mikael",       "Mikaeli",        "Mikaeli",    0, Gender::male},
+    {"Olavi",        "Olavi",          "Olavi",      0, Gender::male},
+    {"Onni",         "Onne",           "Onne",       0, Gender::male},
+    {"Matias",       "Matiakse",       "Matiast",    0, Gender::male},
+    {"Elias",        "Eliakse",        "Eliast",     0, Gender::male},
+    {"Oliver",       "Oliveri",        "Oliveri",    0, Gender::male},
+    {"Ilmari",       "Ilmari",         "Ilmari",     0, Gender::male},
+    {"Eemeli",       "Eemeli",         "Eemeli",     1, Gender::male},
+    {"Maria",        "Maria",          "Maria",      0, Gender::female},
+    {"Sofia",        "Sofia",          "Sofia",      0, Gender::female},
+    {"Emilia",       "Emilia",         "Emilia",     0, Gender::female},
+    {"Olivia",       "Olivia",         "Olivia",     0, Gender::female},
+    {"Aino",         "Aino",           "Aino",       0, Gender::female},
+    {"Amanda",       "Amanda",         "Amanda",     0, Gender::female},
+    {"Matilda",      "Matilda",        "Matilda",    0, Gender::female},
+    {"Helmi",        "Helme",          "Helme",      1, Gender::female},
+    {"Aurora",       "Aurora",         "Aurora",     0, Gender::female},
+    {"Ilona",        "Ilona",          "Ilona",      0, Gender::female},
+    {"Eino",         "Eino",           "Eino",       0, Gender::male},
+    {"Toivo",        "Toivo",          "Toivo",      0, Gender::male},
+    {"Veikko",       "Veiko",          "Veikko",     0, Gender::male},
+    {"Armas",        "Armakse",        "Armast",     0, Gender::male},
+    {"V\xE4in\xF6",  "V\xE4in\xF6",    "V\xE4in\xF6",1, Gender::male},
+    {"Tauno",        "Tauno",          "Tauno",      0, Gender::male},
+    {"Viljo",        "Viljo",          "Viljo",      0, Gender::male},
+    {"Anna",         "Anna",           "Anna",       0, Gender::female},
+    {"Aili",         "Aili",           "Aili",       0, Gender::female},
+    {"Aune",         "Aune",           "Aune",       0, Gender::female},
+    {"Tyyne",        "Tyyne",          "Tyyne",      1, Gender::female},
+    {"Helena",       "Helena",         "Helena",     0, Gender::female},
+    {"Martta",       "Marta",          "Martta",     0, Gender::female},
+    {"Elisabet",     "Elisabeti",      "Elisabeti",  1, Gender::female}
 };

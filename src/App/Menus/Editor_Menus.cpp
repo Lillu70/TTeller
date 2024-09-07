@@ -95,6 +95,7 @@ static void Do_Event_Editor_All_Events_Frame()
             String unique_name = Generate_Unique_Name(
                 Begin(s_editor_state.event_container.events), 
                 s_editor_state.event_container.day_event_count,
+                L1(new_event),
                 &s_allocator);
             
             u32 temp_count = s_editor_state.event_container.events->count;
@@ -135,6 +136,7 @@ static void Do_Event_Editor_All_Events_Frame()
             String unique_name = Generate_Unique_Name(
                 Begin(s_editor_state.event_container.events) + s_editor_state.event_container.day_event_count, 
                 s_editor_state.event_container.events->count - s_editor_state.event_container.day_event_count,
+                L1(new_event),
                 &s_allocator);
             
             Editor_Event* event = Push(&s_editor_state.event_container.events, &s_allocator);
@@ -1704,9 +1706,10 @@ static void Do_Name_New_Campaign_Popup(GUI_Context* context)
 static void Do_Are_You_Sure_You_Want_To_Delete_Campaing_Popup(GUI_Context* context)
 {
     GUI_Do_Title_Text(context, &GUI_AUTO_MIDDLE, L1(want_to_delete));
-    GUI_Do_Text(context, AUTO, L1(campaing_deletion_is_permanent));
     
     context->layout.build_direction = GUI_Build_Direction::down_center;
+    
+    GUI_Do_Text(context, AUTO, L1(campaing_deletion_is_permanent));
     
     char* t1 = L1(cancel);
     char* t2 = L1(_delete);

@@ -857,44 +857,88 @@ static f64 Win32_Get_Frame_Time()
 
 static bool Win32_Open_Select_File_Dialog(
     char* result_buffer, 
-    u32 result_buffer_size
+    u32 result_buffer_size,
+    char* dialog_title,
+    char* filter_name,
+    char** filter_file_types,
+    u32 filter_type_count
     )
 {
     Assert(result_buffer);
     Assert(result_buffer_size);
     
     Mem_Zero(result_buffer, result_buffer_size);
+    BOOL result = 0;
     
-    OPENFILENAMEA of = {};
-    of.lStructSize          = sizeof (OPENFILENAME);
-    of.hwndOwner            = 0;
-    of.hInstance            = 0;
-    of.lpstrFilter          = "Kuvia\0*.png;*.jpg;*.bmp\0";
-    of.lpstrCustomFilter    = 0;
-    of.nMaxCustFilter       = 0;
-    of.nFilterIndex         = 0;
-    of.lpstrFile            = (char*)result_buffer;
-    of.nMaxFile             = result_buffer_size;
-    of.lpstrFileTitle       = 0;
-    of.nMaxFileTitle        = 0;
-    of.lpstrInitialDir      = 0;
-    of.lpstrTitle           = "Valitse hahmolle kuva"; 
-    of.Flags                = 0;
-    of.nFileOffset          = 0;
-    of.nFileExtension       = 0;
-    of.lpstrDefExt          = 0;
-    of.lCustData            = 0;
-    of.lpfnHook             = 0;
-    of.lpTemplateName       = 0;
-    //of.lpEditInfo         = 0;
-    //of.lpstrPrompt        = 0;
-    //of.*pvReserved        = 0;
-    of.FlagsEx              = 0;
-    of.dwReserved            = 0;
+    char filter_buffer[256];
     
+    u32 write_head = Null_Terminated_Buffer_Lenght(filter_name);
     
-    LPOPENFILENAMEA dialog = &of;
-    BOOL result = GetOpenFileNameA(dialog);
+    if(write_head < Array_Lenght(filter_buffer))
+    {    
+        Mem_Copy(filter_buffer, filter_name, write_head);
+        filter_buffer[write_head++] = 0;
+        
+        char* wild_prefix = "*.";
+        u32 wild_leng = Null_Terminated_Buffer_Lenght(wild_prefix);
+        
+        char post_fix = ';';
+        
+        
+        for(u32 i = 0; i < filter_type_count; ++i)
+        {
+            u32 leng = Null_Terminated_Buffer_Lenght(filter_file_types[i]);
+            
+            if(write_head + leng + wild_leng + 1 < Array_Lenght(filter_buffer))
+            {
+                Mem_Copy(filter_buffer + write_head, wild_prefix, wild_leng);
+                write_head += wild_leng;
+                
+                Mem_Copy(filter_buffer + write_head, filter_file_types[i], leng);
+                write_head += leng;
+                
+                filter_buffer[write_head++] = post_fix;
+                
+            }
+        }
+        
+        if(write_head + 1 < Array_Lenght(filter_buffer))
+        {
+            filter_buffer[write_head] = 0;
+            filter_buffer[write_head + 1] = 0;
+            
+            OPENFILENAMEA of = {};
+            of.lStructSize          = sizeof(OPENFILENAME);
+            of.hwndOwner            = 0;
+            of.hInstance            = 0;
+            of.lpstrFilter          = filter_buffer;
+            of.lpstrCustomFilter    = 0;
+            of.nMaxCustFilter       = 0;
+            of.nFilterIndex         = 0;
+            of.lpstrFile            = (char*)result_buffer;
+            of.nMaxFile             = result_buffer_size;
+            of.lpstrFileTitle       = 0;
+            of.nMaxFileTitle        = 0;
+            of.lpstrInitialDir      = 0;
+            of.lpstrTitle           = dialog_title; 
+            of.Flags                = 0;
+            of.nFileOffset          = 0;
+            of.nFileExtension       = 0;
+            of.lpstrDefExt          = 0;
+            of.lCustData            = 0;
+            of.lpfnHook             = 0;
+            of.lpTemplateName       = 0;
+            //of.lpEditInfo         = 0;
+            //of.lpstrPrompt        = 0;
+            //of.*pvReserved        = 0;
+            of.FlagsEx              = 0;
+            of.dwReserved           = 0;
+
+
+            LPOPENFILENAMEA dialog = &of;
+            result = GetOpenFileNameA(dialog);
+        }
+    }
     
     return result;
 }

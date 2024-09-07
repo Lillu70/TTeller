@@ -355,14 +355,14 @@ static u32 Convert_Editor_Campaign_Into_Game_Format(
             events_data_size += sizeof(Event_Header) * event_container->events->count;
             requirements_data_size += sizeof(Req_GM_Header) * event_container->events->count;
             
-            for(each(Editor_Event*, e,event_container->events))
+            for(each(Editor_Event*, e, event_container->events))
             {
                 u32 participant_header_size = sizeof(Participant_Header) * e->participents->count;
                 
                 events_data_size += participant_header_size;
                 events_data_size += sizeof(Global_Mark_Consequence_GM) * e->global_mark_cons->count;
                 events_data_size += e->name.lenght + 1;
-                events_data_size +=    e->event_text.lenght + 1;
+                events_data_size += e->event_text.lenght + 1;
                 
                 requirements_data_size += participant_header_size;
                 requirements_data_size += sizeof(Global_Mark_Requirement_GM) * e->global_mark_reqs->count;
@@ -593,13 +593,9 @@ static u32 Convert_Editor_Campaign_Into_Game_Format(
         
         game->total_player_count = 0;
         game->live_player_count = 0;
-        game->language = Language::finnish;
-        
-        game->player_names 
-            = Create_Dynamic_Array<Game_Player_Name_FI>(allocator, u32(6));
-        
+ 
+        game->player_ud = Create_Dynamic_Array<Player_UD>(allocator, u32(6));
         game->player_images = Create_Dynamic_Array<Player_Image>(allocator, u32(6));
-        
         game->global_marks = Create_Dynamic_Array<Mark_GM>(allocator, 4);
         game->active_events = Create_Dynamic_Array<Event>(allocator, 4);
         
@@ -645,6 +641,8 @@ static void Get_Active_Event_Ref_And_Header(
 
 static void Generate_Display_Text(Game_State* game)
 {
+    EMV_Call(s_mem.validate_heap();)
+    
     Event_Header* event_header;
     Event* event_ref;
     Get_Active_Event_Ref_And_Header(game, game->display_event_idx, &event_ref, &event_header);
@@ -660,6 +658,13 @@ static void Generate_Display_Text(Game_State* game)
     };
     Mode mode = Mode::search;
     
+    enum class Seek_Reason
+    {
+        name,
+        gender
+    };
+    Seek_Reason seek_reason = {};
+    
     String_View number_view = {};
     u32 player_idx = 0;
     bool a_switch = 0;
@@ -671,7 +676,7 @@ static void Generate_Display_Text(Game_State* game)
     
     if(event_header->event_text.buffer)
     {
-        for(char* cptr = event_header->event_text.buffer;; ++cptr)
+        for(char* cptr = event_header->event_text.buffer; ; ++cptr)
         {
             char c = *cptr;
             switch(mode)
@@ -681,6 +686,27 @@ static void Generate_Display_Text(Game_State* game)
                     if(c == '/')
                     {
                         cptr += 1; // NOTE: skip the next character for now.
+                        char nc = *cptr;
+                        switch(nc)
+                        {
+                            case 'K':
+                            case 'k':
+                            {
+                                seek_reason = Seek_Reason::name;
+                            }break;
+                            
+                            case 'g':
+                            case 'G':
+                            {
+                                seek_reason = Seek_Reason::gender;
+                            }break;
+                            
+                            default:
+                            {
+                                Terminate;
+                            }
+                        }
+                        
                         
                         mode = Mode::seek_number;
                         number_view.buffer = cptr + 1;
@@ -716,56 +742,132 @@ static void Generate_Display_Text(Game_State* game)
                 
                 case Mode::seek_form:
                 {
-                    Game_Player_Name_FI* name = Begin(game->player_names) + player_idx;
-                    a_switch = false;
-                    a_switch_owerride = name->special_char_override;
-                    full_name = &name->full_name;
-                    switch(c)
+                    Player_UD* user_data = Begin(game->player_ud) + player_idx;
+                    switch(seek_reason)
                     {
-                        case ':':
+                        case Seek_Reason::name:
                         {
-                            mode = Mode::seek_bender;
-                            if(name->variant_name_1.lenght)
+                            a_switch = false;
+                            a_switch_owerride = user_data->special_char_override;
+                            full_name = &user_data->full_name;
+                            switch(c)
                             {
-                                u32 required_memory = game->display_text.lenght + name->variant_name_1.lenght + 1;
-                                Reserve_String_Memory(&game->display_text, required_memory);
-                                char* dest = game->display_text.buffer + game->display_text.lenght;
+                                case ':':
+                                {
+                                    mode = Mode::seek_bender;
+                                    if(user_data->variant_name_1.lenght)
+                                    {
+                                        u32 required_memory = game->display_text.lenght + user_data->variant_name_1.lenght + 1;
+                                        Reserve_String_Memory(&game->display_text, required_memory);
+                                        char* dest = game->display_text.buffer + game->display_text.lenght;
+                                        
+                                        Mem_Copy(dest, user_data->variant_name_1.buffer, user_data->variant_name_1.lenght);
+                                        game->display_text.lenght += user_data->variant_name_1.lenght;
+                                    }
+                                }break;
                                 
-                                Mem_Copy(dest, name->variant_name_1.buffer, name->variant_name_1.lenght);
-                                game->display_text.lenght += name->variant_name_1.lenght;
+                                case ';':
+                                {
+                                    mode = Mode::seek_bender;
+                                    if(user_data->variant_name_2.lenght)
+                                    {
+                                        u32 required_memory = game->display_text.lenght + user_data->variant_name_2.lenght + 1;
+                                        Reserve_String_Memory(&game->display_text, required_memory);
+                                        char* dest = game->display_text.buffer + game->display_text.lenght;
+                                        
+                                        Mem_Copy(dest, user_data->variant_name_2.buffer, user_data->variant_name_2.lenght);
+                                        game->display_text.lenght += user_data->variant_name_2.lenght;
+                                    }
+                                }break;
+                                
+                                default:
+                                {
+                                    mode = Mode::search;
+                                    cptr -= 1; // NOTE GO back!
+                                    
+                                    if(user_data->full_name.lenght)
+                                    {
+                                        u32 required_memory = game->display_text.lenght + user_data->full_name.lenght + 1;
+                                        Reserve_String_Memory(&game->display_text, required_memory);
+                                        char* dest = game->display_text.buffer + game->display_text.lenght;
+                                        
+                                        Mem_Copy(dest, user_data->full_name.buffer, user_data->full_name.lenght);
+                                        game->display_text.lenght += user_data->full_name.lenght;
+                                    }
+                                }
                             }
+                            
                         }break;
                         
-                        case ';':
+                        case Seek_Reason::gender:
                         {
-                            mode = Mode::seek_bender;
-                            if(name->variant_name_2.lenght)
+                            char* p = LN1(prounoun_v1, u32(user_data->gender));
+                            
+                            switch(c)
                             {
-                                u32 required_memory = game->display_text.lenght + name->variant_name_2.lenght + 1;
-                                Reserve_String_Memory(&game->display_text, required_memory);
-                                char* dest = game->display_text.buffer + game->display_text.lenght;
+                                case ';':
+                                case ':':
+                                {
+                                    switch(*(cptr + 1))
+                                    {
+                                        case 'm':
+                                        {
+                                            p = LN1(prounoun_v2, u32(user_data->gender));
+                                            cptr += 1;
+                                        }break;
+                                        
+                                        case 's':
+                                        {
+                                            p = LN1(prounoun_v3, u32(user_data->gender));
+                                            cptr += 1;
+                                        }break;
+                                    }
+                                    
+                                }break;
                                 
-                                Mem_Copy(dest, name->variant_name_2.buffer, name->variant_name_2.lenght);
-                                game->display_text.lenght += name->variant_name_2.lenght;
+                                default:
+                                {
+                                    cptr -= 1; // NOTE GO back!
+                                }
                             }
-                        }break;
-                        
-                        default:
-                        {
                             
                             mode = Mode::search;
-                            cptr -= 1; // NOTE GO back!
                             
-                            if(name->full_name.lenght)
+                            u32 p_leng = Null_Terminated_Buffer_Lenght(p);
+                            
+                            u32 required_memory = game->display_text.lenght + p_leng + 1;
+                            Reserve_String_Memory(&game->display_text, required_memory);
+                            char* dest = game->display_text.buffer + game->display_text.lenght;
+                            
+                            bool capitalize = false;
+                            
+                            // Checks if the first character of the inserted text should be capitalized.
                             {
-                                u32 required_memory = game->display_text.lenght + name->full_name.lenght + 1;
-                                Reserve_String_Memory(&game->display_text, required_memory);
-                                char* dest = game->display_text.buffer + game->display_text.lenght;
-                                
-                                Mem_Copy(dest, name->full_name.buffer, name->full_name.lenght);
-                                game->display_text.lenght += name->full_name.lenght;
+                                if(game->display_text.lenght)
+                                {
+                                    for(u32 i = game->display_text.lenght - 1; i < game->display_text.lenght; --i)
+                                    {
+                                        char character = *(game->display_text.buffer + i);
+                                        if(character != ' ' && character != '\n')
+                                        {
+                                            if(character == '.' || character == '!' || character == '?')
+                                            {
+                                                capitalize = true;
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }    
                             }
-                        }
+                            
+                            Mem_Copy(dest, p, p_leng);
+                            game->display_text.lenght += p_leng;
+                            if(capitalize)
+                            {
+                                *dest = *dest -= 'a' - 'A';
+                            }
+                            
+                        }break;
                     }
                     
                 }break;
@@ -818,18 +920,21 @@ static void Generate_Display_Text(Game_State* game)
                 break;
         }
         
-        game->display_text.buffer[game->display_text.lenght + 1] = 0;
-    }    
+        game->display_text.buffer[game->display_text.lenght] = 0;
+    }
+    
+    
+    EMV_Call(s_mem.validate_heap();)
 }
 
 
-static inline void Hollow_Player_Name_FI(Game_Player_Name_FI* player)
+static inline void Hollow_Player_User_Data(Player_UD* user_data)
 {
-    Assert(player);
+    Assert(user_data);
 
-    player->full_name.free();
-    player->variant_name_1.free();
-    player->variant_name_2.free();
+    user_data->full_name.free();
+    user_data->variant_name_1.free();
+    user_data->variant_name_2.free();
 }
 
 
@@ -866,11 +971,11 @@ static void Delete_Game(Game_State* game, Allocator_Shell* allocator)
         }
     }
     allocator->free(game->player_images);
-        
-    for(auto n = Begin(game->player_names); n < End(game->player_names); ++n)
-        Hollow_Player_Name_FI(n);
 
-    allocator->free(game->player_names);
+    for(each(Player_UD*, user_data, game->player_ud))
+        Hollow_Player_User_Data(user_data);
+
+    allocator->free(game->player_ud);
     
     for(each(Event*, e, game->active_events))
     {
@@ -903,7 +1008,7 @@ static void Reset_Game(Game_State* game, Allocator_Shell* allocator)
     game->players = 0;
     
     game->player_images->count = game->total_player_count;
-    game->player_names->count = game->total_player_count;
+    game->player_ud->count = game->total_player_count;
     
     game->total_player_count = 0;
     game->live_player_count = 0;
@@ -934,19 +1039,18 @@ static void Begin_Game(Game_State* game, Platform_Calltable* platform, Allocator
     game->live_player_count = game->total_player_count;
     
     u32 s = sizeof(*game->players) + sizeof(*game->player_assignement_table);
-    u32 alloc_size = s * game->live_player_count;
+    u32 alloc_size = s * game->total_player_count;
     
     u32 event_count = Max(game->event_table_day.count, game->event_table_night.count);
     alloc_size += sizeof(*game->event_assignement_table) * event_count;
     
-    void* m = allocator->push(alloc_size);
-    game->players = (Game_Player*)m;
-    game->player_assignement_table = (u32*)(game->players + game->live_player_count);
+    game->players = (Game_Player*)allocator->push(alloc_size);
+    game->player_assignement_table = (u32*)(game->players + game->total_player_count);
     
     game->event_assignement_table_size = event_count;
-    game->event_assignement_table = game->player_assignement_table + game->live_player_count;
+    game->event_assignement_table = game->player_assignement_table + game->total_player_count;
     
-    for(Game_Player* p = game->players; p < game->players + game->live_player_count; ++p)
+    for(Game_Player* p = game->players; p < game->players + game->total_player_count; ++p)
     {
         for(u32 i = 0; i < Array_Lenght(p->stats); ++i)
             p->stats[i] = Game_Player::starting_stat_value;
@@ -959,17 +1063,17 @@ static void Begin_Game(Game_State* game, Platform_Calltable* platform, Allocator
 }
 
 
-static void Create_Player_Name_FI(Game_State* game, Allocator_Shell* allocator)
+static void Create_Player_User_Data(Game_State* game, Allocator_Shell* allocator)
 {
     Assert(game);
     Assert(game->memory);
-    Assert(game->player_names);
+    Assert(game->player_ud);
 
-    Game_Player_Name_FI* name = Push(&game->player_names, allocator);
+    Player_UD* user_data = Push(&game->player_ud, allocator);
     
-    Init_String(&name->full_name, allocator, u32(0));
-    Init_String(&name->variant_name_1, allocator, u32(0));
-    Init_String(&name->variant_name_2, allocator, u32(0));
+    Init_String(&user_data->full_name, allocator, 12);
+    Init_String(&user_data->variant_name_1, allocator, 12);
+    Init_String(&user_data->variant_name_2, allocator, 12);
 }
 
 
@@ -1152,6 +1256,8 @@ static bool Assign_Events_To_Participants(
     Event_List event_list,
     Allocator_Shell* allocator)
 {
+    EMV_Call(s_mem.validate_heap();)
+    
     Hollow_Active_Events(game, allocator);
     
     game->active_event_list = event_list;
@@ -1365,12 +1471,16 @@ static bool Assign_Events_To_Participants(
     game->display_event_idx = 0;
     Generate_Display_Text(game);
     
+    EMV_Call(s_mem.validate_heap());
+    
     return true;
 }
 
 
 static void Give_Player_Mark(Game_Player* player, Mark_GM mark, Allocator_Shell* allocator)
 {
+    EMV_Call(s_mem.validate_heap());
+    
     Assert(u32(mark.type) < u32(Mark_Type::COUNT));
     
     Exists_Statement exists;
@@ -1392,11 +1502,15 @@ static void Give_Player_Mark(Game_Player* player, Mark_GM mark, Allocator_Shell*
     {
         *Push(&player->marks, allocator) = mark;
     }
+    
+    EMV_Call(s_mem.validate_heap();)
 }
 
 
 static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocator)
 {
+    EMV_Call(s_mem.validate_heap();)
+    
     // Apply active event consequences
     for(u32 e = 0; e < game->active_events->count; ++e)
     {
@@ -1534,6 +1648,7 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
         }
     }
     
+    EMV_Call(s_mem.validate_heap();)
     
     // Cull dead players.
     // NOTE: This will sometimes result in incorrect player death display order.
@@ -1562,12 +1677,13 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
             // ---
             
             // ---
-            Game_Player_Name_FI* player_names = Begin(game->player_names); 
-            Game_Player_Name_FI* player_name = player_names + i; 
-            Game_Player_Name_FI* last_player_name = player_names + game->live_player_count; 
-            Game_Player_Name_FI temp_player_name = *player_name;
-            *player_name = *last_player_name;
-            *last_player_name = temp_player_name;
+            {
+                Player_UD* array = Begin(game->player_ud); 
+                
+                Player_UD* user_data = array + i; 
+                Player_UD* last_user_data = array + game->live_player_count; 
+                Swap(user_data, last_user_data);
+            }
             // ---
             
             
@@ -1583,6 +1699,8 @@ static void Resolve_Current_Event_Set(Game_State* game, Allocator_Shell* allocat
             i -= 1;
         }
     }
+    
+    EMV_Call(s_mem.validate_heap();)
 }
 
 
@@ -1624,6 +1742,8 @@ static void Tickdown_Marks(Game_State* game)
             }
         }
     }
+    
+    EMV_Call(s_mem.validate_heap();)
 }
 
 
@@ -1633,9 +1753,9 @@ static inline bool Fill_Empty_Names(Game_State* game, Allocator_Shell* allocator
     
     bool result = true;
     
-    for(each(Game_Player_Name_FI*, name, game->player_names))
+    for(each(Player_UD*, user_data, game->player_ud))
     {
-        if(!name->full_name.lenght && !name->variant_name_1.lenght && !name->variant_name_2.lenght)
+        if(!user_data->full_name.lenght && !user_data->variant_name_1.lenght && !user_data->variant_name_2.lenght)
         {
             u32 name_idx = game->rm.random_u32(filler_name_list_lenght);
             
@@ -1647,18 +1767,19 @@ static inline bool Fill_Empty_Names(Game_State* game, Allocator_Shell* allocator
                 u32 offset = (name_idx + attempt_count) % filler_name_list_lenght;
                 Filler_Name_Data_FI* filler_name = s_filler_name_list_FI + offset;
 
-                for(each(Game_Player_Name_FI*, cmp_name, game->player_names))
-                    if(C_STR_Compare(cmp_name->full_name.buffer, filler_name->full_name))
+                for(each(Player_UD*, cmp_ud, game->player_ud))
+                    if(C_STR_Compare(cmp_ud->full_name.buffer, filler_name->full_name))
                         goto FAIL;
                 
                 
                 // Success!
                 {
-                    Set_String_Text(&name->full_name, filler_name->full_name);
-                    Set_String_Text(&name->variant_name_1, filler_name->variant_name_1);
-                    Set_String_Text(&name->variant_name_2, filler_name->variant_name_2);
+                    Set_String_Text(&user_data->full_name, filler_name->full_name);
+                    Set_String_Text(&user_data->variant_name_1, filler_name->variant_name_1);
+                    Set_String_Text(&user_data->variant_name_2, filler_name->variant_name_2);
                     
-                    name->special_char_override = filler_name->special_char_override;
+                    user_data->special_char_override = filler_name->special_char_override;
+                    user_data->gender = filler_name->gender;
                     
                     success = true;
                 }

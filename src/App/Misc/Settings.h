@@ -1,5 +1,26 @@
 
+
+// ===================================
+// Copyright (c) 2024 by Valtteri Kois
+// All rights reserved.
+// ===================================
+
 #pragma once
+
+
+static constexpr char* s_data_folder_path = "Tiedostot\\";
+static constexpr char* s_campaigns_folder_path = "Tiedostot\\Kampanjat\\";
+static constexpr char* s_campaign_file_extension = ".nalkmp";
+static constexpr char* s_campaign_folder_wildcard_path = "Tiedostot\\Kampanjat\\*.nalkmp";
+
+
+enum class Language : u8
+{
+    english,
+    finnish,
+    COUNT
+};
+
 
 static Font s_font = {
     s_terminus_font_char_width, 

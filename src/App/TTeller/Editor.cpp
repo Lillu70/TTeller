@@ -326,9 +326,12 @@ static void Init_Event_Container_Takes_Name_Ownership(
 }
 
 
-static String Generate_Unique_Name(Editor_Event* events, u32 event_count, Allocator_Shell* allocator)
+static String Generate_Unique_Name(
+    Editor_Event* events, 
+    u32 event_count, 
+    char* def_name, 
+    Allocator_Shell* allocator)
 {
-    char* def_name = "Uusi tapahtuma";
     u32 def_name_len = Null_Terminated_Buffer_Lenght(def_name);
     String unique_name = Create_String(allocator, def_name);
     for(u32 attempt_count = 1; ;++attempt_count)
@@ -445,6 +448,8 @@ static void Update_Editor_Event_Text_Issues(Editor_Event* event)
                         cptr += 1;
                         switch(*cptr)
                         {
+                            case 'g':
+                            case 'G':
                             case 'K':
                             case 'k':
                             {
@@ -459,7 +464,7 @@ static void Update_Editor_Event_Text_Issues(Editor_Event* event)
                                     issues.errors |= Event_Errors::participant_identifier_is_not_a_number;
                                     mode = Mode::seek_space;
                                 }
-                                
+
                             }break;
                             
                             default:

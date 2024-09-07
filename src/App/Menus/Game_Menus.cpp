@@ -113,7 +113,7 @@ static void Do_New_Game_Players()
         
         if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(add_player)))
         {
-            Create_Player_Name_FI(&s_game_state, &s_allocator);
+            Create_Player_User_Data(&s_game_state, &s_allocator);
             *Push(&s_game_state.player_images, &s_allocator) = {};
             
             s_gui.flags |= GUI_Context_Flags::maxout_horizontal_slider;
@@ -165,7 +165,7 @@ static void Do_New_Game_Players()
         
         v2f dim = v2f{w1, title_height};
         
-        b32 live_player_count = s_game_state.player_names->count; 
+        b32 live_player_count = s_game_state.player_images->count; 
         if(live_player_count > 1 && GUI_Do_Button(context, &title_row_pos, &dim, start_game_text))
             s_global_data.active_menu = Menus::GM_let_the_games_begin;
         
@@ -176,7 +176,6 @@ static void Do_New_Game_Players()
         if(!s_game_state.memory)
             return;
         
-        Dynamic_Array<Game_Player_Name_FI>* names = s_game_state.player_names;
         Player_Image* player_images = Begin(s_game_state.player_images);
         
         v2f* pos = &GUI_AUTO_TOP_LEFT;
@@ -189,7 +188,7 @@ static void Do_New_Game_Players()
         v2f player_picture_dim = Hadamar_Product(s_player_picture_dim_base, GUI_DEFAULT_TEXT_SCALE);
         
         u32 i = 0;
-        for(auto n = Begin(names); n < End(names); ++n, ++i)
+        for(each(Player_UD*, user_data, s_game_state.player_ud))
         {
             Assert(i < s_game_state.player_images->count);
             Player_Image* player_image = player_images + i; 
@@ -217,67 +216,85 @@ static void Do_New_Game_Players()
             context->layout.build_direction = GUI_Build_Direction::down_left;
             
             GUI_Do_Text(context, AUTO, L1(name), GUI_Highlight_Next(context));
-            if(GUI_Do_SL_Input_Field(context, AUTO, &player_creation_text_box_width, &n->full_name))
+            if(GUI_Do_SL_Input_Field(context, AUTO, &player_creation_text_box_width, &user_data->full_name))
             {
                 context->selected_index += 1;
-                if(!n->variant_name_1.lenght)
+                if(!user_data->variant_name_1.lenght)
                 {
-                    Reserve_String_Memory(&n->variant_name_1, n->full_name.lenght + 1, false);
-                    Mem_Copy(n->variant_name_1.buffer, n->full_name.buffer, n->full_name.lenght + 1);
-                    n->variant_name_1.lenght = n->full_name.lenght;
+                    Reserve_String_Memory(&user_data->variant_name_1, user_data->full_name.lenght + 1, false);
+                    Mem_Copy(
+                        user_data->variant_name_1.buffer, 
+                        user_data->full_name.buffer, 
+                        user_data->full_name.lenght + 1);
+                    
+                    user_data->variant_name_1.lenght = user_data->full_name.lenght;
                 }
                 
-                if(!n->variant_name_2.lenght)
+                if(!user_data->variant_name_2.lenght)
                 {
-                    Reserve_String_Memory(&n->variant_name_2, n->full_name.lenght + 1, false);
-                    Mem_Copy(n->variant_name_2.buffer, n->full_name.buffer, n->full_name.lenght + 1);
-                    n->variant_name_2.lenght = n->full_name.lenght;
+                    Reserve_String_Memory(&user_data->variant_name_2, user_data->full_name.lenght + 1, false);
+                    Mem_Copy(
+                        user_data->variant_name_2.buffer, 
+                        user_data->full_name.buffer, 
+                        user_data->full_name.lenght + 1);
+                    
+                    user_data->variant_name_2.lenght = user_data->full_name.lenght;
                 }
             }
             
-            GUI_Do_Text(context, AUTO, L1(name_form_1), GUI_Highlight_Next(context));
-            
-            if(GUI_Do_SL_Input_Field(
-                context, 
-                AUTO, 
-                &player_creation_text_box_width, 
-                &n->variant_name_1))
+            if(s_settings.language == Language::finnish)
             {
-                context->selected_index += 1;
+                GUI_Do_Text(context, AUTO, L1(name_form_1), GUI_Highlight_Next(context));
+                
+                if(GUI_Do_SL_Input_Field(
+                    context, 
+                    AUTO, 
+                    &player_creation_text_box_width, 
+                    &user_data->variant_name_1))
+                {
+                    context->selected_index += 1;
+                }
+                
+                GUI_Do_Text(context, AUTO, L1(name_form_2), GUI_Highlight_Next(context));
+                
+                GUI_Do_SL_Input_Field(
+                    context, 
+                    AUTO, 
+                    &player_creation_text_box_width, 
+                    &user_data->variant_name_2);
+            
+                
+                v2f checkbox_dim = v2f{1.f, 1.f} * context->layout.last_element.dim.y;
+                GUI_Do_Checkbox(context, AUTO, &checkbox_dim, &user_data->special_char_override);
+                
+                GUI_Push_Layout(context);
+                
+                context->layout.build_direction = GUI_Build_Direction::right_center;
+                
+                GUI_Do_Text(context, AUTO, L1(umlauts_override), GUI_Highlight_Prev(context));
+                
+                GUI_Pop_Layout(context);
             }
             
-            GUI_Do_Text(context, AUTO, L1(name_form_2), GUI_Highlight_Next(context));
-            
-            GUI_Do_SL_Input_Field(
-                context, 
-                AUTO, 
-                &player_creation_text_box_width, 
-                &n->variant_name_2);
-            
-            
-            v2f checkbox_dim = v2f{1.f, 1.f} * context->layout.last_element.dim.y;
-            GUI_Do_Checkbox(context, AUTO, &checkbox_dim, &n->special_char_override);
-            
-            GUI_Push_Layout(context);
-            
-            context->layout.build_direction = GUI_Build_Direction::right_center;
-            
-            GUI_Do_Text(context, AUTO, L1(umlauts_override), GUI_Highlight_Prev(context));
-            
-            GUI_Pop_Layout(context);
-            
-            v2f test_button_dim = 
-                v2f{player_creation_text_box_width, context->layout.last_element.dim.y};
-            if(GUI_Do_Button(context, AUTO, &test_button_dim, L1(test_forms)))
+            GUI_Do_Text(context, AUTO, L1(gender));
+            if(u32 s = GUI_Do_Dropdown_Button(context, AUTO, &GUI_AUTO_FIT, u32(user_data->gender), LN(genders)))
             {
-                
+                user_data->gender = Gender(s - 1);
             }
             
             if(GUI_Do_Button(context, AUTO, &GUI_AUTO_FIT, L1(choose_image)))
             {
                 char path[260];
                 
-                if(s_platform.Open_Select_File_Dialog(path, Array_Lenght(path)))
+                char* filters[] = {"png", "jpg", "bmp"};
+                
+                if(s_platform.Open_Select_File_Dialog(
+                    path, 
+                    Array_Lenght(path), 
+                    L1(choose_image), 
+                    L1(image), 
+                    filters,
+                    Array_Lenght(filters)))
                 {
                     Image loaded_img;
                     if(Load_Image_Raw(&loaded_img, path, &s_platform))
@@ -331,11 +348,17 @@ static void Do_New_Game_Players()
              
              
             if(defer_del)
-            {                
-                Assert(names->count == s_game_state.player_images->count);
+            {
+                Dynamic_Array<Player_UD>* user_data_array = s_game_state.player_ud;
                 
-                Hollow_Player_Name_FI(n);
-                Remove_Element_From_Packed_Array(Begin(names), &names->count, sizeof(*n), i);
+                Assert(user_data_array->count == s_game_state.player_images->count);
+                
+                Hollow_Player_User_Data(user_data);
+                Remove_Element_From_Packed_Array(
+                    Begin(user_data_array), 
+                    &user_data_array->count, 
+                    sizeof(*user_data), 
+                    i);
                 
                 if(img->buffer)
                     s_allocator.free(img->buffer);
@@ -344,8 +367,11 @@ static void Do_New_Game_Players()
                 u32* img_count = &s_game_state.player_images->count;
                 Remove_Element_From_Packed_Array(player_images, img_count, sizeof(*player_images), i);
              
-                n -= 1;
-                i -= 1;
+                user_data -= 1;
+            }
+            else
+            {
+                i += 1;
             }
         }
         
@@ -491,13 +517,13 @@ static void Do_Let_The_Games_Begin_Frame()
         v2f* p = &GUI_AUTO_TOP_CENTER;
         
         Player_Image* player_images = Begin(s_game_state.player_images);
-        Game_Player_Name_FI* player_names = Begin(s_game_state.player_names);
+        Player_UD* user_data_array = Begin(s_game_state.player_ud);
         
         v2f player_picture_dim = Hadamar_Product(s_player_picture_dim_base, GUI_DEFAULT_TEXT_SCALE);
         
         for(u32 i = 0; i < s_game_state.player_images->count; ++i)
         {
-            char* name = (player_names + i)->full_name.buffer;
+            char* name = (user_data_array + i)->full_name.buffer;
             Image* img = &(player_images + i)->image;
             
             GUI_Do_Text(context, p, name);
@@ -608,14 +634,14 @@ static void Do_Event_Display_Frame()
         for(u32 i = 0; i < active_event->participant_count; ++i)
         {
             u32 player_idx = active_event->player_indices[i];
-            Game_Player_Name_FI* player_name = Begin(s_game_state.player_names) + player_idx;
+            Player_UD* user_data = Begin(s_game_state.player_ud) + player_idx;
             
-            f32 name_lenght = GUI_Character_Width(context) * f32(player_name->full_name.lenght);
+            f32 name_lenght = GUI_Character_Width(context) * f32(user_data->full_name.lenght);
             f32 half_lenght = Max(name_lenght / 2.f, min_half_lenght);
             
             name_pos.x += half_lenght;
             
-            GUI_Do_Text(context, &name_pos, player_name->full_name.buffer);
+            GUI_Do_Text(context, &name_pos, user_data->full_name.buffer);
             
             name_pos.x += half_lenght + padding;            
             
@@ -785,7 +811,7 @@ static void Do_Day_Counter_Display_Frame()
         GUI_Context* sub_context_b = Get_GUI_Context_From_Pool();
         
         Player_Image* images = Begin(s_game_state.player_images);
-        Game_Player_Name_FI* names = Begin(s_game_state.player_names);
+        Player_UD* user_data_array = Begin(s_game_state.player_ud);
 
         context->layout.anchor = GUI_Anchor::top_left;
         context->layout.build_direction = GUI_Build_Direction::down_left;
@@ -805,7 +831,7 @@ static void Do_Day_Counter_Display_Frame()
                 sub_context->layout.anchor = GUI_Anchor::top;
                 sub_context->layout.build_direction = GUI_Build_Direction::down_center;
                 
-                GUI_Do_Title_Text(sub_context, &GUI_AUTO_TOP_CENTER, (names + i)->full_name.buffer);
+                GUI_Do_Title_Text(sub_context, &GUI_AUTO_TOP_CENTER, (user_data_array + i)->full_name.buffer);
                 GUI_Do_Image_Panel(sub_context, AUTO, &player_picture_dim, &((images + i)->image));
                 
                 sub_context->layout.build_direction = GUI_Build_Direction::down_left;
@@ -1022,7 +1048,7 @@ static void Do_All_Players_Are_Dead_Frame()
             return;
         
         Player_Image* images = Begin(s_game_state.player_images);
-        Game_Player_Name_FI* names = Begin(s_game_state.player_names);
+        Player_UD* user_data_array = Begin(s_game_state.player_ud);
         
         context->layout.anchor = GUI_Anchor::top;
         context->layout.build_direction = GUI_Build_Direction::down_center;
@@ -1033,7 +1059,7 @@ static void Do_All_Players_Are_Dead_Frame()
         
         for(u32 i = 0; i < s_game_state.total_player_count; ++i)
         {
-            GUI_Do_Text(context, AUTO, (names + i)->full_name.buffer);
+            GUI_Do_Text(context, AUTO, (user_data_array + i)->full_name.buffer);
             GUI_Do_Image_Panel(context, AUTO, &player_picture_dim, &((images + i)->image));
         }
         
@@ -1084,11 +1110,11 @@ static void Do_We_Have_A_Winner_Frame()
         GUI_Do_Text(context, &GUI_AUTO_TOP_CENTER, L1(winner));
         
         Player_Image* images = Begin(s_game_state.player_images);
-        Game_Player_Name_FI* names = Begin(s_game_state.player_names);
+        Player_UD* user_data_array = Begin(s_game_state.player_ud);
         
         v2f player_picture_dim = Hadamar_Product(s_player_picture_dim_base, GUI_DEFAULT_TEXT_SCALE);
         
-        GUI_Do_Text(context, AUTO, names->full_name.buffer);
+        GUI_Do_Text(context, AUTO, user_data_array->full_name.buffer);
         GUI_Do_Image_Panel(context, AUTO, &player_picture_dim, &images->image);
         
         v2f seperator_dim = v2f{f32(context->canvas->dim.x) - 50, 10};
@@ -1100,7 +1126,7 @@ static void Do_We_Have_A_Winner_Frame()
         
         for(u32 i = 1; i < s_game_state.total_player_count; ++i)
         {
-            GUI_Do_Text(context, AUTO, (names + i)->full_name.buffer);
+            GUI_Do_Text(context, AUTO, (user_data_array + i)->full_name.buffer);
             GUI_Do_Image_Panel(context, AUTO, &player_picture_dim, &((images + i)->image));
         }
         
