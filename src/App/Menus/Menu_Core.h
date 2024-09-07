@@ -355,7 +355,7 @@ static inline void Gather_Editor_Format_Campaigns()
     u32 exe_path_lenght = s_platform.Get_Executable_Path(exe_path, Array_Lenght(exe_path));
     
     String campaign_directory 
-        = Create_String(&s_allocator, exe_path, campaign_folder_wildcard_path);
+        = Create_String(&s_allocator, exe_path, s_campaign_folder_wildcard_path);
     
     s_global_data.on_disk_campaign_names = s_platform.Search_Directory_For_Maching_Names(
         campaign_directory.buffer, 

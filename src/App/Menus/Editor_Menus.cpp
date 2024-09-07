@@ -1365,7 +1365,7 @@ static void Do_Event_Editor_Campaigns_Menu_Frame()
         context->layout.build_direction = GUI_Build_Direction::right_center;
         
         context->flags |= GUI_Context_Flags::one_time_skip_padding;
-        GUI_Do_Text(context, AUTO, campaign_folder_wildcard_path, {}, GUI_Scale_Default(s));
+        GUI_Do_Text(context, AUTO, s_campaign_folder_wildcard_path, {}, GUI_Scale_Default(s));
         
         context->flags |= GUI_Context_Flags::one_time_skip_padding;
         GUI_Do_Text(context, AUTO, L1(where_wildcard_is_campaing_name), {}, GUI_Scale_Default(s));
@@ -1487,12 +1487,12 @@ static void Do_Event_Editor_Quit_Popup(GUI_Context* context)
     if(GUI_Do_Button(context, AUTO, &button_dim, t2))
     {
         Serialize_Campaign(&s_editor_state.event_container, &s_platform);
-        s_platform.Set_Flag(App_Flags::is_running, false);
+        s_global_data.active_menu = Menus::quit_app;
     }
     
     if(GUI_Do_Button(context, AUTO, &button_dim, t3))
     {
-        s_platform.Set_Flag(App_Flags::is_running, false);
+        s_global_data.active_menu = Menus::quit_app;
     }
 }
 

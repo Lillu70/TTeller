@@ -46,6 +46,7 @@ static Settings s_settings = {};
 
 struct Settings_Save_Format
 {
+    static constexpr char* file_name = "SETTINGS";
     static constexpr u32 identity = PCG_Hash(1969);
     
     u32 identifier;
@@ -146,14 +147,15 @@ static void Set_Settings_To_Default(bool restore_language = false)
 }
 
 
-static inline bool Try_Save_Settings()
+static inline bool Save_Settings()
 {
     bool result = false;
     
     char exe_path[255];
     if(s_platform.Get_Executable_Path(exe_path, Array_Lenght(exe_path)))
     {
-        String settings_path = Create_String(&s_allocator, exe_path, data_folder_path, "SETTINGS");
+        char* t = Settings_Save_Format::file_name;
+        String settings_path = Create_String(&s_allocator, exe_path, s_data_folder_path, t);
         
         Settings_Save_Format payload = {};
         payload.identifier = payload.identity;
@@ -178,7 +180,8 @@ static inline bool Try_Load_Settings()
     char exe_path[255];
     if(s_platform.Get_Executable_Path(exe_path, Array_Lenght(exe_path)))
     {
-        String settings_path = Create_String(&s_allocator, exe_path, data_folder_path, "SETTINGS");
+        char* t = Settings_Save_Format::file_name;
+        String settings_path = Create_String(&s_allocator, exe_path, s_data_folder_path, t);
         
         u32 file_size;
         if(s_platform.Get_File_Size(settings_path.buffer, &file_size))

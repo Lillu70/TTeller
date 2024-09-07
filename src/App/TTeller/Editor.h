@@ -7,10 +7,10 @@
 
 #pragma once
 
-static constexpr char* data_folder_path = "Tiedostot\\";
-static constexpr char* campaigns_folder_path = "Tiedostot\\Kampanjat\\";
-static constexpr char* campaign_file_extension = ".nalkmp";
-static constexpr char* campaign_folder_wildcard_path = "Tiedostot\\Kampanjat\\*.nalkmp";
+static constexpr char* s_data_folder_path = "Tiedostot\\";
+static constexpr char* s_campaigns_folder_path = "Tiedostot\\Kampanjat\\";
+static constexpr char* s_campaign_file_extension = ".nalkmp";
+static constexpr char* s_campaign_folder_wildcard_path = "Tiedostot\\Kampanjat\\*.nalkmp";
 
 static constexpr i8 STAT_MINIMUM = 0;
 static constexpr i8 STAT_MAXIMUM = 3;
@@ -170,9 +170,9 @@ struct Event_Consequens
 struct Participent
 {
     static constexpr u32 max_requirements = 20;
-    Dynamic_Array<Participation_Requirement>* reqs;
-    
     static constexpr u32 max_consequenses = 20;
+    
+    Dynamic_Array<Participation_Requirement>* reqs;
     Dynamic_Array<Event_Consequens>* cons;
 };
 

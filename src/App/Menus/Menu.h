@@ -32,5 +32,7 @@ enum class Menus : u32
         GM_night_falls,
         GM_everyone_is_dead,
         GM_we_have_a_winner,
-    GAME_MODE_END
+    GAME_MODE_END,
+    
+    quit_app
 };

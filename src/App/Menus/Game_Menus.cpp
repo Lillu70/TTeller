@@ -382,7 +382,7 @@ static void Do_Select_Campagin_To_Play_Frame()
         context->layout.build_direction = GUI_Build_Direction::right_center;
         
         context->flags |= GUI_Context_Flags::one_time_skip_padding;
-        GUI_Do_Text(context, AUTO, campaign_folder_wildcard_path, {}, GUI_Scale_Default(.5f));
+        GUI_Do_Text(context, AUTO, s_campaign_folder_wildcard_path, {}, GUI_Scale_Default(.5f));
         
         context->flags |= GUI_Context_Flags::one_time_skip_padding;
         GUI_Do_Text(context, AUTO, L1(where_wildcard_is_campaing_name), {}, GUI_Scale_Default(.5f));
@@ -696,7 +696,7 @@ static void Do_Day_Counter_Display_Frame()
                 case 0: // Quit
                 {
                     Delete_Game(&s_game_state, &s_allocator);
-                    s_global_data.active_menu = Menus::main_menu;
+                    s_global_data.active_menu = Menus::select_campaign_to_play_menu;
                     return;
                 }break;
                 

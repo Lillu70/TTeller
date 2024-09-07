@@ -20,12 +20,12 @@ static inline Editor_Event* Active_Event(Editor_State* editor)
 
 static inline void Generate_Folder_Hierarchy(Platform_Calltable* platform)
 {
-    if(!platform->Create_Directory(data_folder_path))
+    if(!platform->Create_Directory(s_data_folder_path))
     {
         Terminate;
     }
     
-    if(!platform->Create_Directory(campaigns_folder_path))
+    if(!platform->Create_Directory(s_campaigns_folder_path))
     {
         Terminate;
     }
@@ -393,9 +393,9 @@ static String Create_Campaign_Full_Path(
         &result, 
         allocator,
         exe_path,
-        campaigns_folder_path, 
+        s_campaigns_folder_path, 
         source_name->buffer,
-        campaign_file_extension);
+        s_campaign_file_extension);
     
     return result;
 }

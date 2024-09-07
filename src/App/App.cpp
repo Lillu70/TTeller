@@ -191,6 +191,11 @@ void Update_App()
             Do_Choose_Language_Frame();
         }break;
         
+        case Menus::quit_app:
+        {
+            s_platform.Set_Flag(App_Flags::is_running, false);
+        }break;
+        
         default:
         {
             Terminate;
@@ -275,6 +280,12 @@ void Update_App()
             {
                 Clear_Editor_Format_Campaigns();
             }break;
+            
+            case Menus::choose_language:
+            case Menus::settings_menu:
+            {
+                Save_Settings();
+            }break;
         }
         
         // Handle entering a menu.
@@ -334,11 +345,6 @@ void Update_App()
     s_scrach_buffer.clear();
     
     s_global_data.pooled_contexes_in_use_count = 0;
-    
-    if(!Is_Flag_Set(s_platform.Get_Flags(), (u32)App_Flags::is_running))
-    {
-        Try_Save_Settings();
-    }
-    
+
     End_Timing_Block(internal_run_time);
 }
