@@ -35,6 +35,7 @@ constexpr u32 X_AXIS = 0;
 constexpr u32 Y_AXIS = 1;
 
 // TODO: Define all mins (for signed types) and maxes.
+constexpr f32 F32_MIN = 1.175494351e-38F;
 constexpr f32 F32_MAX = 3.402823466e+38F;
 constexpr f64 F64_MAX = 1.7976931348623157E+308;
 constexpr u64 U64_MAX = 0xFFFFFFFFFFFFFFFF;

@@ -230,21 +230,22 @@ namespace GUI_Context_Flags
 {
     enum : u32
     {
-        soft_ignore_selection           = 1 << 0, // Makes it so that nothing is selected, but mouse selection is still possible to exit this state.
-        enable_dynamic_sliders          = 1 << 1,
-        cursor_mask_validation          = 1 << 2,
-        cursor_mask_enabled             = 1 << 3,
-        disable_wrapping                = 1 << 4,
-        one_time_disable_kc_navigation  = 1 << 5,
-        disable_mouse_scroll            = 1 << 6,
-        context_ready                   = 1 << 7,
-        maxout_vertical_slider          = 1 << 8,
-        maxout_horizontal_slider        = 1 << 9,
-        hard_ignore_selection           = 1 << 10, // Makes it so that nothing is selected and to leave this state this flag has to manually set to 0.
-        one_time_skip_padding           = 1 << 11,
-        dont_auto_activate              = 1 << 12,
-        one_time_ignore_id              = 1 << 13, // CONSIDER: This is really hacky, but do we event need ids?
-        one_time_taking_control_of_external_input = 1 << 14,
+        soft_ignore_selection                           = 1 << 0, // Makes it so that nothing is selected, but mouse selection is still possible to exit this state.
+        enable_dynamic_sliders                          = 1 << 1,
+        cursor_mask_validation                          = 1 << 2,
+        cursor_mask_enabled                             = 1 << 3,
+        disable_wrapping                                = 1 << 4,
+        one_time_disable_kc_navigation                  = 1 << 5,
+        disable_mouse_scroll                            = 1 << 6,
+        context_ready                                   = 1 << 7,
+        maxout_vertical_slider                          = 1 << 8,
+        maxout_horizontal_slider                        = 1 << 9,
+        hard_ignore_selection                           = 1 << 10, // Makes it so that nothing is selected and to leave this state this flag has to manually set to 0.
+        one_time_skip_padding                           = 1 << 11,
+        dont_auto_activate                              = 1 << 12,
+        one_time_ignore_id                              = 1 << 13, // CONSIDER: This is really hacky, but do we event need ids?
+        one_time_taking_control_of_external_input       = 1 << 14,
+        enable_auto_layout_bounds_collision_offseting   = 1 << 15,
     }; // max shift is 31
 }
 

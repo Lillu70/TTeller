@@ -327,6 +327,7 @@ static inline void Init_GUI()
     
     s_gui_pop_up.flags |= GUI_Context_Flags::enable_dynamic_sliders;
     s_gui_banner.flags |= GUI_Context_Flags::enable_dynamic_sliders;
+    s_gui_banner.flags |= GUI_Context_Flags::enable_auto_layout_bounds_collision_offseting;
     s_gui.flags |= GUI_Context_Flags::enable_dynamic_sliders;
     
     GUI_Set_Default_Menu_Actions();

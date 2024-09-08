@@ -482,81 +482,84 @@ static inline GUI_Placement GUI_Get_Placement(
         }
         
         result.pos = layout->last_element.pos + offset;
+        
+        result.rect = Create_Rect_Center_HZ(result.pos, result.dim);
     }
     else
     {
         GUI_Anchor anchor = layout->anchor;
         
-        v2f p;
-        // TODO: Figure out if this should be -1
-        v2f canvas_size = context->canvas_space_dim.As<f32>() - 0.f;
+        v2f p = {};
+        v2f canvas_size = context->canvas_space_dim.As<f32>();
+        
+        enum class Offset_Dir
+        {
+            none,
+            left,
+            right,
+            up,
+            down,
+        };
+        Offset_Dir collision_offset = Offset_Dir::none;
+        
         if(pos == &GUI_AUTO_TOP_CENTER)
         {
             pos = &p;
-            
-            // anchor = GUI_Anchor::top;
             p = {canvas_size.x / 2, canvas_size.y - padding};
+            collision_offset = Offset_Dir::up;
         }
         else if(pos == &GUI_AUTO_TOP_RIGHT)
         {
             pos = &p;
-            
-            // anchor = GUI_Anchor::top_right;
             p = v2f{canvas_size.x - padding, canvas_size.y - padding};
+            collision_offset = Offset_Dir::right;
         }
         else if(pos == &GUI_AUTO_TOP_LEFT)
         {
             pos = &p;
-            
-            // anchor = GUI_Anchor::top_left;
             p = {padding, canvas_size.y - padding};
+            collision_offset = Offset_Dir::left;
         }
         else if(pos == &GUI_AUTO_MIDDLE_RIGHT)
         {
             pos = &p;
             
-            // anchor = GUI_Anchor::right;
             p = {canvas_size.x - padding, canvas_size.y / 2};
+            collision_offset = Offset_Dir::right;
         }
         else if(pos == &GUI_AUTO_MIDDLE_LEFT)
         {
             pos = &p;
-            
-            // anchor = GUI_Anchor::left;
             p = {padding, canvas_size.y / 2};
+            collision_offset = Offset_Dir::left;
         }
         else if(pos == &GUI_AUTO_BOTTOM_CENTER)
         {
             pos = &p;
-            
-            // anchor = GUI_Anchor::bottom;
             p = {canvas_size.x / 2, padding};
+            collision_offset = Offset_Dir::down;
         }
         else if(pos == &GUI_AUTO_BOTTOM_RIGHT)
         {
             pos = &p;
-            
-            // anchor = GUI_Anchor::bottom_right;
             p = {canvas_size.x - padding, padding};
+            collision_offset = Offset_Dir::right;
         }
         else if(pos == &GUI_AUTO_BOTTOM_LEFT)
         {
             pos = &p;
-            
-            // anchor = GUI_Anchor::bottom_left;
             p = {padding, padding};
+            collision_offset = Offset_Dir::left;
         }
         else if(pos == &GUI_AUTO_MIDDLE)
         {
             pos = &p;
-            
-            // anchor = GUI_Anchor::center;
             p = canvas_size / 2;
         }
         
-        v2f half_dim = result.dim / 2;
         result.pos = context->anchor_base + *pos;
         
+        v2f half_dim = result.dim / 2;
         switch(anchor)
         {
             case GUI_Anchor::top:
@@ -603,9 +606,47 @@ static inline GUI_Placement GUI_Get_Placement(
                 result.pos.x -= half_dim.x;
             }break;
         }
+        
+        result.rect = Create_Rect_Center_HZ(result.pos, result.dim);
+
+        if(context->flags & GUI_Context_Flags::enable_auto_layout_bounds_collision_offseting &&
+            collision_offset != Offset_Dir::none &&
+            Is_Rect_Valid(context->bounds_rel_anchor_base))
+        {
+            Rect padded_rect = Expand_Rect(result.rect, GUI_Padding(context));
+            if(Rects_Overlap(padded_rect, context->bounds_rel_anchor_base))
+            {
+                Rect* a = &padded_rect;
+                Rect* b = &context->bounds_rel_anchor_base;
+                
+                switch(collision_offset)
+                {
+                    case Offset_Dir::up:
+                    {
+                        result.pos.y += b->max.y - a->min.y;
+                    }break;
+                    
+                    case Offset_Dir::down:
+                    {
+                        result.pos.y -= a->max.y - b->min.y;
+                    }break;
+                    
+                    case Offset_Dir::left:
+                    {
+                        result.pos.x -= a->max.x - b->min.x;
+                    }break;
+                    
+                    case Offset_Dir::right:
+                    {
+                        result.pos.x += b->max.x - a->min.x;
+                    }break;
+                }
+                
+                result.rect = Create_Rect_Center_HZ(result.pos, result.dim);
+            }
+        }
     }
     
-    result.rect = Create_Rect_Center_HZ(result.pos, result.dim);
     if(allow_rect_to_be_invalid || Is_Rect_Valid(result.rect))
     {
         layout->last_element.pos = result.pos;
@@ -614,8 +655,6 @@ static inline GUI_Placement GUI_Get_Placement(
         
         GUI_Update_Bounds(context, result.rect);
     }
-    
-    // CONSIDER: BIG CONSIDER!!! Fuck with the true values or leave as is?
     
     result.pos += context->rendering_offset;
     result.rect.min += context->rendering_offset;
@@ -665,7 +704,8 @@ static inline void GUI_Reset_Context(GUI_Context* context)
     // Make sure context is not reset between begin and end.
     Assert(!GUI_Is_Context_Ready(context));
     
-    u32 retained_flags = context->flags & GUI_Context_Flags::enable_dynamic_sliders;
+    u32 retained_flags = context->flags & GUI_Context_Flags::enable_dynamic_sliders | 
+        context->flags & GUI_Context_Flags::enable_auto_layout_bounds_collision_offseting;
     f32 dynamic_slider_girth = context->dynamic_slider_girth;
     u32 id = context->_context_id;
     *context = GUI_Context();
@@ -773,7 +813,7 @@ static void GUI_Begin_Context(
     context->layout_stack_count = 0;
     context->selected_element_dim = {};
     context->selected_element_pos = {};
-    context->bounds_rel_anchor_base = { {F32_MAX, F32_MAX}, {-F32_MAX, -F32_MAX} };
+    context->bounds_rel_anchor_base = { {F32_MAX, F32_MAX}, {F32_MIN, F32_MIN} };
     
     context->canvas_space_dim = context->canvas->dim;
     context->canvas_rect = Create_Rect_Min_Dim(v2f{0}, v2u::Cast<f32>(context->canvas->dim));
@@ -1047,25 +1087,20 @@ static inline void GUI_End_Context(GUI_Context* context)
                     bounds.min.y = bounds_recovery.min.y;
                     {
                         if(bounds.min.y >= canvas_bottom)
-                            bounds.min.y = canvas_bottom;
-                        else
                         {
-                            //if(bounds.min.y > 0)
-                            //    bounds.min.y = 0;
-                            
+                            bounds.min.y = canvas_bottom;
+                        }
+                        else
+                        {   
                             bounds.min.y -= padding;
                         }
                         
                         if(bounds.max.y < canvas_bottom_and_height)
+                        {
                             bounds.max.y = canvas_bottom_and_height;
-                        
+                        }
                         else
                         {
-                            //bounds.max.y += padding;
-                            
-                            // TODO: This was changed from canvas_height without real understanding
-                            // of what the meaning is. Look into this!
-                            
                             y_factor = bounds.max.y - canvas_bottom_and_height;
                         }
                     }
@@ -1129,17 +1164,25 @@ static inline void GUI_End_Context(GUI_Context* context)
                     f32 slider_max = (gui_height / canvas_height) - 1;
                     v2f slider_dim = {slider_girth, canvas_height};
                     f32 slider_value = (anchor_base.y + y_factor) / canvas_height;
-                    
-                    context->flags |= GUI_Context_Flags::one_time_skip_padding;
-                    
-                    GUI_Do_Handle_Slider(
-                        context, 
-                        &GUI_AUTO_TOP_RIGHT, 
-                        &slider_dim, 
-                        &slider_value,
-                        slider_max, 
-                        0,
-                        GUI_Cardinal_Direction::up_down);
+
+                    {
+                        u32 auto_layout_bounds_collision_offseting_flag = 
+                            context->flags & GUI_Context_Flags::enable_auto_layout_bounds_collision_offseting;
+                        
+                        Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::enable_auto_layout_bounds_collision_offseting);
+                        
+                        context->flags |= GUI_Context_Flags::one_time_skip_padding;
+                        GUI_Do_Handle_Slider(
+                            context, 
+                            &GUI_AUTO_TOP_RIGHT, 
+                            &slider_dim, 
+                            &slider_value,
+                            slider_max, 
+                            0,
+                            GUI_Cardinal_Direction::up_down);
+                        
+                        context->flags |= auto_layout_bounds_collision_offseting_flag;
+                    }
                     
                     f32 local_scroll_v = (!shift_down)? mouse_scroll : 0;
                     f32 scroll_delta = local_scroll_v / canvas_height * context->mouse_scroll_speed;
@@ -1200,15 +1243,24 @@ static inline void GUI_End_Context(GUI_Context* context)
                     v2f slider_dim = {canvas_width, slider_girth};
                     f32 slider_value = (-(anchor_base.x - x_factor)) / canvas_width;
                     
-                    context->flags |= GUI_Context_Flags::one_time_skip_padding;
-                    GUI_Do_Handle_Slider(
-                        context, 
-                        &GUI_AUTO_BOTTOM_LEFT, 
-                        &slider_dim, 
-                        &slider_value,
-                        slider_max, 
-                        0,
-                        GUI_Cardinal_Direction::left_right);
+                    {
+                        u32 auto_layout_bounds_collision_offseting_flag = 
+                            context->flags & GUI_Context_Flags::enable_auto_layout_bounds_collision_offseting;
+                        
+                        Inverse_Bit_Mask(&context->flags, GUI_Context_Flags::enable_auto_layout_bounds_collision_offseting);
+                        
+                        context->flags |= GUI_Context_Flags::one_time_skip_padding;
+                        GUI_Do_Handle_Slider(
+                            context, 
+                            &GUI_AUTO_BOTTOM_LEFT, 
+                            &slider_dim, 
+                            &slider_value,
+                            slider_max, 
+                            0,
+                            GUI_Cardinal_Direction::left_right);
+                            
+                        context->flags |= auto_layout_bounds_collision_offseting_flag;
+                    }
                     
                     f32 local_scroll_v = (shift_down)? mouse_scroll : 0;
                     f32 scroll_delta = local_scroll_v / canvas_width * context->mouse_scroll_speed;
