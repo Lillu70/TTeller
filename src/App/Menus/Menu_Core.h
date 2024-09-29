@@ -299,20 +299,20 @@ static inline void Init_GUI()
 {
     // globals:
     Action* htkeys = s_hotkeys;
-    htkeys[Global_Hotkeys::toggle_fullscreen]           = Make_Action(Key_Code::F11, Button::START);
-    htkeys[Global_Hotkeys::open_quit_popup]             = Make_Action(Key_Code::ESC, Button::BUT_Y);
-    htkeys[Global_Hotkeys::display_memory]              = Make_Action(Key_Code::F8, Button::NONE);
-    htkeys[Global_Hotkeys::toggle_language]             = Make_Action(Key_Code::F9, Button::NONE);
+    htkeys[Global_Hotkeys::toggle_fullscreen]   = Make_Action(Key_Code::F11, Button::START);
+    htkeys[Global_Hotkeys::open_quit_popup]     = Make_Action(Key_Code::ESC, Button::BUT_Y);
+    htkeys[Global_Hotkeys::display_memory]      = Make_Action(Key_Code::F8, Button::NONE);
+    htkeys[Global_Hotkeys::toggle_language]     = Make_Action(Key_Code::F9, Button::NONE);
     
     // editor:
-    htkeys[Editor_Hotkeys::active_pannel_toggle]        = Make_Action(Key_Code::TAB, Button::BUT_X);
-    htkeys[Editor_Hotkeys::jump_to_all_events]          = Make_Action(Key_Code::F1,  Button::NONE);
-    htkeys[Editor_Hotkeys::jump_to_participants]        = Make_Action(Key_Code::F2,  Button::NONE);
-    htkeys[Editor_Hotkeys::jump_to_event_text]          = Make_Action(Key_Code::F3,  Button::NONE);
-    htkeys[Editor_Hotkeys::jump_to_consequences]        = Make_Action(Key_Code::F4,  Button::NONE);
-    htkeys[Editor_Hotkeys::save]                        = Make_Action(Key_Code::F5,  Button::L_THUMB);
-    htkeys[Editor_Hotkeys::jump_left]                   = Make_Action(Key_Code::F6,  Button::L_SHLD);
-    htkeys[Editor_Hotkeys::jump_right]                  = Make_Action(Key_Code::F7,  Button::R_SHLD);
+    htkeys[Editor_Hotkeys::active_pannel_toggle]    = Make_Action(Key_Code::TAB, Button::BUT_X);
+    htkeys[Editor_Hotkeys::jump_to_all_events]      = Make_Action(Key_Code::F1,  Button::NONE);
+    htkeys[Editor_Hotkeys::jump_to_participants]    = Make_Action(Key_Code::F2,  Button::NONE);
+    htkeys[Editor_Hotkeys::jump_to_event_text]      = Make_Action(Key_Code::F3,  Button::NONE);
+    htkeys[Editor_Hotkeys::jump_to_consequences]    = Make_Action(Key_Code::F4,  Button::NONE);
+    htkeys[Editor_Hotkeys::save]                    = Make_Action(Key_Code::F5,  Button::L_THUMB);
+    htkeys[Editor_Hotkeys::jump_left]               = Make_Action(Key_Code::F6,  Button::L_SHLD);
+    htkeys[Editor_Hotkeys::jump_right]              = Make_Action(Key_Code::F7,  Button::R_SHLD);
     // ------------
     
     GUI_Context::platform = &s_platform;

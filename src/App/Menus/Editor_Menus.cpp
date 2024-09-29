@@ -745,7 +745,6 @@ static void Do_Event_Editor_Participants_Frame()
                         context->layout.build_direction = GUI_Build_Direction::right_center;
                         
                         // Numerical_Relation
-                        constexpr char* value_option_names[] = {"0", "1", "2", "3"};
                         if(u32 s = GUI_Do_Dropdown_Button(
                             context, 
                             AUTO, 
@@ -758,6 +757,7 @@ static void Do_Event_Editor_Participants_Frame()
                         }
                         
                         // Target value
+                        static constexpr char* value_option_names[] = {"0", "1", "2", "3"};
                         if(u32 s = GUI_Do_Dropdown_Button(
                             context, 
                             AUTO, 
@@ -1227,7 +1227,7 @@ static void Do_Event_Editor_Consequences_Frame()
                                 con->stat_change_amount *= -1;
                         }
                         
-                        constexpr char* num_options[] = {"1", "2", "3"};
+                        static constexpr char* num_options[] = {"1", "2", "3"};
                         u32 abs_stat_amount = Abs(con->stat_change_amount) - 1;
                         
                         Assert(abs_stat_amount < Array_Lenght(num_options));

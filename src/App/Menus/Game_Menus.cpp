@@ -277,7 +277,12 @@ static void Do_New_Game_Players()
             }
             
             GUI_Do_Text(context, AUTO, L1(gender));
-            if(u32 s = GUI_Do_Dropdown_Button(context, AUTO, &GUI_AUTO_FIT, u32(user_data->gender), LN(genders)))
+            if(u32 s = GUI_Do_Dropdown_Button(
+                context, 
+                AUTO, 
+                &GUI_AUTO_FIT, 
+                u32(user_data->gender), 
+                LN(genders)))
             {
                 user_data->gender = Gender(s - 1);
             }
@@ -707,7 +712,6 @@ static void Do_Day_Counter_Display_Frame()
         }
         
         context->layout.anchor = GUI_Anchor::top_right;
-        
         
         
         if(u32 s = GUI_Do_Dropdown_Button(

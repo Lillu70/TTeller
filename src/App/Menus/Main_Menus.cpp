@@ -314,7 +314,18 @@ static void Do_Settings_Menu_Frame()
         v2f check_box_dim = v2f{} + GUI_Character_Height(context);
         if(s_settings.text_scale == Text_Scale::custom)
         {            
-            GUI_Do_Checkbox(context, AUTO, &check_box_dim, &s_settings.allow_non_uniform_text_scale);
+            if(GUI_Do_Checkbox(
+                context, 
+                AUTO, 
+                &check_box_dim, 
+                &s_settings.allow_non_uniform_text_scale))
+            {
+                if(!s_settings.allow_non_uniform_text_scale)
+                {
+                    GUI_DEFAULT_TEXT_SCALE.y = GUI_DEFAULT_TEXT_SCALE.x;
+                }
+            }
+            
             v2f slider_dim = v2f{300, context->layout.last_element.dim.y};
             
             GUI_Push_Layout(context);
